@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet:*)",
+      "mcp__context7__resolve-library-id",
+      "Bash(find:*)",
+      "Bash(for file in *:*)",
+      "Bash(do sed:*)",
+      "Bash(done)",
+      "Bash(xargs:*)",
+      "Bash(awk:*)",
+      "Bash(findstr:*)",
+      "Bash(dir:*)",
+      "Bash(Select-String -Pattern \"\\(error|succeeded|failed\\)\")",
+      "Bash(Select-Object:*)",
+      "Bash(del:*)",
+      "Bash(git add:*)",
+      "Bash(git reset:*)"
+    ]
+  },
+  "enabledPlugins": {
+    "csharp-lsp@claude-plugins-official": true
+  }
+}

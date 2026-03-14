@@ -1,0 +1,315 @@
+@model PedagangPulsa.Web.Areas.Admin.ViewModels.UserDetailViewModel
+
+@{
+    ViewData["Title"] = "User Details";
+    Layout = "_AdminLayout";
+    var userId = Model.Id;
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">User Details</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a asp-action="Index" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to List
+        </a>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="row">
+    <!-- User Info Card -->
+    <div class="col-lg-4 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0"><i class="bi bi-person-circle"></i> Profile</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-5 text-muted">Username</dt>
+                    <dd class="col-sm-7">@Model.Username</dd>
+
+                    <dt class="col-sm-5 text-muted">Full Name</dt>
+                    <dd class="col-sm-7">@Model.FullName ?? "-"</dd>
+
+                    <dt class="col-sm-5 text-muted">Email</dt>
+                    <dd class="col-sm-7">@Model.Email ?? "-"</dd>
+
+                    <dt class="col-sm-5 text-muted">Phone</dt>
+                    <dd class="col-sm-7">@Model.Phone ?? "-"</dd>
+
+                    <dt class="col-sm-5 text-muted">Level</dt>
+                    <dd class="col-sm-7">
+                        <span class="badge bg-primary">@Model.Level</span>
+                    </dd>
+
+                    <dt class="col-sm-5 text-muted">Status</dt>
+                    <dd class="col-sm-7">
+                        @{
+                            var statusClass = Model.Status switch
+                            {
+                                "Active" => "bg-success",
+                                "Suspended" => "bg-danger",
+                                "Inactive" => "bg-warning",
+                                _ => "bg-secondary"
+                            };
+                        }
+                        <span class="badge @statusClass">@Model.Status</span>
+                    </dd>
+
+                    <dt class="col-sm-5 text-muted">Referral Code</dt>
+                    <dd class="col-sm-7">
+                        <code>@Model.ReferralCode</code>
+                    </dd>
+
+                    <dt class="col-sm-5 text-muted">Referred By</dt>
+                    <dd class="col-sm-7">@Model.ReferredBy ?? "-"</dd>
+
+                    <dt class="col-sm-5 text-muted">Registered</dt>
+                    <dd class="col-sm-7">@Model.CreatedAt</dd>
+                </dl>
+            </div>
+            <div class="card-footer">
+                <div class="d-grid gap-2">
+                    @if (User.IsInRole("SuperAdmin") || User.IsInRole("Admin"))
+                    {
+                        <a asp-action="EditLevel" asp-route-id="@Model.Id" class="btn btn-outline-primary">
+                            <i class="bi bi-gear"></i> Edit Level
+                        </a>
+                    }
+                    @if (User.IsInRole("SuperAdmin"))
+                    {
+                        <a asp-action="Suspend" asp-route-id="@Model.Id" class="btn btn-outline-warning">
+                            <i class="bi bi-lock"></i> @(Model.Status == "Suspended" ? "Unsuspend" : "Suspend")
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="col-lg-8">
+        <ul class="nav nav-tabs" id="userTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="balance-tab" data-bs-toggle="tab" data-bs-target="#balance" type="button">
+                    <i class="bi bi-wallet2"></i> Balance
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="transactions-tab" data-bs-toggle="tab" data-bs-target="#transactions" type="button">
+                    <i class="bi bi-receipt"></i> Transactions
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="referral-tab" data-bs-toggle="tab" data-bs-target="#referral" type="button">
+                    <i class="bi bi-share"></i> Referral
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content mt-3" id="userTabsContent">
+            <!-- Balance Tab -->
+            <div class="tab-pane fade show active" id="balance" role="tabpanel">
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <div class="card shadow-sm">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-1">Active Balance</h6>
+                                <h4 class="mb-0 text-success">Rp Model.ActiveBalance.ToString("N0")</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card shadow-sm">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-1">Held Balance</h6>
+                                <h4 class="mb-0 text-warning">Rp Model.HeldBalance.ToString("N0")</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="card shadow-sm">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-1">Total Balance</h6>
+                                <h3 class="mb-0 text-primary">Rp Model.TotalBalance.ToString("N0")</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Balance Mutations -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h6 class="card-title mb-0">Recent Balance Mutations</h6>
+                    </div>
+                    <div class="card-body">
+                        @if (Model.RecentTransactions.Any())
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Type</th>
+                                            <th>Amount</th>
+                                            <th>Before</th>
+                                            <th>After</th>
+                                            <th>Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var tx in Model.RecentTransactions.Take(10))
+                                        {
+                                            <tr>
+                                                <td>@tx.CreatedAt.ToString("dd MMM yyyy HH:mm")</td>
+                                                <td>@tx.Type</td>
+                                                <td class="@GetTxAmountClass(tx.Type)">Rp tx.Amount.ToString("N0")</td>
+                                                <td>Rp tx.ActiveBefore.ToString("N0")</td>
+                                                <td>Rp tx.ActiveAfter.ToString("N0")</td>
+                                                <td class="text-muted small">@tx.Notes ?? "-"</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-muted mb-0">No recent transactions found.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transactions Tab -->
+            <div class="tab-pane fade" id="transactions" role="tabpanel">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped" id="userTransactionsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Product</th>
+                                        <th>Destination</th>
+                                        <th>Amount</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="userTransactionsBody">
+                                    <tr>
+                                        <td colspan="6" class="text-center">Loading transactions...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Referral Tab (Placeholder) -->
+            <div class="tab-pane fade" id="referral" role="tabpanel">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    Referral information will be available in Sprint 4.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Load user transactions when tab is shown
+            $('button[data-bs-target="#transactions"]').on('shown.bs.tab', function() {
+                loadUserTransactions();
+            });
+
+            function loadUserTransactions() {
+                const userId = '@userId';
+                const tableBody = $('#userTransactionsBody');
+
+                $.ajax({
+                    url: '/Admin/Transaction/GetData',
+                    type: 'POST',
+                    data: {
+                        draw: 1,
+                        start: 0,
+                        length: 10,
+                        userId: userId
+                    },
+                    success: function(response) {
+                        if (response.data && response.data.length > 0) {
+                            tableBody.empty();
+                            response.data.forEach(function(tx) {
+                                const statusClass = getStatusClass(tx.status);
+                                const statusIcon = getStatusIcon(tx.status);
+                                const row = `
+                                    <tr>
+                                        <td>${tx.createdAt}</td>
+                                        <td>${tx.productName}</td>
+                                        <td><code>${tx.destinationNumber}</code></td>
+                                        <td>${ 'Rp '.+toLocaleString('id-ID')}</td>
+                                        <td><span class="badge ${statusClass}">${statusIcon} ${tx.status}</span></td>
+                                        <td>
+                                            <a href="/Admin/Transaction/Details/${tx.id}" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                `;
+                                tableBody.append(row);
+                            });
+                        } else {
+                            tableBody.html('<tr><td colspan="6" class="text-center">No transactions found for this user.</td></tr>');
+                        }
+                    },
+                    error: function() {
+                        tableBody.html('<tr><td colspan="6" class="text-center text-danger">Failed to load transactions.</td></tr>');
+                    }
+                });
+            }
+
+            function getStatusClass(status) {
+                switch(status.toLowerCase()) {
+                    case 'success': return 'bg-success';
+                    case 'failed': return 'bg-danger';
+                    case 'pending':
+                    case 'processing': return 'bg-warning';
+                    default: return 'bg-secondary';
+                }
+            }
+
+            function getStatusIcon(status) {
+                switch(status.toLowerCase()) {
+                    case 'success': return '<i class="bi bi-check-circle"></i>';
+                    case 'failed': return '<i class="bi bi-x-circle"></i>';
+                    case 'pending':
+                    case 'processing': return '<i class="bi bi-clock"></i>';
+                    default: return '';
+                }
+            }
+        });
+
+        function  'Rp '.+toLocaleString('id-ID') {
+            return 'Rp ' + amount.toLocaleString('id-ID');
+        }
+    </script>
+}
+
+@functions {
+    private string GetTxAmountClass(string type)
+    {
+        var creditTypes = new[] { "Topup", "TransferIn", "PurchaseRelease", "Adjustment", "Refund" };
+        return creditTypes.Contains(type) ? "text-success" : "text-danger";
+    }
+}

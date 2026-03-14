@@ -1,0 +1,212 @@
+@model PedagangPulsa.Web.Areas.Admin.ViewModels.SupplierProductListViewModel
+
+@{
+    ViewData["Title"] = "Supplier Mappings";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Supplier Mappings</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a asp-controller="Product" asp-action="Details" asp-route-id="@Model.ProductId" class="btn btn-outline-secondary me-2">
+            <i class="bi bi-arrow-left"></i> Back to Product
+        </a>
+        @if (User.IsInRole("SuperAdmin") || User.IsInRole("Admin"))
+        {
+            <a asp-action="Add" asp-route-productId="@Model.ProductId" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Add Supplier
+            </a>
+        }
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-box-seam"></i> @Model.ProductCode - @Model.ProductName
+        </h5>
+        <small class="text-white-50">@Model.ProductCategory</small>
+    </div>
+    <div class="card-body">
+        @if (Model.SupplierProducts.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-hover" id="supplierProductsTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">Seq</th>
+                            <th>Supplier</th>
+                            <th>Supplier SKU</th>
+                            <th>Cost Price</th>
+                            <th>Status</th>
+                            <th class="text-end" style="width: 150px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sortableTable">
+                        @foreach (var sp in Model.SupplierProducts.OrderBy(s => s.Sequence))
+                        {
+                            <tr data-supplier-id="@sp.SupplierId" data-sequence="@sp.Sequence">
+                                <td>
+                                    <span class="badge bg-primary fs-6 sequence-badge">@sp.Sequence</span>
+                                </td>
+                                <td>
+                                    <strong>@sp.SupplierName</strong>
+                                </td>
+                                <td>
+                                    <code>@(sp.SupplierSku ?? "-")</code>
+                                </td>
+                                <td>
+                                    Rp sp.CostPrice.ToString("N0")
+                                </td>
+                                <td>
+                                    <span class="badge @(sp.IsActive ? "bg-success" : "bg-secondary")">
+                                        @(sp.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <div class="btn-group" role="group">
+                                        @if (User.IsInRole("SuperAdmin") || User.IsInRole("Admin"))
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-move-up" title="Move Up">
+                                                <i class="bi bi-arrow-up"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-move-down" title="Move Down">
+                                                <i class="bi bi-arrow-down"></i>
+                                            </button>
+                                            <a asp-action="Edit" asp-route-productId="@Model.ProductId" asp-route-supplierId="@sp.SupplierId"
+                                               class="btn btn-sm btn-outline-primary" title="Edit">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <a asp-action="Delete" asp-route-productId="@Model.ProductId" asp-route-supplierId="@sp.SupplierId"
+                                               class="btn btn-sm btn-outline-danger" title="Delete">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="alert alert-info small">
+                <i class="bi bi-info-circle"></i>
+                <strong>Routing Order:</strong> Suppliers will be tried in sequence order (1, 2, 3...).
+                Use the up/down buttons to change the order.
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5">
+                <i class="bi bi-inbox fs-1 text-muted"></i>
+                <p class="text-muted mt-3">No suppliers mapped to this product yet.</p>
+                @if (User.IsInRole("SuperAdmin") || User.IsInRole("Admin"))
+                {
+                    <a asp-action="Add" asp-route-productId="@Model.ProductId" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Add First Supplier
+                    </a>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@if (Model.AvailableSuppliers.Any() && (User.IsInRole("SuperAdmin") || User.IsInRole("Admin")))
+{
+    <div class="card shadow-sm">
+        <div class="card-header bg-white">
+            <h6 class="card-title mb-0">Available Suppliers</h6>
+        </div>
+        <div class="card-body">
+            <p class="small text-muted mb-2">These suppliers are not yet mapped to this product:</p>
+            @foreach (var supplier in Model.AvailableSuppliers)
+            {
+                <a asp-action="Add" asp-route-productId="@Model.ProductId" asp-route-supplierId="@supplier.Id"
+                   class="btn btn-sm btn-outline-secondary me-2 mb-2">
+                    <i class="bi bi-plus"></i> @supplier.Name
+                </a>
+            }
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Move up button
+            $(document).on('click', '.btn-move-up', function() {
+                const row = $(this).closest('tr');
+                const prevRow = row.prev();
+                if (prevRow.length > 0) {
+                    row.insertBefore(prevRow);
+                    updateSequenceNumbers();
+                    saveOrder();
+                }
+            });
+
+            // Move down button
+            $(document).on('click', '.btn-move-down', function() {
+                const row = $(this).closest('tr');
+                const nextRow = row.next();
+                if (nextRow.length > 0) {
+                    row.insertAfter(nextRow);
+                    updateSequenceNumbers();
+                    saveOrder();
+                }
+            });
+
+            function updateSequenceNumbers() {
+                $('#sortableTable tr').each(function(index) {
+                    const seq = index + 1;
+                    $(this).data('sequence', seq);
+                    $(this).find('.sequence-badge').text(seq);
+                });
+            }
+
+            function saveOrder() {
+                const suppliers = [];
+                $('#sortableTable tr').each(function(index) {
+                    suppliers.push({
+                        supplierId: $(this).data('supplier-id'),
+                        sequence: index + 1
+                    });
+                });
+
+                $.ajax({
+                    url: '/Admin/SupplierProduct/Reorder',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        productId: '@Model.ProductId',
+                        suppliers: suppliers
+                    }),
+                    success: function(response) {
+                        if (response.success) {
+                            showAlert('success', response.message);
+                        } else {
+                            showAlert('danger', response.message);
+                        }
+                    },
+                    error: function() {
+                        showAlert('danger', 'Failed to update order');
+                    }
+                });
+            }
+
+            function showAlert(type, message) {
+                const alertHtml = '<div class="alert alert-' + type + ' alert-dismissible fade show" role="alert">' +
+                    message +
+                    '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+                    '</div>';
+                $('.container-fluid').prepend(alertHtml);
+                setTimeout(function() {
+                    $('.alert').fadeOut();
+                }, 3000);
+            }
+        });
+
+        function  'Rp '.+toLocaleString('id-ID') {
+            return 'Rp ' + amount.toLocaleString('id-ID');
+        }
+    </script>
+}

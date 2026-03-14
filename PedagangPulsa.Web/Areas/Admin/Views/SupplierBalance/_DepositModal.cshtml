@@ -1,0 +1,94 @@
+@model PedagangPulsa.Web.Areas.Admin.ViewModels.DepositSupplierViewModel
+
+<div class="modal-header bg-success text-white">
+    <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Deposit to Supplier</h5>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+</div>
+<div class="modal-body">
+    <div class="alert alert-info">
+        <div class="row">
+            <div class="col-sm-4"><strong>Supplier:</strong></div>
+            <div class="col-sm-8">@Model.SupplierName (@Model.SupplierCode)</div>
+        </div>
+        <div class="row">
+            <div class="col-sm-4"><strong>Current Balance:</strong></div>
+            <div class="col-sm-8">Rp Model.CurrentBalance.ToString("N0")</div>
+        </div>
+    </div>
+
+    <form asp-action="Deposit" asp-controller="SupplierBalance" asp-area="Admin" method="post" id="depositForm">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="SupplierId" />
+
+        <div class="mb-3">
+            <label asp-for="Amount" class="form-label fw-bold">Deposit Amount <span class="text-danger">*</span></label>
+            <div class="input-group">
+                <span class="input-group-text">Rp</span>
+                <input asp-for="Amount" class="form-control" required placeholder="Enter amount to deposit" step="0.01" min="0.01" />
+            </div>
+            <span asp-validation-for="Amount" class="text-danger"></span>
+            <small class="form-text text-muted">
+                After deposit: <strong id="finalBalance">Rp Model.CurrentBalance + Model.Amount.ToString("N0")</strong>
+            </small>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="Notes" class="form-label">Admin Notes</label>
+            <textarea asp-for="Notes" class="form-control" rows="2" placeholder="Payment reference, bank, or other notes..."></textarea>
+        </div>
+
+        <div class="alert alert-success">
+            <i class="bi bi-info-circle"></i>
+            This will add funds to the supplier's balance for transaction processing.
+        </div>
+    </form>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+    <button type="button" class="btn btn-success" onclick="submitDeposit()">
+        <i class="bi bi-check-circle"></i> Deposit
+    </button>
+</div>
+
+<script>
+    function  'Rp '.+toLocaleString('id-ID') {
+        return 'Rp ' + amount.toLocaleString('id-ID');
+    }
+
+    const currentBalance = @Model.CurrentBalance;
+
+    $('#Amount').on('input', function() {
+        const amount = parseFloat($(this).val()) || 0;
+        const total = currentBalance + amount;
+        $('#finalBalance').text( 'Rp '.+toLocaleString('id-ID'));
+    });
+
+    function submitDeposit() {
+        const form = $('#depositForm');
+        const amount = parseFloat($('#Amount').val());
+
+        if (!amount || amount <= 0) {
+            toastr.error('Please enter a valid amount greater than zero');
+            return;
+        }
+
+        $.ajax({
+            url: form.attr('action'),
+            type: 'POST',
+            data: form.serialize(),
+            success: function(response) {
+                if (response.success) {
+                    $('#depositModal').modal('hide');
+                    $('#ledgerTable').DataTable().ajax.reload();
+                    location.reload(); // Reload to update balance cards
+                    toastr.success(response.message);
+                } else {
+                    toastr.error(response.message);
+                }
+            },
+            error: function() {
+                toastr.error('An error occurred while processing your request.');
+            }
+        });
+    }
+</script>

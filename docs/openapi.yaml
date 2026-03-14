@@ -1,0 +1,1144 @@
+openapi: 3.0.3
+info:
+  title: PedagangPulsa API
+  description: |
+    PedagangPulsa Member Mobile API v1.0
+
+    ## Authentication
+
+    The API uses JWT (JSON Web Token) based authentication with a 2-step verification process:
+
+    1. **Login** → Get Access Token (15min) + Refresh Token (7days)
+    2. **PIN Verify** → Get PIN Session Token (5min) for sensitive operations
+
+    ## Idempotency
+
+    Transaction and Transfer endpoints require `X-Reference-Id` header to prevent duplicate requests.
+
+  version: 1.0.0
+  contact:
+    name: PedagangPulsa API Support
+    email: api@pedagangpulsa.com
+    url: https://pedagangpulsa.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.pedagangpulsa.com/api/v1
+    description: Production server
+  - url: https://sandbox-api.pedagangpulsa.com/api/v1
+    description: Sandbox server
+
+tags:
+  - name: Auth
+    description: Authentication endpoints
+  - name: Balance
+    description: Balance management
+  - name: Topup
+    description: Topup requests
+  - name: Products
+    description: Product catalog
+  - name: Transactions
+    description: Transaction management
+  - name: Transfers
+    description: Balance transfers
+  - name: Notifications
+    description: User notifications
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Auth
+      summary: Register new user
+      description: Create a new user account with optional referral code
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              basic:
+                value:
+                  username: user123
+                  full_name: John Doe
+                  email: john@example.com
+                  phone: "08123456789"
+                  pin: "123456"
+              with_referral:
+                value:
+                  username: user123
+                  full_name: John Doe
+                  email: john@example.com
+                  phone: "08123456789"
+                  pin: "123456"
+                  referral_code: AGUS2026
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                username_taken:
+                  value:
+                    success: false
+                    error_code: USERNAME_TAKEN
+                    message: Username sudah digunakan
+                    details:
+                      field: username
+
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Login user
+      description: Authenticate with username and PIN
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              username: user123
+              pin: "123456"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: Refresh access token
+      description: Get new access token using refresh token
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+                  description: Refresh token from login
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RefreshTokenResponse'
+
+  /auth/pin/verify:
+    post:
+      tags:
+        - Auth
+      summary: Verify PIN
+      description: Verify PIN for sensitive operations (transaction, transfer)
+      operationId: verifyPin
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - pin
+              properties:
+                pin:
+                  type: string
+                  pattern: '^\\d{6}$'
+                  description: 6-digit PIN
+      responses:
+        '200':
+          description: PIN verified successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          pin_session_token:
+                            type: string
+                            format: uuid
+                          expires_in:
+                            type: integer
+                            description: TTL in seconds (300 = 5 minutes)
+
+  /balance:
+    get:
+      tags:
+        - Balance
+      summary: Get current balance
+      description: Get user's current balance information
+      operationId: getBalance
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Balance retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Balance'
+
+  /balance/history:
+    get:
+      tags:
+        - Balance
+      summary: Get balance history
+      description: Get user's balance mutation history with pagination
+      operationId: getBalanceHistory
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Balance history retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BalanceHistoryResponse'
+
+  /topup:
+    post:
+      tags:
+        - Topup
+      summary: Request topup
+      description: Submit topup request with proof of transfer
+      operationId: requestTopup
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TopupRequest'
+      responses:
+        '201':
+          description: Topup request created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TopupResponse'
+
+  /topup/history:
+    get:
+      tags:
+        - Topup
+      summary: Get topup history
+      description: Get user's topup request history
+      operationId: getTopupHistory
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+      responses:
+        '200':
+          description: Topup history retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TopupHistoryResponse'
+
+  /products:
+    get:
+      tags:
+        - Products
+      summary: List products
+      description: Get list of available products with prices for user's level
+      operationId: listProducts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: category
+          in: query
+          description: Filter by product category
+          schema:
+            type: string
+            enum: [Pulsa, Data, PLN, Game, PPOB, E-Money]
+        - name: operator
+          in: query
+          description: Filter by operator
+          schema:
+            type: string
+        - name: type
+          in: query
+          description: Filter by product type
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProductListResponse'
+
+  /transactions:
+    post:
+      tags:
+        - Transactions
+      summary: Create transaction
+      description: |
+        Purchase a product.
+        Requires both X-Reference-Id header (for idempotency) AND pin_session_token in request body.
+      operationId: createTransaction
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/X-Reference-Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTransactionRequest'
+            example:
+              product_id: 550e8400-e29b-41d4-a716-446655440005
+              destination: "08123456789"
+              pin_session_token: 550e8400-e29b-41d4-a716-446655440001
+      responses:
+        '201':
+          description: Transaction created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TransactionResponse'
+        '400':
+          description: Insufficient balance or invalid PIN session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Duplicate transaction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      tags:
+        - Transactions
+      summary: List transactions
+      description: Get user's transaction history
+      operationId: listTransactions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, processing, success, failed]
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Transactions retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TransactionListResponse'
+
+  /transactions/{id}:
+    get:
+      tags:
+        - Transactions
+      summary: Get transaction detail
+      description: Get detailed transaction information including attempt timeline
+      operationId: getTransactionDetail
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transaction detail retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TransactionDetail'
+
+  /transfer:
+    post:
+      tags:
+        - Transfers
+      summary: Transfer balance
+      description: |
+        Transfer balance to another user.
+        Requires both X-Reference-Id header AND pin_session_token.
+      operationId: transferBalance
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/X-Reference-Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferRequest'
+      responses:
+        '201':
+          description: Transfer successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TransferResponse'
+        '403':
+          description: Transfer disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /notifications:
+    get:
+      tags:
+        - Notifications
+      summary: List notifications
+      description: Get user's notifications
+      operationId: listNotifications
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: is_read
+          in: query
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Notifications retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/NotificationListResponse'
+
+  /notifications/{id}/read:
+    post:
+      tags:
+        - Notifications
+      summary: Mark notification as read
+      operationId: markNotificationRead
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Notification marked as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /notifications/read-all:
+    post:
+      tags:
+        - Notifications
+      summary: Mark all notifications as read
+      operationId: markAllNotificationsRead
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: All notifications marked as read
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          marked_count:
+                            type: integer
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token from /auth/login
+
+  parameters:
+    X-Reference-Id:
+      name: X-Reference-Id
+      in: header
+      required: true
+      description: |
+        Unique reference ID for idempotency.
+        Format: app-{user_id}-{timestamp}-{random}
+        Example: app-550e8400-e29b-41d4-a716-446655440000-1710234567-a1b2c3
+      schema:
+        type: string
+        example: app-550e8400-e29b-41d4-a716-446655440000-1710234567-a1b2c3
+
+  schemas:
+    SuccessResponse:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error_code
+        - message
+      properties:
+        success:
+          type: boolean
+          example: false
+        error_code:
+          type: string
+          example: INSUFFICIENT_BALANCE
+        message:
+          type: string
+          example: Saldo tidak mencukupi
+        details:
+          type: object
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 20
+        total_items:
+          type: integer
+          example: 150
+        total_pages:
+          type: integer
+          example: 8
+
+    # Auth schemas
+    RegisterRequest:
+      type: object
+      required:
+        - username
+        - full_name
+        - email
+        - phone
+        - pin
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 20
+          pattern: '^[a-zA-Z0-9_]+$'
+        full_name:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          pattern: '^0\\d{9,12}$|^62\\d{9,12}$'
+        pin:
+          type: string
+          pattern: '^\\d{6}$'
+        referral_code:
+          type: string
+
+    RegisterResponse:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        referral_code:
+          type: string
+        level:
+          type: string
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - pin
+      properties:
+        username:
+          type: string
+        pin:
+          type: string
+          pattern: '^\\d{6}$'
+
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+          description: Access token TTL in seconds
+          example: 900
+        token_type:
+          type: string
+          example: Bearer
+        user:
+          type: object
+          properties:
+            user_id:
+              type: string
+              format: uuid
+            username:
+              type: string
+            full_name:
+              type: string
+            email:
+              type: string
+              format: email
+            phone:
+              type: string
+            level:
+              type: string
+            can_transfer:
+              type: boolean
+
+    RefreshTokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+          example: 900
+        token_type:
+          type: string
+          example: Bearer
+
+    # Balance schemas
+    Balance:
+      type: object
+      properties:
+        active_balance:
+          type: integer
+          example: 150000
+        held_balance:
+          type: integer
+          example: 5600
+        total_balance:
+          type: integer
+          example: 155600
+        currency:
+          type: string
+          example: IDR
+
+    BalanceHistoryResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              type:
+                type: string
+                enum: [topup, transaction, refund, adjustment, referral, transfer_in, transfer_out]
+              amount:
+                type: integer
+              balance_after:
+                type: integer
+              description:
+                type: string
+              ref_type:
+                type: string
+              ref_id:
+                type: string
+                format: uuid
+              created_at:
+                type: string
+                format: date-time
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    # Topup schemas
+    TopupRequest:
+      type: object
+      required:
+        - amount
+        - bank_code
+        - transfer_proof
+      properties:
+        amount:
+          type: number
+          format: decimal
+          minimum: 10000
+          maximum: 10000000
+        bank_code:
+          type: string
+        transfer_proof:
+          type: string
+          format: binary
+        notes:
+          type: string
+          maxLength: 500
+
+    TopupResponse:
+      type: object
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        bank_code:
+          type: string
+        transfer_proof_url:
+          type: string
+          format: uri
+        created_at:
+          type: string
+          format: date-time
+
+    TopupHistoryResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopupResponse'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    # Product schemas
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sku:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        operator:
+          type: string
+        type:
+          type: string
+        description:
+          type: string
+        image_url:
+          type: string
+          format: uri
+        sell_price:
+          type: integer
+        currency:
+          type: string
+          example: IDR
+
+    ProductListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    # Transaction schemas
+    CreateTransactionRequest:
+      type: object
+      required:
+        - product_id
+        - destination
+        - pin_session_token
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        destination:
+          type: string
+          description: Destination number (phone, meter number, etc.)
+        pin_session_token:
+          type: string
+          format: uuid
+          description: Token from /auth/pin/verify
+
+    TransactionResponse:
+      type: object
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+        reference_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, success, failed, refunded]
+        product:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            operator:
+              type: string
+            type:
+              type: string
+        destination:
+          type: string
+        price:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    TransactionListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionResponse'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    TransactionDetail:
+      type: object
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+        reference_id:
+          type: string
+        status:
+          type: string
+        product:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            sku:
+              type: string
+            operator:
+              type: string
+            category:
+              type: string
+            type:
+              type: string
+        destination:
+          type: string
+        price:
+          type: integer
+        cost_price:
+          type: integer
+        profit:
+          type: integer
+        sn:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        attempts:
+          type: array
+          items:
+            type: object
+            properties:
+              attempt_id:
+                type: string
+                format: uuid
+              supplier_name:
+                type: string
+              seq:
+                type: integer
+              status:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              completed_at:
+                type: string
+                format: date-time
+              supplier_trx_id:
+                type: string
+              sn:
+                type: string
+              error_code:
+                type: string
+              error_message:
+                type: string
+
+    # Transfer schemas
+    TransferRequest:
+      type: object
+      required:
+        - to_username
+        - amount
+        - pin_session_token
+      properties:
+        to_username:
+          type: string
+        amount:
+          type: number
+          format: decimal
+          minimum: 1000
+          maximum: 1000000
+        notes:
+          type: string
+          maxLength: 200
+        pin_session_token:
+          type: string
+          format: uuid
+
+    TransferResponse:
+      type: object
+      properties:
+        transfer_id:
+          type: string
+          format: uuid
+        from:
+          type: string
+        to:
+          type: string
+        amount:
+          type: number
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    # Notification schemas
+    NotificationListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              type:
+                type: string
+                enum: [transaction_success, transaction_failed, topup_approved, topup_rejected, balance_adjustment, referral_bonus, transfer_in, transfer_out]
+              title:
+                type: string
+              message:
+                type: string
+              is_read:
+                type: boolean
+              created_at:
+                type: string
+                format: date-time
+        unread_count:
+          type: integer
+        pagination:
+          $ref: '#/components/schemas/Pagination'

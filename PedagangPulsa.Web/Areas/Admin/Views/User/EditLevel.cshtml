@@ -1,0 +1,61 @@
+@model PedagangPulsa.Web.Areas.Admin.ViewModels.EditLevelUserViewModel
+
+@{
+    ViewData["Title"] = "Edit User Level";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Edit User Level</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a asp-action="Details" asp-route-id="@Model.UserId" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Details
+        </a>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title mb-4">Change User Level</h5>
+
+                <div class="mb-4">
+                    <div class="alert alert-info">
+                        <strong>User:</strong> @Model.Username<br />
+                        <strong>Current Level:</strong> <span class="badge bg-primary">@Model.CurrentLevelName</span>
+                    </div>
+                </div>
+
+                <form asp-action="EditLevel" method="post">
+                    <input type="hidden" asp-for="UserId" />
+                    <input type="hidden" asp-for="Username" />
+                    <input type="hidden" asp-for="FullName" />
+                    <input type="hidden" asp-for="CurrentLevelId" />
+                    <input type="hidden" asp-for="CurrentLevelName" />
+
+                    <div class="mb-3">
+                        <label asp-for="NewLevelId" class="form-label">New Level</label>
+                        <select asp-for="NewLevelId" class="form-select" asp-items="new SelectList(Model.AvailableLevels, nameof(EditLevelUserViewModel.UserLevelItem.Id), nameof(EditLevelUserViewModel.UserLevelItem.Name))">
+                            <option value="">-- Select New Level --</option>
+                        </select>
+                        <span asp-validation-for="NewLevelId" class="text-danger small"></span>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Update Level
+                        </button>
+                        <a asp-action="Details" asp-route-id="@Model.UserId" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

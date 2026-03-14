@@ -1,0 +1,117 @@
+@using PedagangPulsa.Application.Services
+
+@model ProfitByProductReport
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="alert alert-info">
+            <h6 class="mb-2">Report Period</h6>
+            <p class="mb-0">
+                @if (Model.StartDate.HasValue && Model.EndDate.HasValue)
+                {
+                    <span>From <strong>@Model.StartDate.Value.ToString("dd MMM yyyy")</strong> to <strong>@Model.EndDate.Value.ToString("dd MMM yyyy")</strong></span>
+                }
+                else
+                {
+                    <span>All time</span>
+                }
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Revenue</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">Rp @Model.TotalRevenue.ToString("N0")</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-left-danger shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Total Cost</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">Rp @Model.TotalCost.ToString("N0")</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Total Profit</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">Rp @Model.TotalProfit.ToString("N0")</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Transactions</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">@Model.TotalTransactions.ToString("N0")</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white">
+        <h5 class="card-title mb-0"><i class="bi bi-box"></i> Profit Breakdown by Product</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Category</th>
+                        <th class="text-end">Revenue</th>
+                        <th class="text-end">Cost</th>
+                        <th class="text-end">Profit</th>
+                        <th class="text-end">Margin</th>
+                        <th class="text-center">Tx</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.ByProduct)
+                    {
+                        var margin = item.TotalRevenue > 0 ? (item.TotalProfit / item.TotalRevenue) * 100 : 0;
+                        <tr>
+                            <td>@item.ProductName</td>
+                            <td>@item.Category</td>
+                            <td class="text-end">Rp @item.TotalRevenue.ToString("N0")</td>
+                            <td class="text-end">Rp @item.TotalCost.ToString("N0")</td>
+                            <td class="text-end @(item.TotalProfit >= 0 ? "text-success" : "text-danger")">Rp @item.TotalProfit.ToString("N0")</td>
+                            <td class="text-end">@margin.ToString("F2")%</td>
+                            <td class="text-center">@item.TotalTransactions.ToString("N0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@{
+    string formatCurrency(decimal amount)
+    {
+        return "Rp " + amount.ToString("N0", new System.Globalization.CultureInfo("id-ID"));
+    }
+}

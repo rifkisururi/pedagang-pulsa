@@ -1,0 +1,215 @@
+@model dynamic
+
+@{
+    ViewData["Title"] = "Topup Requests";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Topup Requests</h1>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">Search</label>
+                <input type="text" class="form-control" id="searchInput" placeholder="Search by username...">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Status</label>
+                <select class="form-select" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="pending" selected>Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Start Date</label>
+                <input type="date" class="form-control" id="startDate" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">End Date</label>
+                <input type="date" class="form-control" id="endDate" />
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small fw-bold">&nbsp;</label>
+                <button type="button" class="btn btn-outline-secondary w-100" id="resetFilters">
+                    <i class="bi bi-arrow-clockwise"></i> Reset
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped" id="topupTable" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Request ID</th>
+                        <th>Date/Time</th>
+                        <th>Username</th>
+                        <th>Amount</th>
+                        <th>Bank</th>
+                        <th>Proof</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" />
+
+    <script>
+        $(document).ready(function() {
+            var table = $('#topupTable').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: '/Admin/Topup/GetData',
+                    type: 'POST',
+                    data: function(d) {
+                        d.search = $('#searchInput').val();
+                        d.status = $('#statusFilter').val() || null;
+                        d.startDate = $('#startDate').val() || null;
+                        d.endDate = $('#endDate').val() || null;
+                        return d;
+                    }
+                },
+                order: [[1, 'desc']],
+                columns: [
+                    {
+                        data: 'id',
+                        render: function(data) {
+                            const shortId = data.substring(0, 8);
+                            return '<code>' + shortId + '</code>';
+                        }
+                    },
+                    { data: 'createdAt' },
+                    { data: 'username' },
+                    {
+                        data: 'amount',
+                        render: function(data) {
+                            return  'Rp '.+toLocaleString('id-ID');
+                        }
+                    },
+                    { data: 'bankName' },
+                    {
+                        data: 'transferProof',
+                        render: function(data) {
+                            if (!data) return '-';
+                            return '<a href="' + data + '" target="_blank" class="btn btn-sm btn-link p-0" title="View proof">' +
+                                '<i class="bi bi-image fs-5"></i></a>';
+                        }
+                    },
+                    {
+                        data: 'status',
+                        render: function(data) {
+                            var badgeClass = 'bg-secondary';
+                            var icon = '';
+                            switch(data.toLowerCase()) {
+                                case 'pending':
+                                    badgeClass = 'bg-warning';
+                                    icon = '<i class="bi bi-clock"></i> ';
+                                    break;
+                                case 'approved':
+                                    badgeClass = 'bg-success';
+                                    icon = '<i class="bi bi-check-circle"></i> ';
+                                    break;
+                                case 'rejected':
+                                    badgeClass = 'bg-danger';
+                                    icon = '<i class="bi bi-x-circle"></i> ';
+                                    break;
+                            }
+                            return '<span class="badge ' + badgeClass + '">' + icon + data + '</span>';
+                        }
+                    },
+                    {
+                        data: null,
+                        orderable: false,
+                        render: function(data, type, row) {
+                            var actions = '<div class="btn-group" role="group">';
+
+                            actions += '<a href="/Admin/Topup/Details/' + row.id + '" class="btn btn-sm btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>';
+
+                            if (row.status === 'Pending') {
+                                actions += '<button type="button" class="btn btn-sm btn-outline-success btn-approve" data-id="' + row.id + '" title="Approve"><i class="bi bi-check-circle"></i></button>';
+                                actions += '<button type="button" class="btn btn-sm btn-outline-danger btn-reject" data-id="' + row.id + '" title="Reject"><i class="bi bi-x-circle"></i></button>';
+                            }
+
+                            actions += '</div>';
+                            return actions;
+                        }
+                    }
+                ],
+                pageLength: 25,
+                lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]]
+            });
+
+            // Apply filters on change
+            $('#searchInput, #statusFilter, #startDate, #endDate').on('change', function() {
+                table.ajax.reload();
+            });
+
+            $('#searchInput').on('keyup', function(e) {
+                if (e.key === 'Enter') {
+                    table.ajax.reload();
+                }
+            });
+
+            // Reset filters
+            $('#resetFilters').on('click', function() {
+                $('#searchInput').val('');
+                $('#statusFilter').val('pending');
+                $('#startDate').val('');
+                $('#endDate').val('');
+                table.ajax.reload();
+            });
+
+            // Approve button click
+            $(document).on('click', '.btn-approve', function() {
+                const id = $(this).data('id');
+                loadAndShowApproveModal(id);
+            });
+
+            // Reject button click
+            $(document).on('click', '.btn-reject', function() {
+                const id = $(this).data('id');
+                loadAndShowRejectModal(id);
+            });
+        });
+
+        function loadAndShowApproveModal(id) {
+            $.get('/Admin/Topup/Approve/' + id, function(data) {
+                $('#approveModal .modal-content').html(data);
+                $('#approveModal').modal('show');
+            });
+        }
+
+        function loadAndShowRejectModal(id) {
+            $.get('/Admin/Topup/Reject/' + id, function(data) {
+                $('#rejectModal .modal-content').html(data);
+                $('#rejectModal').modal('show');
+            });
+        }
+
+        function  'Rp '.+toLocaleString('id-ID') {
+            return 'Rp ' + amount.toLocaleString('id-ID');
+        }
+    </script>
+}
+
+<!-- Modals -->
+<div class="modal fade" id="approveModal" tabindex="-1">
+    <div class="modal-dialog"></div>
+</div>
+
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog"></div>
+</div>

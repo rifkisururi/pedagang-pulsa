@@ -1,0 +1,156 @@
+@model PedagangPulsa.Web.Areas.Admin.ViewModels.TopupDetailViewModel
+
+@{
+    ViewData["Title"] = "Topup Request Details";
+    Layout = "_AdminLayout";
+
+    var statusClass = Model.Status switch
+    {
+        "Pending" => "bg-warning",
+        "Approved" => "bg-success",
+        "Rejected" => "bg-danger",
+        _ => "bg-secondary"
+    };
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Topup Request Details</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a asp-action="Index" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to List
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Request Info Card -->
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0"><i class="bi bi-receipt"></i> Topup Request</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-5 text-muted">Request ID</dt>
+                    <dd class="col-sm-7"><code>@Model.Id.ToString().Substring(0, 8)</code></dd>
+
+                    <dt class="col-sm-5 text-muted">Status</dt>
+                    <dd class="col-sm-7">
+                        <span class="badge @statusClass fs-6">@Model.Status</span>
+                    </dd>
+
+                    <dt class="col-sm-5 text-muted">Created</dt>
+                    <dd class="col-sm-7">@Model.CreatedAt.ToString("dd MMM yyyy HH:mm:ss")</dd>
+
+                    <dt class="col-sm-5 text-muted">Username</dt>
+                    <dd class="col-sm-7">@Model.Username</dd>
+
+                    <dt class="col-sm-5 text-muted">Full Name</dt>
+                    <dd class="col-sm-7">@Model.FullName ?? "-"</dd>
+
+                    <dt class="col-sm-5 text-muted">Amount</dt>
+                    <dd class="col-sm-7">Rp Model.Amount.ToString("N0")</dd>
+
+                    <dt class="col-sm-5 text-muted">Bank</dt>
+                    <dd class="col-sm-7">@Model.BankName</dd>
+
+                    @if (!string.IsNullOrEmpty(Model.AccountNumber))
+                    {
+                        <dt class="col-sm-5 text-muted">Account Number</dt>
+                        <dd class="col-sm-7"><code>@Model.AccountNumber</code></dd>
+                    }
+
+                    @if (!string.IsNullOrEmpty(Model.AccountName))
+                    {
+                        <dt class="col-sm-5 text-muted">Account Name</dt>
+                        <dd class="col-sm-7">@Model.AccountName</dd>
+                    }
+
+                    @if (!string.IsNullOrEmpty(Model.TransferProof))
+                    {
+                        <dt class="col-sm-5 text-muted">Transfer Proof</dt>
+                        <dd class="col-sm-7">
+                            <a href="@Model.TransferProof" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-image"></i> View Proof
+                            </a>
+                        </dd>
+                    }
+
+                    @if (Model.Status == "Approved")
+                    {
+                        <dt class="col-sm-5 text-muted">Final Amount</dt>
+                        <dd class="col-sm-7 text-success">Rp Model.FinalAmount ?? 0.ToString("N0")</dd>
+                    }
+
+                    @if (!string.IsNullOrEmpty(Model.Notes))
+                    {
+                        <dt class="col-sm-5 text-muted">Notes</dt>
+                        <dd class="col-sm-7">@Model.Notes</dd>
+                    }
+
+                    @if (!string.IsNullOrEmpty(Model.RejectReason))
+                    {
+                        <dt class="col-sm-5 text-muted">Reject Reason</dt>
+                        <dd class="col-sm-7 text-danger">@Model.RejectReason</dd>
+                    }
+
+                    @if (!string.IsNullOrEmpty(Model.ApprovedBy))
+                    {
+                        <dt class="col-sm-5 text-muted">Approved By</dt>
+                        <dd class="col-sm-7">@Model.ApprovedBy</dd>
+                    }
+
+                    @if (Model.ApprovedAt.HasValue)
+                    {
+                        <dt class="col-sm-5 text-muted">Approved At</dt>
+                        <dd class="col-sm-7">@Model.ApprovedAt.Value.ToString("dd MMM yyyy HH:mm:ss")</dd>
+                    }
+
+                    @if (!string.IsNullOrEmpty(Model.RejectedBy))
+                    {
+                        <dt class="col-sm-5 text-muted">Rejected By</dt>
+                        <dd class="col-sm-7">@Model.RejectedBy</dd>
+                    }
+
+                    @if (Model.RejectedAt.HasValue)
+                    {
+                        <dt class="col-sm-5 text-muted">Rejected At</dt>
+                        <dd class="col-sm-7">@Model.RejectedAt.Value.ToString("dd MMM yyyy HH:mm:ss")</dd>
+                    }
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Balance Card -->
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0"><i class="bi bi-wallet2"></i> User Balance</h5>
+            </div>
+            <div class="card-body">
+                <div class="text-center py-4">
+                    <h6 class="text-muted mb-2">Current Balance</h6>
+                    <h2 class="@(Model.Status == "Approved" ? "text-success" : "text-primary")">
+                        Rp Model.CurrentBalance.ToString("N0")
+                    </h2>
+                    @if (Model.Status == "Approved")
+                    {
+                        <small class="text-success">
+                            <i class="bi bi-arrow-up-circle"></i> +
+ Rp Model.FinalAmount ?? 0.ToString("N0") (approved)
+                        </small>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function  'Rp '.+toLocaleString('id-ID') {
+            return 'Rp ' + amount.toLocaleString('id-ID');
+        }
+    </script>
+}

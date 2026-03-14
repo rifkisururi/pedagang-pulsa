@@ -1,0 +1,73 @@
+@model PedagangPulsa.Web.Areas.Admin.ViewModels.SuspendUserViewModel
+
+@{
+    ViewData["Title"] = Model.IsSuspended ? "Unsuspend User" : "Suspend User";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">@ViewData["Title"]</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a asp-action="Details" asp-route-id="@Model.UserId" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Details
+        </a>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title mb-4">
+                    <i class="bi bi-exclamation-triangle text-@(Model.IsSuspended ? "success" : "warning")"></i>
+                    @(Model.IsSuspended ? "Unsuspend User Account" : "Suspend User Account")
+                </h5>
+
+                <div class="mb-4">
+                    <div class="alert alert-@(Model.IsSuspended ? "info" : "warning")">
+                        <strong>User:</strong> @Model.Username<br />
+                        <strong>Name:</strong> @Model.FullName ?? "-"<br />
+                        @if (Model.IsSuspended)
+                        {
+                            <span>This user is currently <strong>suspended</strong> and cannot login or perform transactions.</span>
+                        }
+                        else
+                        {
+                            <span>This action will <strong>suspend</strong> the user. They will not be able to login or perform transactions until unsuspended.</span>
+                        }
+                    </div>
+                </div>
+
+                <form asp-action="Suspend" method="post">
+                    <input type="hidden" asp-for="UserId" />
+                    <input type="hidden" asp-for="Username" />
+                    <input type="hidden" asp-for="FullName" />
+                    <input type="hidden" asp-for="IsSuspended" />
+
+                    @if (!Model.IsSuspended)
+                    {
+                        <div class="mb-3">
+                            <label asp-for="Reason" class="form-label">Reason for Suspension <span class="text-danger">*</span></label>
+                            <textarea asp-for="Reason" class="form-control" rows="3" placeholder="Enter the reason for suspending this user..." required></textarea>
+                            <span asp-validation-for="Reason" class="text-danger small"></span>
+                        </div>
+                    }
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-@(Model.IsSuspended ? "success" : "warning")">
+                            <i class="bi bi-@(Model.IsSuspended ? "check-circle" : "ban")"></i>
+                            @(Model.IsSuspended ? "Unsuspend User" : "Suspend User")
+                        </button>
+                        <a asp-action="Details" asp-route-id="@Model.UserId" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

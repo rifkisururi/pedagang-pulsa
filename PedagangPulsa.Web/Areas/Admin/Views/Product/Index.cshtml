@@ -1,0 +1,184 @@
+@model dynamic
+
+@{
+    ViewData["Title"] = "Products";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Product Management</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        @if (User.IsInRole("SuperAdmin") || User.IsInRole("Admin"))
+        {
+            <a asp-action="Create" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Add Product
+            </a>
+        }
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">Search</label>
+                <input type="text" class="form-control" id="searchInput" placeholder="Search products...">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Category</label>
+                <select class="form-select" id="categoryFilter">
+                    <option value="">All Categories</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Status</label>
+                <select class="form-select" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">&nbsp;</label>
+                <button type="button" class="btn btn-outline-secondary w-100" id="resetFilters">
+                    <i class="bi bi-arrow-clockwise"></i> Reset
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped" id="productsTable" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Price</th>
+                        <th>Cost Price</th>
+                        <th>Status</th>
+                        <th>Available</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" />
+
+    <script>
+        $(document).ready(function() {
+            // Load categories for filter dropdown
+            $.get('/Admin/Product/GetCategories', function(data) {
+                data.forEach(function(category) {
+                    $('#categoryFilter').append('<option value="' + category.id + '">' + category.name + '</option>');
+                });
+            });
+
+            var table = $('#productsTable').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: '/Admin/Product/GetData',
+                    type: 'POST',
+                    data: function(d) {
+                        d.search = $('#searchInput').val();
+                        d.categoryId = $('#categoryFilter').val() || null;
+                        d.isActive = $('#statusFilter').val() || null;
+                        return d;
+                    }
+                },
+                order: [[0, 'asc']],
+                columns: [
+                    {
+                        data: 'code',
+                        render: function(data, type, row) {
+                            return '<code>' + data + '</code>';
+                        }
+                    },
+                    {
+                        data: 'name',
+                        render: function(data, type, row) {
+                            return '<a href="/Admin/Product/Details/' + row.id + '" class="text-decoration-none fw-bold">' + data + '</a>';
+                        }
+                    },
+                    { data: 'category' },
+                    {
+                        data: 'price',
+                        render: function(data) {
+                            return  'Rp '.+toLocaleString('id-ID');
+                        }
+                    },
+                    {
+                        data: 'costPrice',
+                        render: function(data) {
+                            return  'Rp '.+toLocaleString('id-ID');
+                        }
+                    },
+                    {
+                        data: 'isActive',
+                        render: function(data) {
+                            var badgeClass = data === 'Active' ? 'bg-success' : 'bg-secondary';
+                            return '<span class="badge ' + badgeClass + '">' + data + '</span>';
+                        }
+                    },
+                    {
+                        data: 'isAvailable',
+                        render: function(data) {
+                            var badgeClass = data === 'Yes' ? 'bg-primary' : 'bg-warning';
+                            return '<span class="badge ' + badgeClass + '">' + data + '</span>';
+                        }
+                    },
+                    {
+                        data: null,
+                        orderable: false,
+                        render: function(data, type, row) {
+                            var actions = '<div class="btn-group" role="group">' +
+                                '<a href="/Admin/Product/Details/' + row.id + '" class="btn btn-sm btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>';
+
+                            @if (User.IsInRole("SuperAdmin") || User.IsInRole("Admin")) {
+                                <text>
+                                    actions += '<a href="/Admin/Product/Edit/' + row.id + '" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>' +
+                                        '<a href="/Admin/Product/Delete/' + row.id + '" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>';
+                                </text>
+                            }
+
+                            actions += '</div>';
+                            return actions;
+                        }
+                    }
+                ],
+                pageLength: 25,
+                lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]]
+            });
+
+            // Apply filters on change
+            $('#searchInput, #categoryFilter, #statusFilter').on('change', function() {
+                table.ajax.reload();
+            });
+
+            $('#searchInput').on('keyup', function(e) {
+                if (e.key === 'Enter') {
+                    table.ajax.reload();
+                }
+            });
+
+            // Reset filters
+            $('#resetFilters').on('click', function() {
+                $('#searchInput').val('');
+                $('#categoryFilter').val('');
+                $('#statusFilter').val('');
+                table.ajax.reload();
+            });
+        });
+
+        function  'Rp '.+toLocaleString('id-ID') {
+            return 'Rp ' + amount.toLocaleString('id-ID');
+        }
+    </script>
+}

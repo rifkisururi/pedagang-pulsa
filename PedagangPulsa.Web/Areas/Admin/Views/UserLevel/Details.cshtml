@@ -1,0 +1,131 @@
+@model PedagangPulsa.Web.Areas.Admin.ViewModels.UserLevelDetailViewModel
+
+@{
+    ViewData["Title"] = "User Level Details";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">User Level Details</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a asp-action="Index" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to List
+        </a>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0"><i class="bi bi-layers"></i> @Model.Name</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-4 text-muted">Level Name</dt>
+                    <dd class="col-sm-8">
+                        <span class="badge bg-primary fs-6">@Model.Name</span>
+                    </dd>
+
+                    <dt class="col-sm-4 text-muted">Markup Type</dt>
+                    <dd class="col-sm-8">
+                        <span class="badge @(Model.MarkupType == "Percentage" ? "bg-primary" : "bg-info")">
+                            @Model.MarkupType
+                        </span>
+                    </dd>
+
+                    <dt class="col-sm-4 text-muted">Markup Value</dt>
+                    <dd class="col-sm-8">
+                        @if (Model.MarkupType == "Percentage")
+                        {
+                            <span>@Model.MarkupValue%</span>
+                        }
+                        else
+                        {
+                            <span>Rp Model.MarkupValue.ToString("N0")</span>
+                        }
+                    </dd>
+
+                    
+                    <dt class="col-sm-4 text-muted">Status</dt>
+                    <dd class="col-sm-8">
+                        <span class="badge @(Model.IsActive ? "bg-success" : "bg-secondary")">
+                            @(Model.IsActive ? "Active" : "Inactive")
+                        </span>
+                    </dd>
+
+                    <dt class="col-sm-4 text-muted">Description</dt>
+                    <dd class="col-sm-8">@(Model.Description ?? "-")</dd>
+
+                    <dt class="col-sm-4 text-muted">Created</dt>
+                    <dd class="col-sm-8">@Model.CreatedAt.ToString("dd MMM yyyy HH:mm")</dd>
+
+                    <dt class="col-sm-4 text-muted">Updated</dt>
+                    <dd class="col-sm-8">@Model.UpdatedAt.ToString("dd MMM yyyy HH:mm")</dd>
+                </dl>
+            </div>
+            <div class="card-footer">
+                @if (User.IsInRole("SuperAdmin"))
+                {
+                    <div class="btn-group" role="group">
+                        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">
+                            <i class="bi bi-pencil"></i> Edit Level
+                        </a>
+                        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn-outline-danger">
+                            <i class="bi bi-trash"></i> Delete Level
+                        </a>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-white">
+                <h6 class="card-title mb-0">Level Benefits</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <div class="p-3">
+                            <i class="bi bi-tag fs-1 text-primary"></i>
+                            <h6 class="mt-2">Markup Type</h6>
+                            <p class="text-muted small">@Model.MarkupType</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3">
+                            <i class="bi bi-percent fs-1 text-success"></i>
+                            <h6 class="mt-2">Markup Value</h6>
+                            <p class="text-muted small">
+                                @if (Model.MarkupType == "Percentage")
+                                {
+                                    <span>@Model.MarkupValue%</span>
+                                }
+                                else
+                                {
+                                    <span>Rp Model.MarkupValue.ToString("N0")</span>
+                                }
+                            </p>
+                        </div>
+                    </div>
+                    </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function  'Rp '.+toLocaleString('id-ID') {
+            return 'Rp ' + amount.toLocaleString('id-ID');
+        }
+    </script>
+}
