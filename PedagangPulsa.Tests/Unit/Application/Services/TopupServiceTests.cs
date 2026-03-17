@@ -8,17 +8,28 @@ using Xunit;
 
 namespace PedagangPulsa.Tests.Unit.Application.Services;
 
-public class TopupServiceTests : IDisposable
+public class TopupServiceTests : IAsyncLifetime
 {
-    private readonly TestDbContext _context;
-    private readonly TopupService _topupService;
+    private TestDbContext _context = null!;
+    private TopupService _topupService = null!;
 
-    public TopupServiceTests()
+    public async Task InitializeAsync()
     {
         _context = new TestDbContext();
-        _context.SeedAsync().Wait();
+
+        // Clean up database before seeding to avoid primary key conflicts
+        await _context.CleanupBeforeSeedAsync();
+
+        await _context.SeedAsync();
 
         _topupService = new TopupService(_context);
+    }
+
+    public async Task DisposeAsync()
+    {
+        // Clean up test data after all tests
+        await _context.CleanupBeforeSeedAsync();
+        await _context.DisposeAsync();
     }
 
     [Fact]

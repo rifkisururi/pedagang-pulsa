@@ -1,0 +1,90 @@
+@model PedagangPulsa.Web.Areas.Admin.ViewModels.RejectTopupViewModel
+
+<div class="modal-header bg-danger text-white">
+    <h5 class="modal-title"><i class="bi bi-x-circle"></i> Reject Topup Request</h5>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+</div>
+<div class="modal-body">
+    <form asp-action="Reject" asp-controller="Topup" method="post" id="rejectForm">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="Id" />
+
+        <div class="alert alert-info">
+            <div class="row">
+                <div class="col-sm-4"><strong>Username:</strong></div>
+                <div class="col-sm-8">@Model.Username</div>
+            </div>
+            @if (!string.IsNullOrEmpty(Model.FullName))
+            {
+                <div class="row">
+                    <div class="col-sm-4"><strong>Full Name:</strong></div>
+                    <div class="col-sm-8">@Model.FullName</div>
+                </div>
+            }
+            <div class="row">
+                <div class="col-sm-4"><strong>Bank:</strong></div>
+                <div class="col-sm-8">@Model.BankName</div>
+            </div>
+            <div class="row">
+                <div class="col-sm-4"><strong>Amount:</strong></div>
+                <div class="col-sm-8">Rp Model.Amount.ToString("N0")</div>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="RejectReason" class="form-label fw-bold">Reject Reason <span class="text-danger">*</span></label>
+            <textarea asp-for="RejectReason" class="form-control" rows="3" required placeholder="Please provide a reason for rejecting this topup request..."></textarea>
+            <span asp-validation-for="RejectReason" class="text-danger"></span>
+        </div>
+
+        <div class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle"></i>
+            <strong>Warning:</strong> This action cannot be undone. The user will be notified of the rejection.
+        </div>
+    </form>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+    <button type="button" class="btn btn-danger" onclick="submitRejectForm()">
+        <i class="bi bi-x-circle"></i> Reject
+    </button>
+</div>
+
+<script>
+    function  'Rp '.+toLocaleString('id-ID') {
+        return 'Rp ' + amount.toLocaleString('id-ID');
+    }
+
+    function submitRejectForm() {
+        const form = $('#rejectForm');
+        const rejectReason = $('#RejectReason').val().trim();
+
+        if (!rejectReason) {
+            toastr.error('Reject reason is required');
+            $('#RejectReason').addClass('is-invalid');
+            return;
+        }
+
+        $.ajax({
+            url: form.attr('action'),
+            type: 'POST',
+            data: form.serialize(),
+            success: function(response) {
+                if (response.success) {
+                    $('#rejectModal').modal('hide');
+                    $('#topupTable').DataTable().ajax.reload();
+                    toastr.success(response.message);
+                } else {
+                    toastr.error(response.message);
+                }
+            },
+            error: function() {
+                toastr.error('An error occurred while processing your request.');
+            }
+        });
+    }
+
+    $('#RejectReason').on('input', function() {
+        $(this).removeClass('is-invalid');
+    });
+</script>

@@ -113,8 +113,9 @@ public class SupplierService
 
         existing.Name = supplier.Name;
         existing.ApiBaseUrl = supplier.ApiBaseUrl;
-        existing.ApiKeyEnc = supplier.ApiKeyEnc;
-        existing.CallbackSecret = supplier.CallbackSecret;
+        existing.MemberId = supplier.MemberId;
+        existing.Pin = supplier.Pin;
+        existing.Password = supplier.Password;
         existing.TimeoutSeconds = supplier.TimeoutSeconds;
         existing.Balance = supplier.Balance;
         existing.IsActive = supplier.IsActive;

@@ -12,18 +12,22 @@ using Xunit;
 
 namespace PedagangPulsa.Tests.Unit.Application.Services;
 
-public class TransactionServiceTests : IDisposable
+public class TransactionServiceTests : IAsyncLifetime
 {
-    private readonly TestDbContext _context;
-    private readonly TransactionService _transactionService;
-    private readonly Mock<ILoggerFactory> _loggerFactoryMock;
-    private readonly Mock<ISupplierAdapterFactory> _adapterFactoryMock;
-    private readonly Mock<ISupplierAdapter> _supplierAdapterMock;
+    private TestDbContext _context = null!;
+    private TransactionService _transactionService = null!;
+    private Mock<ILoggerFactory> _loggerFactoryMock = null!;
+    private Mock<ISupplierAdapterFactory> _adapterFactoryMock = null!;
+    private Mock<ISupplierAdapter> _supplierAdapterMock = null!;
 
-    public TransactionServiceTests()
+    public async Task InitializeAsync()
     {
         _context = new TestDbContext();
-        _context.SeedAsync().Wait();
+
+        // Clean up database before seeding to avoid primary key conflicts
+        await _context.CleanupBeforeSeedAsync();
+
+        await _context.SeedAsync();
 
         _loggerFactoryMock = MockServices.CreateLoggerFactory();
         _adapterFactoryMock = MockServices.CreateSupplierAdapterFactory();
@@ -34,6 +38,13 @@ public class TransactionServiceTests : IDisposable
             _adapterFactoryMock.Object,
             _loggerFactoryMock.Object
         );
+    }
+
+    public async Task DisposeAsync()
+    {
+        // Clean up test data after all tests
+        await _context.CleanupBeforeSeedAsync();
+        await _context.DisposeAsync();
     }
 
     [Fact]
@@ -267,11 +278,12 @@ public class TransactionServiceTests : IDisposable
         // Assert
         processResult.Should().BeFalse();
 
-        // Refresh transaction
-        _context.Entry(createResult.Transaction).ReloadAsync().Wait();
-        createResult.Transaction.Status.Should().Be(TransactionStatus.Failed);
-        createResult.Transaction.ErrorMessage.Should().Be("All suppliers failed");
-        createResult.Transaction.CompletedAt.Should().NotBeNull();
+        // Refresh transaction - fetch from database instead of ReloadAsync
+        var updatedTransaction = await _context.Transactions.FindAsync(createResult.Transaction.Id);
+        updatedTransaction.Should().NotBeNull();
+        updatedTransaction!.Status.Should().Be(TransactionStatus.Failed);
+        updatedTransaction.ErrorMessage.Should().Be("All suppliers failed");
+        updatedTransaction.CompletedAt.Should().NotBeNull();
 
         // Verify held balance was released
         _context.Entry(user.Balance).ReloadAsync().Wait();
@@ -356,9 +368,11 @@ public class TransactionServiceTests : IDisposable
         await _transactionService.ProcessTransactionAsync(createResult.Transaction.Id);
 
         // Assert
-        _context.Entry(createResult.Transaction).ReloadAsync().Wait();
+        // Fetch from database instead of ReloadAsync
+        var updatedTransaction = await _context.Transactions.FindAsync(createResult.Transaction.Id);
+        updatedTransaction.Should().NotBeNull();
         initialStatus.Should().Be(TransactionStatus.Pending);
-        createResult.Transaction.Status.Should().Be(TransactionStatus.Success);
+        updatedTransaction!.Status.Should().Be(TransactionStatus.Success);
     }
 
     [Fact]

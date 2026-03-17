@@ -11,19 +11,23 @@ using Xunit;
 
 namespace PedagangPulsa.Tests.Unit.Application.Services;
 
-public class BalanceServiceTests : IDisposable
+public class BalanceServiceTests : IAsyncLifetime
 {
-    private readonly TestDbContext _context;
-    private readonly BalanceService _balanceService;
-    private readonly TransactionService _transactionService;
-    private readonly Mock<ILogger<BalanceService>> _loggerMock;
-    private readonly Mock<ILoggerFactory> _loggerFactoryMock;
-    private readonly Mock<ISupplierAdapterFactory> _adapterFactoryMock;
+    private TestDbContext _context = null!;
+    private BalanceService _balanceService = null!;
+    private TransactionService _transactionService = null!;
+    private Mock<ILogger<BalanceService>> _loggerMock = null!;
+    private Mock<ILoggerFactory> _loggerFactoryMock = null!;
+    private Mock<ISupplierAdapterFactory> _adapterFactoryMock = null!;
 
-    public BalanceServiceTests()
+    public async Task InitializeAsync()
     {
         _context = new TestDbContext();
-        _context.SeedAsync().Wait();
+
+        // Clean up database before seeding to avoid primary key conflicts
+        await _context.CleanupBeforeSeedAsync();
+
+        await _context.SeedAsync();
 
         _loggerMock = MockServices.CreateLogger<BalanceService>();
         _balanceService = new BalanceService(_context, _loggerMock.Object);
@@ -31,6 +35,13 @@ public class BalanceServiceTests : IDisposable
         _loggerFactoryMock = MockServices.CreateLoggerFactory();
         _adapterFactoryMock = MockServices.CreateSupplierAdapterFactory();
         _transactionService = new TransactionService(_context, _adapterFactoryMock.Object, _loggerFactoryMock.Object);
+    }
+
+    public async Task DisposeAsync()
+    {
+        // Clean up test data after all tests
+        await _context.CleanupBeforeSeedAsync();
+        await _context.DisposeAsync();
     }
 
     [Fact]

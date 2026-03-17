@@ -21,6 +21,9 @@ public class SupplierServiceTests : IAsyncLifetime
         _supplierProductService = new SupplierProductService(_context);
         _supplierBalanceService = new SupplierBalanceService(_context, new Microsoft.Extensions.Logging.Abstractions.NullLogger<SupplierBalanceService>());
 
+        // Clean up database before seeding to avoid primary key conflicts
+        await _context.CleanupBeforeSeedAsync();
+
         // Seed ProductCategory (required for Product entity)
         var category = new ProductCategory
         {
@@ -36,7 +39,8 @@ public class SupplierServiceTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        await _context.Database.EnsureDeletedAsync();
+        // Clean up test data after all tests
+        await _context.CleanupBeforeSeedAsync();
         await _context.DisposeAsync();
     }
 
@@ -51,7 +55,9 @@ public class SupplierServiceTests : IAsyncLifetime
             Name = "Digiflazz",
             Code = "DIGI",
             ApiBaseUrl = "https://api.digiflazz.com",
-            ApiKeyEnc = "encrypted_key",
+            MemberId = "test_member_id",
+            Pin = "test_pin",
+            Password = "test_password",
             TimeoutSeconds = 30,
             IsActive = true
         };
@@ -106,14 +112,18 @@ public class SupplierServiceTests : IAsyncLifetime
             Name = "Digiflazz",
             Code = "DIGI",
             ApiBaseUrl = "https://api.digiflazz.com",
-            ApiKeyEnc = "old_key",
+            MemberId = "old_member_id",
+            Pin = "old_pin",
+            Password = "old_password",
             TimeoutSeconds = 30
         };
 
         var created = await _supplierService.CreateSupplierAsync(supplier);
 
         created.ApiBaseUrl = "https://api.new-digiflazz.com";
-        created.ApiKeyEnc = "new_encrypted_key";
+        created.MemberId = "new_member_id";
+        created.Pin = "new_pin";
+        created.Password = "new_password";
         created.TimeoutSeconds = 60;
         created.IsActive = false;
 
@@ -123,7 +133,7 @@ public class SupplierServiceTests : IAsyncLifetime
         // Assert
         result.Should().NotBeNull();
         result.ApiBaseUrl.Should().Be("https://api.new-digiflazz.com");
-        result.ApiKeyEnc.Should().Be("new_encrypted_key");
+        result.MemberId.Should().Be("new_member_id");
         result.TimeoutSeconds.Should().Be(60);
         result.IsActive.Should().BeFalse();
     }

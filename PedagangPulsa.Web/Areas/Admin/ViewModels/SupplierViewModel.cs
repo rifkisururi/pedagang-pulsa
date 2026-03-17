@@ -15,14 +15,19 @@ public class SupplierViewModel
     [StringLength(500, ErrorMessage = "URL cannot be longer than 500 characters")]
     public string ApiUrl { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "API Key is required")]
-    [StringLength(200, ErrorMessage = "API Key cannot be longer than 200 characters")]
-    [DataType(DataType.Password)]
-    public string ApiKey { get; set; } = string.Empty;
+    [Required(ErrorMessage = "Member ID is required")]
+    [StringLength(100, ErrorMessage = "Member ID cannot be longer than 100 characters")]
+    public string MemberId { get; set; } = string.Empty;
 
-    [StringLength(200, ErrorMessage = "API Secret cannot be longer than 200 characters")]
+    [Required(ErrorMessage = "PIN is required")]
+    [StringLength(50, ErrorMessage = "PIN cannot be longer than 50 characters")]
     [DataType(DataType.Password)]
-    public string? ApiSecret { get; set; }
+    public string Pin { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Password is required")]
+    [StringLength(100, ErrorMessage = "Password cannot be longer than 100 characters")]
+    [DataType(DataType.Password)]
+    public string Password { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Timeout is required")]
     [Range(10, 120, ErrorMessage = "Timeout must be between 10 and 120 seconds")]

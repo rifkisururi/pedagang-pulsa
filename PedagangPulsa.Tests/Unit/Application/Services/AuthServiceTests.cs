@@ -10,19 +10,30 @@ using Xunit;
 
 namespace PedagangPulsa.Tests.Unit.Application.Services;
 
-public class AuthServiceTests : IDisposable
+public class AuthServiceTests : IAsyncLifetime
 {
-    private readonly TestDbContext _context;
-    private readonly AuthService _authService;
-    private readonly Mock<ILogger<AuthService>> _loggerMock;
+    private TestDbContext _context = null!;
+    private AuthService _authService = null!;
+    private Mock<ILogger<AuthService>> _loggerMock = null!;
 
-    public AuthServiceTests()
+    public async Task InitializeAsync()
     {
         _context = new TestDbContext();
-        _context.SeedAsync().Wait();
+
+        // Clean up database before seeding to avoid primary key conflicts
+        await _context.CleanupBeforeSeedAsync();
+
+        await _context.SeedAsync();
 
         _loggerMock = MockServices.CreateLogger<AuthService>();
         _authService = new AuthService(_context, _loggerMock.Object);
+    }
+
+    public async Task DisposeAsync()
+    {
+        // Clean up test data after all tests
+        await _context.CleanupBeforeSeedAsync();
+        await _context.DisposeAsync();
     }
 
     [Fact]

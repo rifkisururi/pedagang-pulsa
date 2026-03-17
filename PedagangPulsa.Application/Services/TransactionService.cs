@@ -351,8 +351,8 @@ public class TransactionService
         {
             SupplierId = supplierProduct.SupplierId,
             SupplierUsername = supplierProduct.Supplier?.Name ?? "",
-            SupplierApiKey = supplierProduct.Supplier?.ApiKeyEnc ?? "",
-            SupplierApiSecret = supplierProduct.Supplier?.CallbackSecret,
+            SupplierApiKey = supplierProduct.Supplier?.MemberId ?? "",
+            SupplierApiSecret = supplierProduct.Supplier?.Password,
             SupplierApiUrl = supplierProduct.Supplier?.ApiBaseUrl ?? "",
             SupplierProductCode = supplierProduct.SupplierProductCode ?? "",
             DestinationNumber = transaction.Destination,

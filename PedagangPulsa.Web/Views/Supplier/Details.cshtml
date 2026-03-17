@@ -1,0 +1,138 @@
+@model PedagangPulsa.Web.Areas.Admin.ViewModels.SupplierDetailViewModel
+
+@{
+    ViewData["Title"] = "Supplier Details";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Supplier Details</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a asp-action="Index" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to List
+        </a>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="row">
+    <!-- Supplier Info Card -->
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0"><i class="bi bi-shop"></i> @Model.Name</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-5 text-muted">Supplier Name</dt>
+                    <dd class="col-sm-7">@Model.Name</dd>
+
+                    <dt class="col-sm-5 text-muted">Base URL</dt>
+                    <dd class="col-sm-7"><small class="text-muted">@Model.ApiUrl</small></dd>
+
+                    <dt class="col-sm-5 text-muted">Member ID</dt>
+                    <dd class="col-sm-7">
+                        <code>@(Model.MemberId.Length > 20 ? Model.MemberId.Substring(0, 20) + "..." : Model.MemberId)</code>
+                    </dd>
+
+                    <dt class="col-sm-5 text-muted">PIN</dt>
+                    <dd class="col-sm-7">@(string.IsNullOrEmpty(Model.Pin) ? "-" : "••••")</dd>
+
+                    <dt class="col-sm-5 text-muted">Password</dt>
+                    <dd class="col-sm-7">@(string.IsNullOrEmpty(Model.Password) ? "-" : "••••••••")</dd>
+
+                    <dt class="col-sm-5 text-muted">Timeout</dt>
+                    <dd class="col-sm-7">@Model.TimeoutSeconds seconds</dd>
+
+                    <dt class="col-sm-5 text-muted">Status</dt>
+                    <dd class="col-sm-7">
+                        <span class="badge @(Model.IsActive ? "bg-success" : "bg-secondary")">
+                            @(Model.IsActive ? "Active" : "Inactive")
+                        </span>
+                    </dd>
+
+                    <dt class="col-sm-5 text-muted">Created</dt>
+                    <dd class="col-sm-7">@Model.CreatedAt.ToString("dd MMM yyyy HH:mm")</dd>
+
+                    <dt class="col-sm-5 text-muted">Updated</dt>
+                    <dd class="col-sm-7">@Model.UpdatedAt.ToString("dd MMM yyyy HH:mm")</dd>
+                </dl>
+            </div>
+            <div class="card-footer">
+                @if (User.IsInRole("SuperAdmin"))
+                {
+                    <div class="btn-group" role="group">
+                        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">
+                            <i class="bi bi-pencil"></i> Edit Supplier
+                        </a>
+                        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn-outline-danger">
+                            <i class="bi bi-trash"></i> Delete
+                        </a>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Balance Card -->
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0"><i class="bi bi-wallet2"></i> Balance Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <h6 class="text-muted mb-2">Current Balance</h6>
+                    <h2 class="@(Model.Balance < (Model.BalanceThresholdLow ?? 0) ? "text-warning" : "text-success")">
+                        Rp Model.Balance.ToString("N0")
+                    </h2>
+                </div>
+
+                <div class="row">
+                    <div class="col-6">
+                        <div class="p-3 border rounded">
+                            <small class="text-muted d-block">Low Threshold</small>
+                            <strong>Rp Model.BalanceThresholdLow ?? 0.ToString("N0")</strong>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 border rounded">
+                            <small class="text-muted d-block">Critical Threshold</small>
+                            <strong>Rp Model.BalanceThresholdCritical ?? 0.ToString("N0")</strong>
+                        </div>
+                    </div>
+                </div>
+
+                @if (Model.Balance < (Model.BalanceThresholdCritical ?? 0))
+                {
+                    <div class="alert alert-danger mt-3 mb-0">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <strong>Critical:</strong> Balance is below critical threshold!
+                    </div>
+                }
+                else if (Model.Balance < (Model.BalanceThresholdLow ?? 0))
+                {
+                    <div class="alert alert-warning mt-3 mb-0">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Warning:</strong> Balance is below low threshold.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function  'Rp '.+toLocaleString('id-ID') {
+            return 'Rp ' + amount.toLocaleString('id-ID');
+        }
+    </script>
+}

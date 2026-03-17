@@ -17,7 +17,7 @@ namespace PedagangPulsa.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.4")
+                .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "admin_role", new[] { "superadmin", "admin", "finance", "staff" });
@@ -56,8 +56,9 @@ namespace PedagangPulsa.Infrastructure.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
-                    b.Property<int>("Role")
-                        .HasColumnType("integer");
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -168,8 +169,9 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     b.Property<string>("RefType")
                         .HasColumnType("text");
 
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
@@ -256,8 +258,9 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     b.Property<string>("Body")
                         .HasColumnType("text");
 
-                    b.Property<int>("Channel")
-                        .HasColumnType("integer");
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("ErrorMessage")
                         .HasColumnType("text");
@@ -282,7 +285,8 @@ namespace PedagangPulsa.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("Subject")
                         .HasMaxLength(200)
@@ -538,8 +542,9 @@ namespace PedagangPulsa.Infrastructure.Migrations
                         .HasPrecision(15, 2)
                         .HasColumnType("numeric(15,2)");
 
-                    b.Property<int>("BonusStatus")
-                        .HasColumnType("integer");
+                    b.Property<string>("BonusStatus")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("CancellationReason")
                         .HasColumnType("text");
@@ -629,12 +634,6 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     b.Property<string>("ApiBaseUrl")
                         .HasColumnType("text");
 
-                    b.Property<string>("ApiKeyEnc")
-                        .HasColumnType("text");
-
-                    b.Property<string>("CallbackSecret")
-                        .HasColumnType("text");
-
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -646,10 +645,19 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("MemberId")
+                        .HasColumnType("text");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Password")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Pin")
+                        .HasColumnType("text");
 
                     b.Property<short>("TimeoutSeconds")
                         .HasColumnType("smallint");
@@ -882,8 +890,9 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     b.Property<Guid?>("RejectedBy")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("TransferProofUrl")
                         .HasColumnType("text");
@@ -952,8 +961,9 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     b.Property<string>("Sn")
                         .HasColumnType("text");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<int?>("SupplierId")
                         .HasColumnType("integer");
@@ -1014,8 +1024,9 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     b.Property<short>("Seq")
                         .HasColumnType("smallint");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<int>("SupplierId")
                         .HasColumnType("integer");
@@ -1105,8 +1116,9 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     b.Property<Guid?>("ReferredBy")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1178,8 +1190,9 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
-                    b.Property<int>("MarkupType")
-                        .HasColumnType("integer");
+                    b.Property<string>("MarkupType")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<decimal>("MarkupValue")
                         .HasPrecision(10, 4)

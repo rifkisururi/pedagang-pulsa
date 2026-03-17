@@ -17,12 +17,16 @@ public class ProductServiceTests : IAsyncLifetime
     {
         _context = new TestDbContext();
         _service = new ProductService(_context);
+
+        // Clean up database before seeding to avoid primary key conflicts
+        await _context.CleanupBeforeSeedAsync();
         await SeedDataAsync();
     }
 
     public async Task DisposeAsync()
     {
-        await _context.Database.EnsureDeletedAsync();
+        // Clean up test data after all tests
+        await _context.CleanupBeforeSeedAsync();
         await _context.DisposeAsync();
     }
 
@@ -121,7 +125,7 @@ public class ProductServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task CreateProductAsync_WithDuplicateCode_CreatesBothProducts()
+    public async Task CreateProductAsync_WithDuplicateCode_ThrowsException()
     {
         // Arrange
         var existingProduct = new Product
@@ -148,19 +152,20 @@ public class ProductServiceTests : IAsyncLifetime
             IsActive = true
         };
 
-        // Act
-        var result = await _service.CreateProductAsync(newProduct, null);
+        // Act & Assert
+        // PostgreSQL enforces unique constraint on Product.Code
+        // This should throw an exception (DbUpdateException wrapped in AggregateException)
+        var exception = await Assert.ThrowsAsync<Microsoft.EntityFrameworkCore.DbUpdateException>(
+            async () => await _service.CreateProductAsync(newProduct, null));
 
-        // Assert
-        // Note: InMemory database doesn't enforce unique constraints
-        // In production, PostgreSQL would have a unique constraint
-        result.Should().NotBeNull();
+        exception.InnerException.Should().BeOfType<Npgsql.PostgresException>();
 
+        // Verify only one product with this code exists
         var productsWithSameCode = await _context.Products
             .Where(p => p.Code == "TSEL5")
             .ToListAsync();
 
-        productsWithSameCode.Should().HaveCount(2);
+        productsWithSameCode.Should().HaveCount(1);
     }
 
     [Fact]

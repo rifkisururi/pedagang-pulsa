@@ -15,7 +15,15 @@
       "Bash(Select-Object:*)",
       "Bash(del:*)",
       "Bash(git add:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(git commit:*)",
+      "Bash(timeout:*)",
+      "Bash(ping:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(psql -h localhost -U postgres -d pedagangpulsa_db -f drop-enums.sql)",
+      "Bash(powershell:*)",
+      "Bash(git push:*)"
     ]
   },
   "enabledPlugins": {

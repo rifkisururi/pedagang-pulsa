@@ -5,8 +5,9 @@ public class SupplierDetailViewModel
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? ApiUrl { get; set; }
-    public string ApiKey { get; set; } = string.Empty;
-    public string? ApiSecret { get; set; }
+    public string MemberId { get; set; } = string.Empty;
+    public string Pin { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
     public int TimeoutSeconds { get; set; }
     public decimal Balance { get; set; }
     public decimal? BalanceThresholdLow { get; set; }

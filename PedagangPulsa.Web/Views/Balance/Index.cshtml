@@ -1,0 +1,384 @@
+@model dynamic
+
+@{
+    ViewData["Title"] = "Balance Management";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Balance Management</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#adjustBalanceModal">
+            <i class="bi bi-plus-circle"></i> Adjust Balance
+        </button>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Total Active Balance
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalActiveBalance">Loading...</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-wallet2 fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">Search</label>
+                <input type="text" class="form-control" id="searchInput" placeholder="Search by username...">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Type</label>
+                <select class="form-select" id="typeFilter">
+                    <option value="">All Types</option>
+                    <option value="Topup">Topup</option>
+                    <option value="Transaction">Transaction</option>
+                    <option value="ManualCredit">Manual Credit</option>
+                    <option value="ManualDebit">Manual Debit</option>
+                    <option value="ReferralBonus">Referral Bonus</option>
+                    <option value="Commission">Commission</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Start Date</label>
+                <input type="date" class="form-control" id="startDate" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">End Date</label>
+                <input type="date" class="form-control" id="endDate" />
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small fw-bold">&nbsp;</label>
+                <button type="button" class="btn btn-outline-secondary w-100" id="resetFilters">
+                    <i class="bi bi-arrow-clockwise"></i> Reset
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped" id="balanceTable" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Date/Time</th>
+                        <th>Username</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Balance Before</th>
+                        <th>Balance After</th>
+                        <th>Description</th>
+                        <th>Performed By</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" />
+
+    <script>
+        $(document).ready(function() {
+            var table = $('#balanceTable').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: '/Balance/GetData',
+                    type: 'POST',
+                    data: function(d) {
+                        d.search = $('#searchInput').val();
+                        d.type = $('#typeFilter').val() || null;
+                        d.startDate = $('#startDate').val() || null;
+                        d.endDate = $('#endDate').val() || null;
+                        return d;
+                    }
+                },
+                order: [[0, 'desc']],
+                columns: [
+                    { data: 'createdAt' },
+                    { data: 'username' },
+                    {
+                        data: 'type',
+                        render: function(data) {
+                            var badgeClass = 'bg-secondary';
+                            var label = data;
+
+                            switch(data) {
+                                case 'Topup':
+                                    badgeClass = 'bg-success';
+                                    break;
+                                case 'Transaction':
+                                    badgeClass = 'bg-primary';
+                                    break;
+                                case 'ManualCredit':
+                                    badgeClass = 'bg-info';
+                                    label = 'Manual Credit';
+                                    break;
+                                case 'ManualDebit':
+                                    badgeClass = 'bg-warning';
+                                    label = 'Manual Debit';
+                                    break;
+                                case 'ReferralBonus':
+                                    badgeClass = 'bg-purple';
+                                    label = 'Referral Bonus';
+                                    break;
+                                case 'Commission':
+                                    badgeClass = 'bg-teal';
+                                    break;
+                            }
+
+                            return '<span class="badge ' + badgeClass + '">' + label + '</span>';
+                        }
+                    },
+                    {
+                        data: 'amount',
+                        render: function(data, type, row) {
+                            var color = data >= 0 ? 'text-success' : 'text-danger';
+                            var sign = data >= 0 ? '+' : '';
+                            return '<span class="' + color + '">' + sign + 'Rp ' + data.toLocaleString('id-ID') + '</span>';
+                        }
+                    },
+                    {
+                        data: 'balanceBefore',
+                        render: function(data) {
+                            return 'Rp ' + data.toLocaleString('id-ID');
+                        }
+                    },
+                    {
+                        data: 'balanceAfter',
+                        render: function(data) {
+                            return '<strong>' +  'Rp '.+toLocaleString('id-ID') + '</strong>';
+                        }
+                    },
+                    { data: 'description' },
+                    { data: 'performedBy' }
+                ],
+                pageLength: 25,
+                lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]]
+            });
+
+            // Apply filters on change
+            $('#searchInput, #typeFilter, #startDate, #endDate').on('change', function() {
+                table.ajax.reload();
+            });
+
+            $('#searchInput').on('keyup', function(e) {
+                if (e.key === 'Enter') {
+                    table.ajax.reload();
+                }
+            });
+
+            // Reset filters
+            $('#resetFilters').on('click', function() {
+                $('#searchInput').val('');
+                $('#typeFilter').val('');
+                $('#startDate').val('');
+                $('#endDate').val('');
+                table.ajax.reload();
+            });
+        });
+
+        function  'Rp '.+toLocaleString('id-ID') {
+            return 'Rp ' + amount.toLocaleString('id-ID');
+        }
+    </script>
+}
+
+<!-- Adjust Balance Modal -->
+<div class="modal fade" id="adjustBalanceModal" tabindex="--1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Adjust User Balance</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="adjustBalanceForm">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label class="form-label">Search User <span class="text-danger">*</span></label>
+                        <select class="form-control select2" id="userSelect" style="width: 100%;" required>
+                            <option value="">Select a user...</option>
+                        </select>
+                        <small class="form-text text-muted">Start typing to search users by username, email, or phone</small>
+                    </div>
+
+                    <div id="userInfoSection" style="display: none;">
+                        <div class="alert alert-info">
+                            <div class="row">
+                                <div class="col-sm-4"><strong>Username:</strong></div>
+                                <div class="col-sm-8" id="displayUsername">-</div>
+                            </div>
+                            <div class="row">
+                                <div class="col-sm-4"><strong>Full Name:</strong></div>
+                                <div class="col-sm-8" id="displayFullName">-</div>
+                            </div>
+                            <div class="row">
+                                <div class="col-sm-4"><strong>Email:</strong></div>
+                                <div class="col-sm-8" id="displayEmail">-</div>
+                            </div>
+                            <div class="row">
+                                <div class="col-sm-4"><strong>Current Balance:</strong></div>
+                                <div class="col-sm-8" id="displayCurrentBalance">-</div>
+                            </div>
+                        </div>
+
+                        <input type="hidden" id="userId" name="userId" />
+
+                        <div class="mb-3">
+                            <label class="form-label">Amount <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rp</span>
+                                <input type="number" class="form-control" id="amount" name="amount" required
+                                       placeholder="Positive to add, negative to deduct" step="0.01">
+                            </div>
+                            <small class="form-text text-muted">
+                                <i class="bi bi-info-circle"></i>
+                                Use <strong>positive</strong> value to add balance, <strong>negative</strong> to deduct
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Admin Notes</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="2"
+                                      placeholder="Reason for this adjustment..."></textarea>
+                        </div>
+
+                        <div class="alert alert-warning" id="warningMessage" style="display: none;">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Warning:</strong> This will <span id="actionType"></span> the user's balance.
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="submitAdjustBtn" disabled onclick="submitAdjustBalance()">
+                    <i class="bi bi-check-circle"></i> Adjust Balance
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+    $('#userSelect').select2({
+        ajax: {
+            url: '/Balance/SearchUsers',
+            dataType: 'json',
+            delay: 250,
+            data: function(params) {
+                return { term: params.term };
+            },
+            processResults: function(data) {
+                return { results: data };
+            }
+        },
+        minimumInputLength: 2,
+        placeholder: 'Search users...',
+        templateResult: function(item) {
+            if (!item.id) return item.text;
+            return $('<span>' + item.text + '</span>');
+        }
+    });
+
+    $('#userSelect').on('select2:select', function(e) {
+        var data = e.params.data;
+        $('#userId').val(data.id);
+        loadUserInfo(data.id);
+    });
+
+    function loadUserInfo(userId) {
+        $.get('/Balance/AdjustBalance/' + userId, function(data) {
+            $('#displayUsername').text(data.username);
+            $('#displayFullName').text(data.fullName || '-');
+            $('#displayEmail').text(data.email || '-');
+            $('#displayCurrentBalance').text( 'Rp '.+toLocaleString('id-ID'));
+
+            $('#userInfoSection').show();
+            $('#submitAdjustBtn').prop('disabled', false);
+        });
+    }
+
+    $('#amount').on('input', function() {
+        var amount = parseFloat($(this).val());
+        var warningMsg = $('#warningMessage');
+        var actionType = $('#actionType');
+
+        if (!isNaN(amount) && amount !== 0) {
+            warningMsg.show();
+            if (amount > 0) {
+                warningMsg.removeClass('alert-danger').addClass('alert-warning');
+                actionType.text('<strong>add to</strong>');
+            } else {
+                warningMsg.removeClass('alert-warning').addClass('alert-danger');
+                actionType.text('<strong>deduct from</strong>');
+            }
+        } else {
+            warningMsg.hide();
+        }
+    });
+
+    function submitAdjustBalance() {
+        var userId = $('#userId').val();
+        var amount = parseFloat($('#amount').val());
+        var notes = $('#notes').val();
+
+        if (!userId || isNaN(amount) || amount === 0) {
+            toastr.error('Please select a user and enter a valid amount');
+            return;
+        }
+
+        $.ajax({
+            url: '/Balance/AdjustBalance',
+            type: 'POST',
+            data: {
+                __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val(),
+                userId: userId,
+                amount: amount,
+                notes: notes
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#adjustBalanceModal').modal('hide');
+                    $('#balanceTable').DataTable().ajax.reload();
+                    toastr.success(response.message);
+
+                    // Reset form
+                    $('#userSelect').val(null).trigger('change');
+                    $('#userInfoSection').hide();
+                    $('#amount').val('');
+                    $('#notes').val('');
+                    $('#warningMessage').hide();
+                    $('#submitAdjustBtn').prop('disabled', true);
+                } else {
+                    toastr.error(response.message);
+                }
+            },
+            error: function() {
+                toastr.error('An error occurred while processing your request.');
+            }
+        });
+    }
+</script>

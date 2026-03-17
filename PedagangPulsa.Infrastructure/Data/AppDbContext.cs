@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PedagangPulsa.Domain.Entities;
+using PedagangPulsa.Domain.Enums;
 
 namespace PedagangPulsa.Infrastructure.Data;
 
@@ -56,6 +57,58 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // Configure PostgreSQL enum mappings
+        modelBuilder.HasPostgresEnum("user_status", new[] { "active", "inactive", "suspended" });
+        modelBuilder.HasPostgresEnum("transaction_status", new[] { "pending", "processing", "success", "failed", "refunded", "cancelled" });
+        modelBuilder.HasPostgresEnum("attempt_status", new[] { "pending", "processing", "success", "failed", "timeout" });
+        modelBuilder.HasPostgresEnum("topup_status", new[] { "pending", "approved", "rejected" });
+        modelBuilder.HasPostgresEnum("notification_channel", new[] { "email", "sms", "whatsapp" });
+        modelBuilder.HasPostgresEnum("markup_type", new[] { "percentage", "fixed" });
+        modelBuilder.HasPostgresEnum("admin_role", new[] { "superadmin", "admin", "finance", "staff" });
+        modelBuilder.HasPostgresEnum("referral_bonus_status", new[] { "pending", "paid", "cancelled" });
+        modelBuilder.HasPostgresEnum("balance_tx_type", new[] { "topup", "purchase_hold", "purchase_debit", "purchase_release", "transfer_out", "transfer_in", "refund", "adjustment" });
+
+        // Map enum properties to PostgreSQL enum types
+        modelBuilder.Entity<User>()
+            .Property(e => e.Status)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<Transaction>()
+            .Property(e => e.Status)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<TransactionAttempt>()
+            .Property(e => e.Status)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<TopupRequest>()
+            .Property(e => e.Status)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<NotificationLog>()
+            .Property(e => e.Channel)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<NotificationLog>()
+            .Property(e => e.Status)
+            .HasMaxLength(20);
+
+        modelBuilder.Entity<UserLevel>()
+            .Property(e => e.MarkupType)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<AdminUser>()
+            .Property(e => e.Role)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<ReferralLog>()
+            .Property(e => e.BonusStatus)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<BalanceLedger>()
+            .Property(e => e.Type)
+            .HasConversion<string>();
 
         // UserLevel
         modelBuilder.Entity<UserLevel>(entity =>

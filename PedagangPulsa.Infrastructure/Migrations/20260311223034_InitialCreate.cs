@@ -31,7 +31,7 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     Username = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     Email = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     PasswordHash = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
-                    Role = table.Column<int>(type: "integer", nullable: false),
+                    Role = table.Column<string>(type: "text", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     LastLoginAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
@@ -87,7 +87,7 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     Code = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    Channel = table.Column<int>(type: "integer", nullable: false),
+                    Channel = table.Column<string>(type: "text", nullable: false),
                     Subject = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
                     Body = table.Column<string>(type: "text", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false)
@@ -143,7 +143,7 @@ namespace PedagangPulsa.Infrastructure.Migrations
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     Description = table.Column<string>(type: "text", nullable: true),
-                    MarkupType = table.Column<int>(type: "integer", nullable: false),
+                    MarkupType = table.Column<string>(type: "text", nullable: false),
                     MarkupValue = table.Column<decimal>(type: "numeric(10,4)", precision: 10, scale: 4, nullable: false),
                     CanTransfer = table.Column<bool>(type: "boolean", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
@@ -219,7 +219,7 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     CanTransferOverride = table.Column<bool>(type: "boolean", nullable: true),
                     ReferralCode = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     ReferredBy = table.Column<Guid>(type: "uuid", nullable: true),
-                    Status = table.Column<int>(type: "integer", nullable: false),
+                    Status = table.Column<string>(type: "text", nullable: false),
                     EmailVerifiedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     PhoneVerifiedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
@@ -310,7 +310,7 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     Id = table.Column<long>(type: "bigint", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Type = table.Column<int>(type: "integer", nullable: false),
+                    Type = table.Column<string>(type: "text", nullable: false),
                     Amount = table.Column<decimal>(type: "numeric(15,2)", precision: 15, scale: 2, nullable: false),
                     ActiveBefore = table.Column<decimal>(type: "numeric(15,2)", precision: 15, scale: 2, nullable: false),
                     ActiveAfter = table.Column<decimal>(type: "numeric(15,2)", precision: 15, scale: 2, nullable: false),
@@ -361,7 +361,7 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     Id = table.Column<long>(type: "bigint", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Channel = table.Column<int>(type: "integer", nullable: false),
+                    Channel = table.Column<string>(type: "text", nullable: false),
                     TemplateCode = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
                     Recipient = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     Subject = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
@@ -443,7 +443,7 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     ReferrerId = table.Column<Guid>(type: "uuid", nullable: false),
                     RefereeId = table.Column<Guid>(type: "uuid", nullable: false),
                     BonusAmount = table.Column<decimal>(type: "numeric(15,2)", precision: 15, scale: 2, nullable: true),
-                    BonusStatus = table.Column<int>(type: "integer", nullable: false),
+                    BonusStatus = table.Column<string>(type: "text", nullable: false),
                     Notes = table.Column<string>(type: "text", nullable: true),
                     PaidBy = table.Column<Guid>(type: "uuid", nullable: true),
                     PaidAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
@@ -476,7 +476,7 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     BankAccountId = table.Column<int>(type: "integer", nullable: true),
                     Amount = table.Column<decimal>(type: "numeric(15,2)", precision: 15, scale: 2, nullable: false),
                     TransferProofUrl = table.Column<string>(type: "text", nullable: true),
-                    Status = table.Column<int>(type: "integer", nullable: false),
+                    Status = table.Column<string>(type: "text", nullable: false),
                     RejectReason = table.Column<string>(type: "text", nullable: true),
                     Notes = table.Column<string>(type: "text", nullable: true),
                     ApprovedBy = table.Column<Guid>(type: "uuid", nullable: true),
@@ -512,7 +512,7 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     Destination = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     SellPrice = table.Column<decimal>(type: "numeric(15,2)", precision: 15, scale: 2, nullable: false),
                     CostPrice = table.Column<decimal>(type: "numeric(15,2)", precision: 15, scale: 2, nullable: true),
-                    Status = table.Column<int>(type: "integer", nullable: false),
+                    Status = table.Column<string>(type: "text", nullable: false),
                     CurrentSeq = table.Column<short>(type: "smallint", nullable: false),
                     PinVerifiedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     Sn = table.Column<string>(type: "text", nullable: true),
@@ -567,7 +567,7 @@ namespace PedagangPulsa.Infrastructure.Migrations
                     SupplierId = table.Column<int>(type: "integer", nullable: false),
                     SupplierProductId = table.Column<int>(type: "integer", nullable: false),
                     Seq = table.Column<short>(type: "smallint", nullable: false),
-                    Status = table.Column<int>(type: "integer", nullable: false),
+                    Status = table.Column<string>(type: "text", nullable: false),
                     SupplierRefId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     SupplierTrxId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     RequestPayload = table.Column<string>(type: "text", nullable: true),
@@ -674,7 +674,7 @@ namespace PedagangPulsa.Infrastructure.Migrations
                 name: "IX_NotificationLogs_Status_CreatedAt",
                 table: "NotificationLogs",
                 columns: new[] { "Status", "CreatedAt" },
-                filter: "status = 'pending'");
+                filter: "\"Status\" = 'pending'");
 
             migrationBuilder.CreateIndex(
                 name: "IX_NotificationLogs_UserId_CreatedAt",
@@ -765,7 +765,7 @@ namespace PedagangPulsa.Infrastructure.Migrations
                 name: "IX_SupplierCallbacks_CreatedAt_IsProcessed",
                 table: "SupplierCallbacks",
                 columns: new[] { "CreatedAt", "IsProcessed" },
-                filter: "is_processed = false");
+                filter: "\"IsProcessed\" = false");
 
             migrationBuilder.CreateIndex(
                 name: "IX_SupplierCallbacks_SupplierId",
@@ -819,7 +819,7 @@ namespace PedagangPulsa.Infrastructure.Migrations
                 name: "IX_TransactionAttempts_Status_AttemptedAt",
                 table: "TransactionAttempts",
                 columns: new[] { "Status", "AttemptedAt" },
-                filter: "status IN ('pending', 'processing')");
+                filter: "\"Status\" IN ('pending', 'processing')");
 
             migrationBuilder.CreateIndex(
                 name: "IX_TransactionAttempts_SupplierId",
@@ -835,7 +835,7 @@ namespace PedagangPulsa.Infrastructure.Migrations
                 name: "IX_TransactionAttempts_SupplierRefId",
                 table: "TransactionAttempts",
                 column: "SupplierRefId",
-                filter: "supplier_ref_id IS NOT NULL");
+                filter: "\"SupplierRefId\" IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_TransactionAttempts_TransactionId",
@@ -863,7 +863,7 @@ namespace PedagangPulsa.Infrastructure.Migrations
                 name: "IX_Transactions_Status_CreatedAt",
                 table: "Transactions",
                 columns: new[] { "Status", "CreatedAt" },
-                filter: "status IN ('pending', 'processing')");
+                filter: "\"Status\" IN ('pending', 'processing')");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Transactions_UserId_CreatedAt",

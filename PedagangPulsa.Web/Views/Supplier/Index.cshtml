@@ -1,0 +1,161 @@
+@model dynamic
+
+@{
+    ViewData["Title"] = "Suppliers";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Supplier Management</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        @if (User.IsInRole("SuperAdmin"))
+        {
+            <a asp-action="Create" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Add Supplier
+            </a>
+        }
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small fw-bold">Search</label>
+                <input type="text" class="form-control" id="searchInput" placeholder="Search suppliers...">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Status</label>
+                <select class="form-select" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">&nbsp;</label>
+                <button type="button" class="btn btn-outline-secondary w-100" id="resetFilters">
+                    <i class="bi bi-arrow-clockwise"></i> Reset
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped" id="suppliersTable" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>API URL</th>
+                        <th>Timeout</th>
+                        <th>Balance</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" />
+
+    <script>
+        $(document).ready(function() {
+            var table = $('#suppliersTable').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: '/Supplier/GetData',
+                    type: 'POST',
+                    data: function(d) {
+                        d.search = $('#searchInput').val();
+                        d.isActive = $('#statusFilter').val() || null;
+                        return d;
+                    }
+                },
+                order: [[0, 'asc']],
+                columns: [
+                    {
+                        data: 'name',
+                        render: function(data, type, row) {
+                            return '<a href="/Supplier/Details/' + row.id + '" class="text-decoration-none fw-bold">' + data + '</a>';
+                        }
+                    },
+                    {
+                        data: 'apiUrl',
+                        render: function(data) {
+                            if (!data) return '-';
+                            const shortUrl = data.length > 40 ? data.substring(0, 40) + '...' : data;
+                            return '<small class="text-muted">' + shortUrl + '</small>';
+                        }
+                    },
+                    {
+                        data: 'timeoutSeconds',
+                        render: function(data) {
+                            return data + 's';
+                        }
+                    },
+                    {
+                        data: 'balance',
+                        render: function(data) {
+                            return formatCurrency(data);
+                        }
+                    },
+                    {
+                        data: 'isActive',
+                        render: function(data) {
+                            var badgeClass = data === 'Active' ? 'bg-success' : 'bg-secondary';
+                            return '<span class="badge ' + badgeClass + '">' + data + '</span>';
+                        }
+                    },
+                    {
+                        data: null,
+                        orderable: false,
+                        render: function(data, type, row) {
+                            var actions = '<div class="btn-group" role="group">' +
+                                '<a href="/Supplier/Details/' + row.id + '" class="btn btn-sm btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>';
+
+                            @if (User.IsInRole("SuperAdmin")) {
+                                <text>
+                                    actions += '<a href="/Supplier/Edit/' + row.id + '" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>' +
+                                        '<a href="/Supplier/Delete/' + row.id + '" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>';
+                                </text>
+                            }
+
+                            actions += '</div>';
+                            return actions;
+                        }
+                    }
+                ],
+                pageLength: 25,
+                lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]]
+            });
+
+            // Apply filters on change
+            $('#searchInput, #statusFilter').on('change', function() {
+                table.ajax.reload();
+            });
+
+            $('#searchInput').on('keyup', function(e) {
+                if (e.key === 'Enter') {
+                    table.ajax.reload();
+                }
+            });
+
+            // Reset filters
+            $('#resetFilters').on('click', function() {
+                $('#searchInput').val('');
+                $('#statusFilter').val('');
+                table.ajax.reload();
+            });
+        });
+
+        function formatCurrency(amount) {
+            return 'Rp ' + amount.toLocaleString('id-ID');
+        }
+    </script>
+}

@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using PedagangPulsa.Domain.Entities;
 using PedagangPulsa.Domain.Enums;
 
@@ -174,8 +175,9 @@ public class TestDataBuilder
             Name = name,
             Code = code,
             ApiBaseUrl = apiBaseUrl,
-            ApiKeyEnc = "encrypted_test_key",
-            CallbackSecret = "test_secret",
+            MemberId = "test_member_id",
+            Pin = "test_pin",
+            Password = "test_password",
             IsActive = isActive,
             TimeoutSeconds = 30
         };

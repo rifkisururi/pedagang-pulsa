@@ -39,27 +39,6 @@ public static class MockServices
     }
 
     /// <summary>
-    /// Create DbContext options for in-memory database
-    /// </summary>
-    public static DbContextOptions<AppDbContext> CreateInMemoryDbContextOptions()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .EnableSensitiveDataLogging()
-            .Options;
-
-        return options;
-    }
-
-    /// <summary>
-    /// Create a fresh AppDbContext with in-memory database
-    /// </summary>
-    public static AppDbContext CreateInMemoryDbContext()
-    {
-        return new AppDbContext(CreateInMemoryDbContextOptions());
-    }
-
-    /// <summary>
     /// Setup logger to log messages (for debugging tests)
     /// </summary>
     public static void SetupLoggerLogs<T>(Mock<ILogger<T>> loggerMock)

@@ -1,0 +1,200 @@
+@model dynamic
+
+@{
+    ViewData["Title"] = "Users";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">User Management</h1>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">Search</label>
+                <input type="text" class="form-control" id="searchInput" placeholder="Search users...">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Level</label>
+                <select class="form-select" id="levelFilter">
+                    <option value="">All Levels</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Status</label>
+                <select class="form-select" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="suspended">Suspended</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Start Date</label>
+                <input type="date" class="form-control" id="startDate">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">End Date</label>
+                <input type="date" class="form-control" id="endDate">
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small fw-bold">&nbsp;</label>
+                <button type="button" class="btn btn-outline-secondary w-100" id="resetFilters">
+                    <i class="bi bi-arrow-clockwise"></i> Reset
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped" id="usersTable" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Full Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Level</th>
+                        <th>Status</th>
+                        <th>Balance</th>
+                        <th>Registered</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" />
+
+    <script>
+        $(document).ready(function() {
+            // Load user levels for filter dropdown
+            $.get('/User/GetLevels', function(data) {
+                data.forEach(function(level) {
+                    $('#levelFilter').append('<option value="' + level.id + '">' + level.name + '</option>');
+                });
+            });
+
+            var table = $('#usersTable').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: '/User/GetData',
+                    type: 'POST',
+                    data: function(d) {
+                        d.search = $('#searchInput').val();
+                        d.levelId = $('#levelFilter').val() || null;
+                        d.status = $('#statusFilter').val() || null;
+                        d.startDate = $('#startDate').val() || null;
+                        d.endDate = $('#endDate').val() || null;
+                        return d;
+                    }
+                },
+                order: [[7, 'desc']],
+                columns: [
+                    {
+                        data: 'username',
+                        render: function(data, type, row) {
+                            return '<a href="/User/Details/' + row.id + '" class="text-decoration-none fw-bold">' + data + '</a>';
+                        }
+                    },
+                    { data: 'fullName' },
+                    { data: 'email' },
+                    { data: 'phone' },
+                    {
+                        data: 'level',
+                        render: function(data) {
+                            var badgeClass = 'bg-secondary';
+                            if (data === 'Member1' || data === 'member1') badgeClass = 'bg-primary';
+                            if (data === 'Member2' || data === 'member2') badgeClass = 'bg-info';
+                            if (data === 'Member3' || data === 'member3') badgeClass = 'bg-success';
+                            return '<span class="badge ' + badgeClass + '">' + data + '</span>';
+                        }
+                    },
+                    {
+                        data: 'status',
+                        render: function(data) {
+                            var badgeClass = 'bg-secondary';
+                            if (data === 'Active') badgeClass = 'bg-success';
+                            if (data === 'Suspended') badgeClass = 'bg-danger';
+                            if (data === 'Inactive') badgeClass = 'bg-warning';
+                            return '<span class="badge ' + badgeClass + '">' + data + '</span>';
+                        }
+                    },
+                    {
+                        data: 'balance',
+                        render: function(data) {
+                            return  'Rp '.+toLocaleString('id-ID');
+                        }
+                    },
+                    { data: 'createdAt' },
+                    {
+                        data: null,
+                        orderable: false,
+                        render: function(data, type, row) {
+                            var actions = '<div class="btn-group" role="group">' +
+                                '<a href="/User/Details/' + row.id + '" class="btn btn-sm btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>';
+
+                            // Check if user has permission to edit level
+                            @if (User.IsInRole("SuperAdmin") || User.IsInRole("Admin")) {
+                                <text>
+                                    actions += '<a href="/User/EditLevel/' + row.id + '" class="btn btn-sm btn-outline-secondary" title="Edit Level"><i class="bi bi-gear"></i></a>';
+                                </text>
+                            }
+
+                            // Check if user has permission to suspend
+                            @if (User.IsInRole("SuperAdmin")) {
+                                <text>
+                                    actions += '<button type="button" class="btn btn-sm btn-outline-warning btn-suspend" data-id="' + row.id + '" title="Suspend"><i class="bi bi-lock"></i></button>';
+                                </text>
+                            }
+
+                            actions += '</div>';
+                            return actions;
+                        }
+                    }
+                ],
+                pageLength: 25,
+                lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]]
+            });
+
+            // Apply filters on button click or enter
+            $('#searchInput, #levelFilter, #statusFilter, #startDate, #endDate').on('change', function() {
+                table.ajax.reload();
+            });
+
+            $('#searchInput').on('keyup', function(e) {
+                if (e.key === 'Enter') {
+                    table.ajax.reload();
+                }
+            });
+
+            // Reset filters
+            $('#resetFilters').on('click', function() {
+                $('#searchInput').val('');
+                $('#levelFilter').val('');
+                $('#statusFilter').val('');
+                $('#startDate').val('');
+                $('#endDate').val('');
+                table.ajax.reload();
+            });
+
+            // Suspend button click handler
+            $(document).on('click', '.btn-suspend', function() {
+                var userId = $(this).data('id');
+                window.location.href = '/User/Suspend/' + userId;
+            });
+        });
+
+        function  'Rp '.+toLocaleString('id-ID') {
+            return 'Rp ' + amount.toLocaleString('id-ID');
+        }
+    </script>
+}

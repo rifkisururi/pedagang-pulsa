@@ -139,18 +139,22 @@ public class ProductService
             .ToListAsync();
     }
 
-    public async Task<Product?> CreateProductAsync(Product product, List<ProductLevelPrice>? levelPrices)
-    {
-        _context.Products.Add(product);
+     public async Task<Product?> CreateProductAsync(Product product, List<ProductLevelPrice>? levelPrices)
+     {
+         _context.Products.Add(product);
 
-        if (levelPrices != null && levelPrices.Any())
-        {
-            _context.ProductLevelPrices.AddRange(levelPrices);
-        }
+         if (levelPrices != null && levelPrices.Any())
+         {
+             foreach (var price in levelPrices)
+             {
+                 price.Product = product;
+             }
+             _context.ProductLevelPrices.AddRange(levelPrices);
+         }
 
-        await _context.SaveChangesAsync();
-        return product;
-    }
+         await _context.SaveChangesAsync();
+         return product;
+     }
 
     public async Task<Product?> UpdateProductAsync(Product product, List<ProductLevelPrice>? levelPrices)
     {
@@ -201,6 +205,15 @@ public class ProductService
         _context.Products.Remove(product);
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<List<Product>> GetActiveProductsAsync()
+    {
+        return await _context.Products
+            .Include(p => p.Category)
+            .Where(p => p.IsActive)
+            .OrderBy(p => p.Name)
+            .ToListAsync();
     }
 
     public async Task<bool> UpdateProductPriceAsync(Guid productId, int levelId, decimal sellPrice, string? updatedBy = null)

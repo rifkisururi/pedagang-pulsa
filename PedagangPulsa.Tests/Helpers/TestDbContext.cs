@@ -6,7 +6,8 @@ using PedagangPulsa.Infrastructure.Data;
 namespace PedagangPulsa.Tests.Helpers;
 
 /// <summary>
-/// In-memory database context for testing
+/// PostgreSQL database context for testing
+/// Uses the same database as the web application
 /// </summary>
 public class TestDbContext : AppDbContext
 {
@@ -15,14 +16,98 @@ public class TestDbContext : AppDbContext
     private static int _supplierBalanceIdCounter = 1;
     private static int _productLevelPriceIdCounter = 1;
 
-    public bool IsInMemory => Database.IsInMemory();
+    public bool IsInMemory => false;
 
     public TestDbContext() : base(
-        new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .EnableSensitiveDataLogging()
-            .Options)
+        CreateOptions())
     {
+    }
+
+    private static DbContextOptions<AppDbContext> CreateOptions()
+    {
+        // Use the dev database connection string
+        var connectionString = "Host=ep-noisy-rain-a1pqpydc-pooler.ap-southeast-1.aws.neon.tech;Username=neondb_owner;Password=npg_a1pMW8UqCKVI;Database=neondb;SSL Mode=Require;Trust Server Certificate=true";
+
+        return new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(connectionString)
+            .EnableSensitiveDataLogging()
+            .EnableDetailedErrors()
+            .Options;
+    }
+
+    /// <summary>
+    /// Clean up database before seeding to avoid primary key conflicts
+    /// Uses TRUNCATE with CASCADE for efficient cleanup
+    /// </summary>
+    public async Task CleanupBeforeSeedAsync()
+    {
+        // Use TRUNCATE with CASCADE for efficient cleanup and restart sequences
+        // This is safer than DELETE as it handles foreign keys automatically
+        var tables = new[]
+        {
+            "\"AdminUsers\"",
+            "\"Suppliers\"",
+            "\"SupplierBalances\"",
+            "\"SupplierBalanceLedgers\"",
+            "\"SupplierCallbacks\"",
+            "\"SupplierProducts\"",
+            "\"TopupRequests\"",
+            "\"ReferralLogs\"",
+            "\"UserLevels\"",
+            "\"UserLevelConfigs\"",
+            "\"Users\"",
+            "\"UserBalances\"",
+            "\"BalanceLedgers\"",
+            "\"RefreshTokens\"",
+            "\"Products\"",
+            "\"ProductLevelPrices\"",
+            "\"ProductCategories\"",
+            "\"Transactions\"",
+            "\"TransactionAttempts\"",
+            "\"IdempotencyKeys\""
+        };
+
+        foreach (var table in tables)
+        {
+            try
+            {
+                await Database.ExecuteSqlRawAsync($"TRUNCATE TABLE {table} CASCADE");
+            }
+            catch
+            {
+                // Table might not exist or already truncated, continue
+            }
+        }
+
+        // Restart sequences to ensure IDs start from 1
+        await RestartSequencesAsync();
+    }
+
+    /// <summary>
+    /// Restart all sequences to 1
+    /// </summary>
+    private async Task RestartSequencesAsync()
+    {
+        var sequences = new[]
+        {
+            "\"ProductCategories_Id_seq\"",
+            "\"UserLevels_Id_seq\"",
+            "\"SupplierBalances_Id_seq\"",
+            "\"SupplierProducts_Id_seq\"",
+            "\"ProductLevelPrices_Id_seq\""
+        };
+
+        foreach (var sequence in sequences)
+        {
+            try
+            {
+                await Database.ExecuteSqlRawAsync($"ALTER SEQUENCE {sequence} RESTART WITH 1");
+            }
+            catch
+            {
+                // Sequence might not exist, ignore error
+            }
+        }
     }
 
     /// <summary>
@@ -30,10 +115,12 @@ public class TestDbContext : AppDbContext
     /// </summary>
     public async Task SeedAsync()
     {
-        // Add user levels
+        // Clean up first to avoid conflicts
+        await CleanupBeforeSeedAsync();
+
+        // Add user levels - Let database auto-generate IDs
         var member1Level = new UserLevel
         {
-            Id = 1,
             Name = "Member1",
             Description = "Basic member level",
             MarkupType = MarkupType.Percentage,
@@ -44,7 +131,6 @@ public class TestDbContext : AppDbContext
 
         var member2Level = new UserLevel
         {
-            Id = 2,
             Name = "Member2",
             Description = "Advanced member level",
             MarkupType = MarkupType.Percentage,
@@ -55,6 +141,10 @@ public class TestDbContext : AppDbContext
 
         UserLevels.AddRange(member1Level, member2Level);
         await SaveChangesAsync();
+
+        // Get the generated IDs for use in creating users
+        var member1LevelId = member1Level.Id;
+        var member2LevelId = member2Level.Id;
 
         // Add admin user
         var adminUser = new AdminUser
@@ -77,7 +167,7 @@ public class TestDbContext : AppDbContext
             username: "user1",
             email: "user1@test.com",
             phone: "08123456789",
-            levelId: 1,
+            levelId: member1LevelId,
             referralCode: "USER1ABC"
         );
 
@@ -85,7 +175,7 @@ public class TestDbContext : AppDbContext
             username: "user2",
             email: "user2@test.com",
             phone: "08123456790",
-            levelId: 2,
+            levelId: member2LevelId,
             referralCode: "USER2XYZ",
             referredBy: user1.Id
         );
@@ -157,7 +247,7 @@ public class TestDbContext : AppDbContext
             {
                 Id = _productLevelPriceIdCounter++,
                 ProductId = product1.Id,
-                LevelId = 1,
+                LevelId = member1LevelId,
                 SellPrice = 5500,
                 IsActive = true
             },
@@ -165,7 +255,7 @@ public class TestDbContext : AppDbContext
             {
                 Id = _productLevelPriceIdCounter++,
                 ProductId = product1.Id,
-                LevelId = 2,
+                LevelId = member2LevelId,
                 SellPrice = 5300,
                 IsActive = true
             },
@@ -173,7 +263,7 @@ public class TestDbContext : AppDbContext
             {
                 Id = _productLevelPriceIdCounter++,
                 ProductId = product2.Id,
-                LevelId = 1,
+                LevelId = member1LevelId,
                 SellPrice = 10500,
                 IsActive = true
             },
@@ -181,7 +271,7 @@ public class TestDbContext : AppDbContext
             {
                 Id = _productLevelPriceIdCounter++,
                 ProductId = product2.Id,
-                LevelId = 2,
+                LevelId = member2LevelId,
                 SellPrice = 10300,
                 IsActive = true
             }
@@ -194,8 +284,9 @@ public class TestDbContext : AppDbContext
             Name = "Digiflazz",
             Code = "DIGIFLAZZ",
             ApiBaseUrl = "https://api.digiflazz.com",
-            ApiKeyEnc = "encrypted_key",
-            CallbackSecret = "secret123",
+            MemberId = "test_member_id",
+            Pin = "test_pin",
+            Password = "test_password",
             IsActive = true,
             TimeoutSeconds = 30
         };
@@ -205,8 +296,9 @@ public class TestDbContext : AppDbContext
             Name = "VIPReseller",
             Code = "VIPRESELLER",
             ApiBaseUrl = "https://api.vipreseller.com",
-            ApiKeyEnc = "encrypted_key",
-            CallbackSecret = "secret456",
+            MemberId = "test_member_id",
+            Pin = "test_pin",
+            Password = "test_password",
             IsActive = true,
             TimeoutSeconds = 30
         };
@@ -214,32 +306,36 @@ public class TestDbContext : AppDbContext
         Suppliers.AddRange(supplier1, supplier2);
         await SaveChangesAsync();
 
-        // Add supplier balances
+        // Reload suppliers to get their auto-generated IDs
+        var supplier1Id = Suppliers.Where(s => s.Code == "DIGIFLAZZ").Select(s => s.Id).First();
+        var supplier2Id = Suppliers.Where(s => s.Code == "VIPRESELLER").Select(s => s.Id).First();
+
+        // Add supplier balances using actual supplier IDs
         SupplierBalances.AddRange(
             new SupplierBalance
             {
                 Id = _supplierBalanceIdCounter++,
-                SupplierId = 1,
+                SupplierId = supplier1Id,
                 ActiveBalance = 5000000,
                 UpdatedAt = DateTime.UtcNow
             },
             new SupplierBalance
             {
                 Id = _supplierBalanceIdCounter++,
-                SupplierId = 2,
+                SupplierId = supplier2Id,
                 ActiveBalance = 3000000,
                 UpdatedAt = DateTime.UtcNow
             }
         );
         await SaveChangesAsync();
 
-        // Add supplier products
+        // Add supplier products using actual supplier IDs
         SupplierProducts.AddRange(
             new SupplierProduct
             {
                 Id = _supplierProductIdCounter++,
                 ProductId = product1.Id,
-                SupplierId = 1,
+                SupplierId = supplier1Id,
                 SupplierProductCode = "IS5",
                 SupplierProductName = "Indosat 5.000",
                 CostPrice = 5200,
@@ -250,7 +346,7 @@ public class TestDbContext : AppDbContext
             {
                 Id = _supplierProductIdCounter++,
                 ProductId = product1.Id,
-                SupplierId = 2,
+                SupplierId = supplier2Id,
                 SupplierProductCode = "IS5",
                 SupplierProductName = "Indosat 5.000",
                 CostPrice = 5250,
@@ -297,25 +393,7 @@ public class TestDbContext : AppDbContext
     /// </summary>
     public async Task CleanAsync()
     {
-        // Remove all data
-        TransactionAttempts.RemoveRange(TransactionAttempts);
-        SupplierCallbacks.RemoveRange(SupplierCallbacks);
-        Transactions.RemoveRange(Transactions);
-        IdempotencyKeys.RemoveRange(IdempotencyKeys);
-        SupplierProducts.RemoveRange(SupplierProducts);
-        Products.RemoveRange(Products);
-        ProductCategories.RemoveRange(ProductCategories);
-        BalanceLedgers.RemoveRange(BalanceLedgers);
-        UserBalances.RemoveRange(UserBalances);
-        RefreshTokens.RemoveRange(RefreshTokens);
-        Users.RemoveRange(Users);
-        UserLevelConfigs.RemoveRange(UserLevelConfigs);
-        UserLevels.RemoveRange(UserLevels);
-        SupplierBalanceLedgers.RemoveRange(SupplierBalanceLedgers);
-        SupplierBalances.RemoveRange(SupplierBalances);
-        Suppliers.RemoveRange(Suppliers);
-
-        await SaveChangesAsync();
+        await CleanupBeforeSeedAsync();
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

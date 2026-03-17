@@ -98,6 +98,16 @@ public class SupplierProductService
             .Where(sp => sp.ProductId == productId)
             .ToListAsync();
 
+        // First, set all sequences to a temporary value to avoid circular dependency
+        foreach (var sp in supplierProducts)
+        {
+            sp.Seq = short.MaxValue;
+            sp.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+
+        // Now set the correct sequence values
         foreach (var reorder in reorderList)
         {
             var sp = supplierProducts.FirstOrDefault(s => s.SupplierId == reorder.SupplierId);

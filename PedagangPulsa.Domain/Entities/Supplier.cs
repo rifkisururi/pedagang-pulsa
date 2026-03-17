@@ -6,8 +6,9 @@ public class Supplier
     public string Name { get; set; } = string.Empty;
     public string Code { get; set; } = string.Empty;
     public string? ApiBaseUrl { get; set; }
-    public string? ApiKeyEnc { get; set; }
-    public string? CallbackSecret { get; set; }
+    public string? MemberId { get; set; }
+    public string? Pin { get; set; }
+    public string? Password { get; set; }
     public short TimeoutSeconds { get; set; } = 30;
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

@@ -1,0 +1,257 @@
+@model dynamic
+
+@{
+    ViewData["Title"] = "Supplier Products";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Supplier Products Management</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        @if (User.IsInRole("SuperAdmin") || User.IsInRole("Admin"))
+        {
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSupplierProductModal">
+                <i class="bi bi-plus-circle"></i> Add Supplier Product
+            </button>
+        }
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">Search</label>
+                <input type="text" class="form-control" id="searchInput" placeholder="Search products, suppliers...">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Supplier</label>
+                <select class="form-select" id="supplierFilter">
+                    <option value="">All Suppliers</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Status</label>
+                <select class="form-select" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">&nbsp;</label>
+                <button type="button" class="btn btn-outline-secondary w-100" id="resetFilters">
+                    <i class="bi bi-arrow-clockwise"></i> Reset
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped" id="supplierProductsTable" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Product Code</th>
+                        <th>Category</th>
+                        <th>Supplier</th>
+                        <th>Supplier SKU</th>
+                        <th>Cost Price</th>
+                        <th>Sequence</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Supplier Product Modal -->
+<div class="modal fade" id="addSupplierProductModal" tabindex="-1" aria-labelledby="addSupplierProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addSupplierProductModalLabel">
+                    <i class="bi bi-plus-circle"></i> Add Supplier Product
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3">
+                    <i class="bi bi-info-circle"></i>
+                    Select a product to add supplier mapping.
+                </p>
+                <div class="mb-3">
+                    <label for="productSelect" class="form-label">Select Product</label>
+                    <select class="form-select" id="productSelect">
+                        <option value="">-- Select Product --</option>
+                    </select>
+                </div>
+                <div class="alert alert-info small">
+                    <i class="bi bi-lightbulb"></i>
+                    You can add multiple suppliers to a single product. Suppliers will be used in sequence order.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="continueToAdd" disabled>
+                    Continue <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" />
+
+    <script>
+        $(document).ready(function() {
+            // Load suppliers for filter
+            $.get('/Supplier/GetSuppliersSelect', function(data) {
+                if (data && data.length > 0) {
+                    $.each(data, function(i, item) {
+                        $('#supplierFilter').append('<option value="' + item.value + '">' + item.text + '</option>');
+                    });
+                }
+            });
+
+            // Load products for add modal
+            $.get('/Product/GetProductsSelect', function(data) {
+                if (data && data.length > 0) {
+                    $.each(data, function(i, item) {
+                        $('#productSelect').append('<option value="' + item.value + '">' + item.text + '</option>');
+                    });
+                }
+            });
+
+            // Handle product select change
+            $('#productSelect').on('change', function() {
+                var productId = $(this).val();
+                if (productId) {
+                    $('#continueToAdd').prop('disabled', false);
+                } else {
+                    $('#continueToAdd').prop('disabled', true);
+                }
+            });
+
+            // Handle continue button click
+            $('#continueToAdd').on('click', function() {
+                var productId = $('#productSelect').val();
+                if (productId) {
+                    window.location.href = '/SupplierProduct/Add?productId=' + productId;
+                }
+            });
+
+            var table = $('#supplierProductsTable').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: '/SupplierProduct/GetData',
+                    type: 'POST',
+                    data: function(d) {
+                        d.search = $('#searchInput').val();
+                        d.supplierId = $('#supplierFilter').val();
+                        d.isActive = $('#statusFilter').val();
+                        return d;
+                    }
+                },
+                order: [[0, 'asc']],
+                columns: [
+                    {
+                        data: 'productName',
+                        render: function(data, type, row) {
+                            return '<strong>' + data + '</strong>';
+                        }
+                    },
+                    {
+                        data: 'productCode',
+                        render: function(data) {
+                            return '<code>' + data + '</code>';
+                        }
+                    },
+                    {
+                        data: 'productCategory',
+                        render: function(data) {
+                            return '<span class="badge bg-info text-dark">' + data + '</span>';
+                        }
+                    },
+                    {
+                        data: 'supplierName',
+                        render: function(data, type, row) {
+                            return '<a href="/Supplier/Details/' + row.supplierId + '" class="text-decoration-none">' + data + '</a>';
+                        }
+                    },
+                    {
+                        data: 'supplierSku',
+                        render: function(data) {
+                            if (!data || data === '-') return '-';
+                            return '<code>' + data + '</code>';
+                        }
+                    },
+                    {
+                        data: 'costPrice',
+                        render: function(data) {
+                            return formatCurrency(data);
+                        }
+                    },
+                    {
+                        data: 'seq',
+                        className: 'text-center',
+                        render: function(data) {
+                            return '<span class="badge bg-primary">' + data + '</span>';
+                        }
+                    },
+                    {
+                        data: 'isActive',
+                        render: function(data) {
+                            var badgeClass = data === 'Active' ? 'bg-success' : 'bg-secondary';
+                            return '<span class="badge ' + badgeClass + '">' + data + '</span>';
+                        }
+                    },
+                    {
+                        data: null,
+                        orderable: false,
+                        className: 'text-end',
+                        render: function(data, type, row) {
+                            var actions = '<div class="btn-group" role="group">' +
+                                '<a href="/SupplierProduct/ByProduct?productId=' + row.id + '" class="btn btn-sm btn-outline-primary" title="View Product"><i class="bi bi-eye"></i></a>' +
+                                '<a href="/SupplierProduct/Edit?productId=' + row.id + '&supplierId=' + row.supplierId + '" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>' +
+                                '<a href="/SupplierProduct/Delete?productId=' + row.id + '&supplierId=' + row.supplierId + '" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>' +
+                                '</div>';
+                            return actions;
+                        }
+                    }
+                ],
+                pageLength: 25,
+                lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]]
+            });
+
+            // Apply filters on change
+            $('#searchInput, #supplierFilter, #statusFilter').on('change', function() {
+                table.ajax.reload();
+            });
+
+            $('#searchInput').on('keyup', function(e) {
+                if (e.key === 'Enter') {
+                    table.ajax.reload();
+                }
+            });
+
+            // Reset filters
+            $('#resetFilters').on('click', function() {
+                $('#searchInput').val('');
+                $('#supplierFilter').val('');
+                $('#statusFilter').val('');
+                table.ajax.reload();
+            });
+        });
+
+        function formatCurrency(amount) {
+            return 'Rp ' + parseFloat(amount).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        }
+    </script>
+}

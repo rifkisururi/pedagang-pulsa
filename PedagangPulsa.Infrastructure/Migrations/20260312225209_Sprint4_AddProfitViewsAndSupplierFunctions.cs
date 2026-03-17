@@ -153,50 +153,50 @@ namespace PedagangPulsa.Infrastructure.Migrations
             migrationBuilder.Sql(@"
                 CREATE OR REPLACE VIEW v_profit_daily AS
                 SELECT
-                    DATE(t.completed_at) as profit_date,
+                    DATE(t.""CompletedAt"") as profit_date,
                     COUNT(*) as total_transactions,
-                    SUM(t.sell_price) as total_revenue,
-                    SUM(t.cost_price) as total_cost,
-                    SUM(t.sell_price - t.cost_price) as total_profit,
-                    AVG(t.sell_price - t.cost_price) as avg_profit_per_trx
-                FROM transactions t
-                WHERE t.status = 'success'
-                    AND t.completed_at IS NOT NULL
-                GROUP BY DATE(t.completed_at)
+                    SUM(t.""SellPrice"") as total_revenue,
+                    SUM(t.""CostPrice"") as total_cost,
+                    SUM(t.""SellPrice"" - t.""CostPrice"") as total_profit,
+                    AVG(t.""SellPrice"" - t.""CostPrice"") as avg_profit_per_trx
+                FROM ""Transactions"" t
+                WHERE t.""Status"" = 'success'
+                    AND t.""CompletedAt"" IS NOT NULL
+                GROUP BY DATE(t.""CompletedAt"")
                 ORDER BY profit_date DESC;
             ");
 
             migrationBuilder.Sql(@"
                 CREATE OR REPLACE VIEW v_profit_by_supplier AS
                 SELECT
-                    s.id as supplier_id,
-                    s.name as supplier_name,
-                    s.code as supplier_code,
-                    COUNT(t.id) as total_transactions,
-                    SUM(t.cost_price) as total_cost,
-                    SUM(t.sell_price) as total_revenue,
-                    SUM(t.sell_price - t.cost_price) as total_profit
-                FROM transactions t
-                INNER JOIN suppliers s ON t.supplier_id = s.id
-                WHERE t.status = 'success'
-                GROUP BY s.id, s.name, s.code
+                    s.""Id"" as supplier_id,
+                    s.""Name"" as supplier_name,
+                    s.""Code"" as supplier_code,
+                    COUNT(t.""Id"") as total_transactions,
+                    SUM(t.""CostPrice"") as total_cost,
+                    SUM(t.""SellPrice"") as total_revenue,
+                    SUM(t.""SellPrice"" - t.""CostPrice"") as total_profit
+                FROM ""Transactions"" t
+                INNER JOIN ""Suppliers"" s ON t.""SupplierId"" = s.""Id""
+                WHERE t.""Status"" = 'success'
+                GROUP BY s.""Id"", s.""Name"", s.""Code""
                 ORDER BY total_profit DESC;
             ");
 
             migrationBuilder.Sql(@"
                 CREATE OR REPLACE VIEW v_profit_by_product AS
                 SELECT
-                    p.id as product_id,
-                    p.name as product_name,
-                    p.category,
-                    COUNT(t.id) as total_transactions,
-                    SUM(t.sell_price) as total_revenue,
-                    SUM(t.cost_price) as total_cost,
-                    SUM(t.sell_price - t.cost_price) as total_profit
-                FROM transactions t
-                INNER JOIN products p ON t.product_id = p.id
-                WHERE t.status = 'success'
-                GROUP BY p.id, p.name, p.category
+                    p.""Id"" as product_id,
+                    p.""Name"" as product_name,
+                    p.""CategoryId"",
+                    COUNT(t.""Id"") as total_transactions,
+                    SUM(t.""SellPrice"") as total_revenue,
+                    SUM(t.""CostPrice"") as total_cost,
+                    SUM(t.""SellPrice"" - t.""CostPrice"") as total_profit
+                FROM ""Transactions"" t
+                INNER JOIN ""Products"" p ON t.""ProductId"" = p.""Id""
+                WHERE t.""Status"" = 'success'
+                GROUP BY p.""Id"", p.""Name"", p.""CategoryId""
                 ORDER BY total_profit DESC;
             ");
 

@@ -1,0 +1,282 @@
+@model dynamic
+
+@{
+    ViewData["Title"] = "Referral Management";
+    Layout = "_AdminLayout";
+    var topReferrers = ViewBag.TopReferrers as List<PedagangPulsa.Application.Services.ReferralSummary> ?? new List<PedagangPulsa.Application.Services.ReferralSummary>();
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Referral Management</h1>
+</div>
+
+<!-- Top Referrers -->
+@if (topReferrers.Any())
+{
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0"><i class="bi bi-trophy"></i> Top 10 Referrers</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Username</th>
+                                    <th>Full Name</th>
+                                    <th class="text-end">Total Referrals</th>
+                                    <th class="text-end">Total Bonus Paid</th>
+                                    <th class="text-end">Pending Bonus</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (var i = 0; i < topReferrers.Count; i++)
+                                {
+                                    var item = topReferrers[i];
+                                    <tr>
+                                        <td>
+                                            @if (i == 0)
+                                            {
+                                                <span class="badge bg-warning text-dark">🥇</span>
+                                            }
+                                            else if (i == 1)
+                                            {
+                                                <span class="badge bg-secondary">🥈</span>
+                                            }
+                                            else if (i == 2)
+                                            {
+                                                <span class="badge bg-orange-600">🥉</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-light text-dark">@(i + 1)</span>
+                                            }
+                                        </td>
+                                        <td>@item.Username</td>
+                                        <td>@item.FullName ?? "-"</td>
+                                        <td class="text-end">@item.TotalReferrals.ToString("N0")</td>
+                                        <td class="text-end text-success">Rp @item.TotalBonusPaid.ToString("N0")</td>
+                                        <td class="text-end text-warning">Rp @item.PendingBonus.ToString("N0")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">Search</label>
+                <input type="text" class="form-control" id="searchInput" placeholder="Search by username...">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Status</label>
+                <select class="form-select" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="pending" selected>Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Start Date</label>
+                <input type="date" class="form-control" id="startDate" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">End Date</label>
+                <input type="date" class="form-control" id="endDate" />
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small fw-bold">&nbsp;</label>
+                <button type="button" class="btn btn-outline-secondary w-100" id="resetFilters">
+                    <i class="bi bi-arrow-clockwise"></i> Reset
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped" id="referralTable" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Date/Time</th>
+                        <th>Referrer</th>
+                        <th>Referee</th>
+                        <th>Bonus Amount</th>
+                        <th>Status</th>
+                        <th>Paid/Cancelled At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" />
+
+    <script>
+        $(document).ready(function() {
+            var table = $('#referralTable').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: '/Referral/GetData',
+                    type: 'POST',
+                    data: function(d) {
+                        d.search = $('#searchInput').val();
+                        d.status = $('#statusFilter').val() || null;
+                        d.startDate = $('#startDate').val() || null;
+                        d.endDate = $('#endDate').val() || null;
+                        return d;
+                    }
+                },
+                order: [[0, 'desc']],
+                columns: [
+                    { data: 'createdAt' },
+                    { data: 'referrerUsername' },
+                    { data: 'refereeUsername' },
+                    {
+                        data: 'bonusAmount',
+                        render: function(data) {
+                            return 'Rp ' + data.toLocaleString('id-ID');
+                        }
+                    },
+                    {
+                        data: 'bonusStatus',
+                        render: function(data) {
+                            var badgeClass = 'bg-secondary';
+                            var icon = '';
+
+                            switch(data.toLowerCase()) {
+                                case 'pending':
+                                    badgeClass = 'bg-warning';
+                                    icon = '<i class="bi bi-clock"></i> ';
+                                    break;
+                                case 'paid':
+                                    badgeClass = 'bg-success';
+                                    icon = '<i class="bi bi-check-circle"></i> ';
+                                    break;
+                                case 'cancelled':
+                                    badgeClass = 'bg-danger';
+                                    icon = '<i class="bi bi-x-circle"></i> ';
+                                    break;
+                            }
+
+                            return '<span class="badge ' + badgeClass + '">' + icon + data + '</span>';
+                        }
+                    },
+                    { data: 'bonusPaidAt' },
+                    {
+                        data: null,
+                        orderable: false,
+                        render: function(data, type, row) {
+                            var actions = '<div class="btn-group" role="group">';
+
+                            if (row.bonusStatus === 'Pending') {
+                                actions += '<button type="button" class="btn btn-sm btn-outline-success btn-pay" data-id="' + data.id + '" title="Pay Bonus"><i class="bi bi-cash"></i></button>';
+                                actions += '<button type="button" class="btn btn-sm btn-outline-danger btn-cancel" data-id="' + data.id + '" title="Cancel"><i class="bi bi-x-circle"></i></button>';
+                            }
+
+                            actions += '</div>';
+                            return actions;
+                        }
+                    }
+                ],
+                pageLength: 25,
+                lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]]
+            });
+
+            // Apply filters on change
+            $('#searchInput, #statusFilter, #startDate, #endDate').on('change', function() {
+                table.ajax.reload();
+            });
+
+            $('#searchInput').on('keyup', function(e) {
+                if (e.key === 'Enter') {
+                    table.ajax.reload();
+                }
+            });
+
+            // Reset filters
+            $('#resetFilters').on('click', function() {
+                $('#searchInput').val('');
+                $('#statusFilter').val('pending');
+                $('#startDate').val('');
+                $('#endDate').val('');
+                table.ajax.reload();
+            });
+
+            // Pay bonus button
+            $(document).on('click', '.btn-pay', function() {
+                const id = $(this).data('id');
+                if (confirm('Are you sure you want to pay this referral bonus?')) {
+                    payBonus(id);
+                }
+            });
+
+            // Cancel bonus button
+            $(document).on('click', '.btn-cancel', function() {
+                const id = $(this).data('id');
+                const reason = prompt('Enter reason for cancellation:');
+                if (reason !== null) {
+                    cancelBonus(id, reason);
+                }
+            });
+        });
+
+        function  'Rp '.+toLocaleString('id-ID') {
+            return 'Rp ' + amount.toLocaleString('id-ID');
+        }
+
+        function payBonus(logId) {
+            $.ajax({
+                url: '/Referral/PayBonus',
+                type: 'POST',
+                data: { logId: logId },
+                success: function(response) {
+                    if (response.success) {
+                        $('#referralTable').DataTable().ajax.reload();
+                        toastr.success(response.message);
+                    } else {
+                        toastr.error(response.message);
+                    }
+                },
+                error: function() {
+                    toastr.error('An error occurred while processing your request.');
+                }
+            });
+        }
+
+        function cancelBonus(logId, reason) {
+            $.ajax({
+                url: '/Referral/CancelBonus',
+                type: 'POST',
+                data: { logId: logId, reason: reason },
+                success: function(response) {
+                    if (response.success) {
+                        $('#referralTable').DataTable().ajax.reload();
+                        toastr.success(response.message);
+                    } else {
+                        toastr.error(response.message);
+                    }
+                },
+                error: function() {
+                    toastr.error('An error occurred while processing your request.');
+                }
+            });
+        }
+    </script>
+}

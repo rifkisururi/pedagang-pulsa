@@ -22,30 +22,45 @@ public class UserServiceTests : IAsyncLifetime
         _userLevelService = new UserLevelService(_context);
         _referralService = new ReferralService(_context, new Microsoft.Extensions.Logging.Abstractions.NullLogger<ReferralService>());
 
+        // Clean up database before seeding to avoid primary key conflicts
+        await _context.CleanupBeforeSeedAsync();
+
         // Seed required data
         await SeedDataAsync();
     }
 
     public async Task DisposeAsync()
     {
-        await _context.Database.EnsureDeletedAsync();
+        // Clean up test data after all tests
+        await _context.CleanupBeforeSeedAsync();
         await _context.DisposeAsync();
     }
 
     private async Task SeedDataAsync()
     {
-        // Add user levels
+        // Add user levels - Let database auto-generate IDs
         var levels = new List<UserLevel>
         {
-            new() { Id = 1, Name = "Regular", MarkupType = MarkupType.Percentage, MarkupValue = 0, IsActive = true },
-            new() { Id = 2, Name = "Bronze", MarkupType = MarkupType.Percentage, MarkupValue = 2, IsActive = true },
-            new() { Id = 3, Name = "Silver", MarkupType = MarkupType.Percentage, MarkupValue = 1.5m, IsActive = true },
-            new() { Id = 4, Name = "Gold", MarkupType = MarkupType.Percentage, MarkupValue = 1, IsActive = true }
+            new() { Name = "Regular", MarkupType = MarkupType.Percentage, MarkupValue = 0, IsActive = true },
+            new() { Name = "Bronze", MarkupType = MarkupType.Percentage, MarkupValue = 2, IsActive = true },
+            new() { Name = "Silver", MarkupType = MarkupType.Percentage, MarkupValue = 1.5m, IsActive = true },
+            new() { Name = "Gold", MarkupType = MarkupType.Percentage, MarkupValue = 1, IsActive = true }
         };
 
         _context.UserLevels.AddRange(levels);
         await _context.SaveChangesAsync();
+
+        // Store the generated IDs for use in tests
+        _regularLevelId = levels[0].Id;
+        _bronzeLevelId = levels[1].Id;
+        _silverLevelId = levels[2].Id;
+        _goldLevelId = levels[3].Id;
     }
+
+    private int _regularLevelId;
+    private int _bronzeLevelId;
+    private int _silverLevelId;
+    private int _goldLevelId;
 
     #region User CRUD Tests
 
@@ -61,7 +76,7 @@ public class UserServiceTests : IAsyncLifetime
             Email = "test@example.com",
             Phone = "08123456789",
             PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
-            LevelId = 1,
+            LevelId = _regularLevelId,
             Status = UserStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
@@ -108,7 +123,7 @@ public class UserServiceTests : IAsyncLifetime
             Id = Guid.NewGuid(),
             Username = "testuser",
             PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
-            LevelId = 1,
+            LevelId = _regularLevelId,
             Status = UserStatus.Active
         };
 
@@ -116,21 +131,21 @@ public class UserServiceTests : IAsyncLifetime
         await _context.SaveChangesAsync();
 
         // Act
-        var result = await _userService.UpdateUserLevelAsync(user.Id, 3, null, "Level upgrade");
+        var result = await _userService.UpdateUserLevelAsync(user.Id, _silverLevelId, null, "Level upgrade");
 
         // Assert
         result.Should().BeTrue();
 
         var updatedUser = await _context.Users.FindAsync(user.Id);
         updatedUser.Should().NotBeNull();
-        updatedUser!.LevelId.Should().Be(3);
+        updatedUser!.LevelId.Should().Be(_silverLevelId);
     }
 
     [Fact]
     public async Task UpdateUserLevelAsync_WithInvalidId_ReturnsFalse()
     {
         // Act
-        var result = await _userService.UpdateUserLevelAsync(Guid.NewGuid(), 2, null, "Test");
+        var result = await _userService.UpdateUserLevelAsync(Guid.NewGuid(), 9999, null, "Test");
 
         // Assert
         result.Should().BeFalse();
@@ -145,7 +160,7 @@ public class UserServiceTests : IAsyncLifetime
             Id = Guid.NewGuid(),
             Username = "testuser",
             PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
-            LevelId = 1,
+            LevelId = _regularLevelId,
             Status = UserStatus.Active
         };
 
@@ -172,7 +187,7 @@ public class UserServiceTests : IAsyncLifetime
             Id = Guid.NewGuid(),
             Username = "testuser",
             PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
-            LevelId = 1,
+            LevelId = _regularLevelId,
             Status = UserStatus.Suspended
         };
 
@@ -319,7 +334,7 @@ public class UserServiceTests : IAsyncLifetime
             Id = Guid.NewGuid(),
             Username = "testuser",
             PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
-            LevelId = 1,
+            LevelId = _regularLevelId,
             Status = UserStatus.Active
         };
 
@@ -370,7 +385,7 @@ public class UserServiceTests : IAsyncLifetime
                 Id = Guid.NewGuid(),
                 Username = $"user{i}",
                 PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
-                LevelId = 1,
+                LevelId = _regularLevelId,
                 Status = UserStatus.Active
             };
 
@@ -406,7 +421,7 @@ public class UserServiceTests : IAsyncLifetime
             Username = "john_doe",
             FullName = "John Doe",
             PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
-            LevelId = 1,
+            LevelId = _regularLevelId,
             Status = UserStatus.Active
         };
 
@@ -416,7 +431,7 @@ public class UserServiceTests : IAsyncLifetime
             Username = "jane_smith",
             FullName = "Jane Smith",
             PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
-            LevelId = 1,
+            LevelId = _regularLevelId,
             Status = UserStatus.Active
         };
 
@@ -441,7 +456,7 @@ public class UserServiceTests : IAsyncLifetime
             Id = Guid.NewGuid(),
             Username = "user1",
             PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
-            LevelId = 1,
+            LevelId = _regularLevelId,
             Status = UserStatus.Active
         };
 
@@ -450,7 +465,7 @@ public class UserServiceTests : IAsyncLifetime
             Id = Guid.NewGuid(),
             Username = "user2",
             PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
-            LevelId = 2,
+            LevelId = _bronzeLevelId,
             Status = UserStatus.Active
         };
 
@@ -458,11 +473,11 @@ public class UserServiceTests : IAsyncLifetime
         await _context.SaveChangesAsync();
 
         // Act
-        var (users, totalFiltered, _) = await _userService.GetUsersPagedAsync(1, 10, levelId: 2);
+        var (users, totalFiltered, _) = await _userService.GetUsersPagedAsync(1, 10, levelId: _bronzeLevelId);
 
         // Assert
         users.Should().HaveCount(1);
-        users[0].LevelId.Should().Be(2);
+        users[0].LevelId.Should().Be(_bronzeLevelId);
         totalFiltered.Should().Be(1);
     }
 
@@ -475,7 +490,7 @@ public class UserServiceTests : IAsyncLifetime
             Id = Guid.NewGuid(),
             Username = "active_user",
             PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
-            LevelId = 1,
+            LevelId = _regularLevelId,
             Status = UserStatus.Active
         };
 
@@ -484,7 +499,7 @@ public class UserServiceTests : IAsyncLifetime
             Id = Guid.NewGuid(),
             Username = "suspended_user",
             PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
-            LevelId = 1,
+            LevelId = _regularLevelId,
             Status = UserStatus.Suspended
         };
 
@@ -511,20 +526,22 @@ public class UserServiceTests : IAsyncLifetime
         var referrer = new User
         {
             Id = Guid.NewGuid(),
-            Username = "referrer",
+            Username = "referrer_" + Guid.NewGuid().ToString().Substring(0, 8),
             PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
-            LevelId = 1,
-            Status = UserStatus.Active
+            LevelId = _regularLevelId,
+            Status = UserStatus.Active,
+            ReferralCode = "REF" + Guid.NewGuid().ToString().Substring(0, 8).ToUpper()
         };
 
         var referee = new User
         {
             Id = Guid.NewGuid(),
-            Username = "referee",
+            Username = "referee_" + Guid.NewGuid().ToString().Substring(0, 8),
             PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
-            LevelId = 1,
+            LevelId = _regularLevelId,
             Status = UserStatus.Active,
-            ReferredBy = referrer.Id
+            ReferredBy = referrer.Id,
+            ReferralCode = "REF" + Guid.NewGuid().ToString().Substring(0, 8).ToUpper()
         };
 
         var referrerBalance = new UserBalance
@@ -582,20 +599,22 @@ public class UserServiceTests : IAsyncLifetime
         var referrer = new User
         {
             Id = Guid.NewGuid(),
-            Username = "referrer",
+            Username = "referrer_" + Guid.NewGuid().ToString().Substring(0, 8),
             PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
-            LevelId = 1,
-            Status = UserStatus.Active
+            LevelId = _regularLevelId,
+            Status = UserStatus.Active,
+            ReferralCode = "REF" + Guid.NewGuid().ToString().Substring(0, 8).ToUpper()
         };
 
         var referee = new User
         {
             Id = Guid.NewGuid(),
-            Username = "referee",
+            Username = "referee_" + Guid.NewGuid().ToString().Substring(0, 8),
             PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
-            LevelId = 1,
+            LevelId = _regularLevelId,
             Status = UserStatus.Active,
-            ReferredBy = referrer.Id
+            ReferredBy = referrer.Id,
+            ReferralCode = "REF" + Guid.NewGuid().ToString().Substring(0, 8).ToUpper()
         };
 
         var referrerBalance = new UserBalance

@@ -1,6 +1,7 @@
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PedagangPulsa.Infrastructure.Data;
+using PedagangPulsa.Application.Services;
+using PedagangPulsa.Infrastructure.Suppliers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,55 +9,73 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Add ASP.NET Core Identity for Admin Users
-builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
+// Register Infrastructure Services
+builder.Services.AddScoped<ISupplierAdapterFactory, SupplierAdapterFactory>();
+
+// Register Application Services
+builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<ProductService>();
+builder.Services.AddScoped<SupplierService>();
+builder.Services.AddScoped<SupplierProductService>();
+builder.Services.AddScoped<SupplierBalanceService>();
+builder.Services.AddScoped<TransactionService>();
+builder.Services.AddScoped<TopupService>();
+builder.Services.AddScoped<BalanceService>();
+builder.Services.AddScoped<ReportService>();
+builder.Services.AddScoped<ReferralService>();
+builder.Services.AddScoped<UserLevelService>();
+builder.Services.AddScoped<ExportService>();
+builder.Services.AddScoped<AuthService>();
+
+// Add HttpClient for supplier adapters
+builder.Services.AddHttpClient();
+
+// Add Authentication
+builder.Services.AddAuthentication(options =>
 {
-    // Password settings
-    options.Password.RequireDigit = true;
-    options.Password.RequireLowercase = true;
-    options.Password.RequireUppercase = true;
-    options.Password.RequireNonAlphanumeric = true;
-    options.Password.RequiredLength = 8;
-
-    // Lockout settings
-    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
-    options.Lockout.MaxFailedAccessAttempts = 5;
-    options.Lockout.AllowedForNewUsers = true;
-
-    // User settings
-    options.User.RequireUniqueEmail = false;
+    options.DefaultScheme = "AdminAuth";
+    options.DefaultChallengeScheme = "AdminAuth";
 })
-.AddEntityFrameworkStores<AppDbContext>()
-.AddDefaultTokenProviders();
-
-// Configure authentication
-builder.Services.ConfigureApplicationCookie(options =>
+.AddCookie("AdminAuth", options =>
 {
-    options.LoginPath = "/Admin/Account/Login";
-    options.LogoutPath = "/Admin/Account/Logout";
-    options.AccessDeniedPath = "/Admin/Account/AccessDenied";
-    options.SlidingExpiration = true;
+    options.LoginPath = "/Account/Login";
+    options.LogoutPath = "/Account/Logout";
+    options.AccessDeniedPath = "/Account/AccessDenied";
     options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    options.SlidingExpiration = true;
 });
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
+// Add Session for admin authentication
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromHours(8);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
 var app = builder.Build();
 
-// Seed data
+// Run database migrations and seed data
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     try
     {
         var context = services.GetRequiredService<AppDbContext>();
-        await DataSeeder.SeedAsync(context, services);
+
+        // Apply pending migrations
+        await context.Database.MigrateAsync();
+
+        // Seed data
+        await DataSeeder.SeedAsync(context);
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred seeding the database.");
+        logger.LogError(ex, "An error occurred migrating or seeding the database.");
     }
 }
 
@@ -64,23 +83,19 @@ using (var scope = app.Services.CreateScope())
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days, you may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+    // The default HSTS value is 30 days, you might want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
-
+app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+    pattern: "{controller=Dashboard}/{action=Index}/{id?}");
 
-app.MapControllerRoute(
-    name: "admin",
-    pattern: "{area:exists}/{controller=Dashboard}/{action=Index}/{id?}");
-
-app.Run();
+await app.RunAsync();
