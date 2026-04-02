@@ -8,8 +8,11 @@
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Edit Product</h1>
     <div class="btn-toolbar mb-2 mb-md-0">
-        <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Back to Details
+        <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary me-2">
+            <i class="bi bi-info-circle"></i> View Details
+        </a>
+        <a asp-action="Index" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to List
         </a>
     </div>
 </div>
@@ -19,24 +22,24 @@
         <div class="card shadow-sm">
             <div class="card-body">
                 <form asp-action="Edit" method="post">
-                    <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
                     <input type="hidden" asp-for="Id" />
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
 
                     <h5 class="mb-3">Basic Information</h5>
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
                             <label asp-for="Code" class="form-label">Product Code <span class="text-danger">*</span></label>
-                            <input asp-for="Code" class="form-control" required />
+                            <input asp-for="Code" class="form-control" placeholder="e.g., TSEL10" required />
                             <span asp-validation-for="Code" class="text-danger small"></span>
                         </div>
                         <div class="col-md-6">
-                            <label asp-for="Sku" class="form-label">SKU</label>
-                            <input asp-for="Sku" class="form-control" />
-                            <span asp-validation-for="Sku" class="text-danger small"></span>
+                            <label asp-for="Operator" class="form-label">Operator</label>
+                            <input asp-for="Operator" class="form-control" placeholder="e.g., Telkomsel" />
+                            <span asp-validation-for="Operator" class="text-danger small"></span>
                         </div>
                         <div class="col-12">
                             <label asp-for="Name" class="form-label">Product Name <span class="text-danger">*</span></label>
-                            <input asp-for="Name" class="form-control" required />
+                            <input asp-for="Name" class="form-control" placeholder="e.g., Telkomsel 10.000" required />
                             <span asp-validation-for="Name" class="text-danger small"></span>
                         </div>
                         <div class="col-md-6">
@@ -47,41 +50,24 @@
                                 {
                                     @foreach (var cat in Model.AvailableCategories)
                                     {
-                                        <option value="@cat.Id" selected="@(Model.CategoryId == cat.Id)">@cat.Name</option>
+                                        <option value="@cat.Id">@cat.Name</option>
                                     }
                                 }
                             </select>
                             <span asp-validation-for="CategoryId" class="text-danger small"></span>
                         </div>
                         <div class="col-md-6">
-                            <label asp-for="SortOrder" class="form-label">Sort Order</label>
-                            <input asp-for="SortOrder" class="form-control" type="number" />
-                            <span asp-validation-for="SortOrder" class="text-danger small"></span>
+                            <label asp-for="Denomination" class="form-label">Denomination</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rp</span>
+                                <input asp-for="Denomination" class="form-control" type="number" step="1" min="0" />
+                            </div>
+                            <span asp-validation-for="Denomination" class="text-danger small"></span>
                         </div>
                         <div class="col-12">
                             <label asp-for="Description" class="form-label">Description</label>
-                            <textarea asp-for="Description" class="form-control" rows="2"></textarea>
+                            <textarea asp-for="Description" class="form-control" rows="2" placeholder="Product description..."></textarea>
                             <span asp-validation-for="Description" class="text-danger small"></span>
-                        </div>
-                    </div>
-
-                    <h5 class="mb-3">Pricing</h5>
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-6">
-                            <label asp-for="Price" class="form-label">Base Price <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <span class="input-group-text">Rp</span>
-                                <input asp-for="Price" class="form-control" type="number" step="0.01" min="0" required />
-                            </div>
-                            <span asp-validation-for="Price" class="text-danger small"></span>
-                        </div>
-                        <div class="col-md-6">
-                            <label asp-for="CostPrice" class="form-label">Cost Price <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <span class="input-group-text">Rp</span>
-                                <input asp-for="CostPrice" class="form-control" type="number" step="0.01" min="0" required id="costPriceInput" />
-                            </div>
-                            <span asp-validation-for="CostPrice" class="text-danger small"></span>
                         </div>
                     </div>
 
@@ -92,26 +78,25 @@
                                 <tr>
                                     <th>Level</th>
                                     <th>Sell Price</th>
-                                    <th>Margin</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @if (Model.AvailableLevels != null && Model.LevelPrices != null)
+                                @if (Model.LevelPrices != null && Model.AvailableLevels != null)
                                 {
-                                    @for (int i = 0; i < Model.AvailableLevels.Count; i++)
+                                    @for (int i = 0; i < Model.LevelPrices.Count; i++)
                                     {
-                                        var levelPrice = Model.LevelPrices.FirstOrDefault(lp => lp.LevelId == Model.AvailableLevels[i].Id);
+                                        var level = Model.AvailableLevels.FirstOrDefault(l => l.Id == Model.LevelPrices[i].LevelId);
                                         <tr>
                                             <td>
-                                                <span class="badge bg-primary">@Model.AvailableLevels[i].Name</span>
-                                                <input type="hidden" name="LevelPrices[@i].LevelId" value="@Model.AvailableLevels[i].Id" />
+                                                <span class="badge bg-primary">@(level?.Name ?? "Unknown")</span>
+                                                <input type="hidden" name="LevelPrices[@i].LevelId" value="@Model.LevelPrices[i].LevelId" />
                                             </td>
                                             <td>
-                                                <input type="number" name="LevelPrices[@i].SellPrice" class="form-control form-control-sm level-price-input"
-                                                       step="0.01" min="0" value="@(levelPrice?.SellPrice ?? Model.Price)" data-level="@Model.AvailableLevels[i].Name" />
-                                            </td>
-                                            <td>
-                                                <span class="margin-display">-</span>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">Rp</span>
+                                                    <input type="number" name="LevelPrices[@i].SellPrice" class="form-control form-control-sm"
+                                                           step="0.01" min="0" value="@Model.LevelPrices[i].SellPrice" />
+                                                </div>
                                             </td>
                                         </tr>
                                     }
@@ -120,7 +105,7 @@
                         </table>
                         <small class="text-muted">
                             <i class="bi bi-info-circle"></i>
-                            Set sell price for each user level. If left empty, base price will be used.
+                            Set sell price for each user level.
                         </small>
                     </div>
 
@@ -132,19 +117,13 @@
                                 <label asp-for="IsActive" class="form-check-label">Active</label>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="form-check form-switch">
-                                <input asp-for="IsAvailable" class="form-check-input" type="checkbox" />
-                                <label asp-for="IsAvailable" class="form-check-label">Available for Purchase</label>
-                            </div>
-                        </div>
                     </div>
 
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-circle"></i> Update Product
+                            <i class="bi bi-save"></i> Save Changes
                         </button>
-                        <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary">
+                        <a asp-action="Index" class="btn btn-outline-secondary">
                             <i class="bi bi-x-circle"></i> Cancel
                         </a>
                     </div>
@@ -156,31 +135,4 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-    <script>
-        $(document).ready(function() {
-            function calculateMargins() {
-                const costPrice = parseFloat($('#costPriceInput').val()) || 0;
-
-                $('.level-price-input').each(function() {
-                    const sellPrice = parseFloat($(this).val()) || 0;
-                    const margin = sellPrice - costPrice;
-                    const marginRow = $(this).closest('tr').find('.margin-display');
-
-                    marginRow.text('Rp ' + margin.toLocaleString('id-ID'));
-                    marginRow.removeClass('text-danger text-success');
-                    if (margin < 0) {
-                        marginRow.addClass('text-danger');
-                    } else if (margin > 0) {
-                        marginRow.addClass('text-success');
-                    }
-                });
-            }
-
-            $('#costPriceInput').on('input', calculateMargins);
-            $('.level-price-input').on('input', calculateMargins);
-
-            // Initial calculation
-            calculateMargins();
-        });
-    </script>
 }

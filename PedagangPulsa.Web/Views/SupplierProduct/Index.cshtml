@@ -3,6 +3,7 @@
 @{
     ViewData["Title"] = "Supplier Products";
     Layout = "_AdminLayout";
+    var selectedProductId = ViewBag.SelectedProductId as Guid?;
 }
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
@@ -10,8 +11,8 @@
     <div class="btn-toolbar mb-2 mb-md-0">
         @if (User.IsInRole("SuperAdmin") || User.IsInRole("Admin"))
         {
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSupplierProductModal">
-                <i class="bi bi-plus-circle"></i> Add Supplier Product
+            <button type="button" class="btn btn-primary" id="btnAddNew">
+                <i class="bi bi-plus-circle"></i> Add Mapping
             </button>
         }
     </div>
@@ -22,7 +23,13 @@
         <div class="row g-3 align-items-end">
             <div class="col-md-3">
                 <label class="form-label small fw-bold">Search</label>
-                <input type="text" class="form-control" id="searchInput" placeholder="Search products, suppliers...">
+                <input type="text" class="form-control" id="searchInput" placeholder="Search code, name...">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">Product</label>
+                <select class="form-select select2-filter" id="productFilter">
+                    <option value="">All Products</option>
+                </select>
             </div>
             <div class="col-md-2">
                 <label class="form-label small fw-bold">Supplier</label>
@@ -55,7 +62,7 @@
                         <th>Product Code</th>
                         <th>Category</th>
                         <th>Supplier</th>
-                        <th>Supplier SKU</th>
+                        <th>Supplier Product</th>
                         <th>Cost Price</th>
                         <th>Sequence</th>
                         <th>Status</th>
@@ -67,82 +74,141 @@
     </div>
 </div>
 
-<!-- Add Supplier Product Modal -->
-<div class="modal fade" id="addSupplierProductModal" tabindex="-1" aria-labelledby="addSupplierProductModalLabel" aria-hidden="true">
+<!-- Supplier Product Modal -->
+<div class="modal fade" id="supplierProductModal" tabindex="-1" aria-labelledby="supplierProductModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addSupplierProductModalLabel">
-                    <i class="bi bi-plus-circle"></i> Add Supplier Product
-                </h5>
+                <h5 class="modal-title" id="supplierProductModalLabel">Add/Edit Mapping</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="supplierProductForm">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div id="modalAlert" class="alert alert-danger d-none"></div>
+                    
+                    <div class="mb-3">
+                        <label for="ProductId" class="form-label">Product <span class="text-danger">*</span></label>
+                        <select id="ProductId" name="ProductId" class="form-select select2-modal" required style="width: 100%;">
+                            <option value="">-- Select Product --</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="SupplierId" class="form-label">Supplier <span class="text-danger">*</span></label>
+                        <select id="SupplierId" name="SupplierId" class="form-select select2-modal" required style="width: 100%;">
+                            <option value="">-- Select Supplier --</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="SupplierProductCode" class="form-label">Supplier Product Code <span class="text-danger">*</span></label>
+                        <input type="text" id="SupplierProductCode" name="SupplierProductCode" class="form-control" placeholder="e.g., TSEL5" required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="SupplierProductName" class="form-label">Supplier Product Name</label>
+                        <input type="text" id="SupplierProductName" name="SupplierProductName" class="form-control" placeholder="e.g., Telkomsel 5K" />
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="CostPrice" class="form-label">Cost Price <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rp</span>
+                                <input type="number" id="CostPrice" name="CostPrice" class="form-control" step="0.01" min="0" required />
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="Seq" class="form-label">Sequence <span class="text-danger">*</span></label>
+                            <input type="number" id="Seq" name="Seq" class="form-control" min="1" value="1" required />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="IsActive" name="IsActive" value="true" checked>
+                            <label class="form-check-label" for="IsActive">Active</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btnSaveMapping">Save Mapping</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle"></i> Delete Mapping</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="text-muted mb-3">
-                    <i class="bi bi-info-circle"></i>
-                    Select a product to add supplier mapping.
-                </p>
-                <div class="mb-3">
-                    <label for="productSelect" class="form-label">Select Product</label>
-                    <select class="form-select" id="productSelect">
-                        <option value="">-- Select Product --</option>
-                    </select>
-                </div>
-                <div class="alert alert-info small">
-                    <i class="bi bi-lightbulb"></i>
-                    You can add multiple suppliers to a single product. Suppliers will be used in sequence order.
-                </div>
+                <p>Are you sure you want to delete this mapping?</p>
+                <p id="deleteItemName" class="fw-bold"></p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="continueToAdd" disabled>
-                    Continue <i class="bi bi-arrow-right"></i>
-                </button>
+                <button type="button" class="btn btn-danger" id="btnConfirmDelete">Delete</button>
             </div>
         </div>
     </div>
 </div>
 
 @section Scripts {
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" />
 
     <script>
         $(document).ready(function() {
-            // Load suppliers for filter
+            var supplierProductModal = new bootstrap.Modal(document.getElementById('supplierProductModal'));
+            var deleteConfirmModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+            var deleteContext = { productId: null, supplierId: null };
+            var selectedProductIdFromUrl = '@(selectedProductId?.ToString() ?? "")';
+
+            // Initialize Select2 for Filter
+            $('.select2-filter').select2({
+                theme: 'bootstrap-5'
+            });
+
+            // Initialize Select2 for Modal
+            $('.select2-modal').select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#supplierProductModal')
+            });
+
+            // Load suppliers for filter & modal
             $.get('/Supplier/GetSuppliersSelect', function(data) {
                 if (data && data.length > 0) {
                     $.each(data, function(i, item) {
                         $('#supplierFilter').append('<option value="' + item.value + '">' + item.text + '</option>');
+                        $('#SupplierId').append('<option value="' + item.value + '">' + item.text + '</option>');
                     });
                 }
             });
 
-            // Load products for add modal
+            // Load products for filter & modal
             $.get('/Product/GetProductsSelect', function(data) {
                 if (data && data.length > 0) {
                     $.each(data, function(i, item) {
-                        $('#productSelect').append('<option value="' + item.value + '">' + item.text + '</option>');
+                        $('#productFilter').append('<option value="' + item.value + '">' + item.text + '</option>');
+                        $('#ProductId').append('<option value="' + item.value + '">' + item.text + '</option>');
                     });
-                }
-            });
-
-            // Handle product select change
-            $('#productSelect').on('change', function() {
-                var productId = $(this).val();
-                if (productId) {
-                    $('#continueToAdd').prop('disabled', false);
-                } else {
-                    $('#continueToAdd').prop('disabled', true);
-                }
-            });
-
-            // Handle continue button click
-            $('#continueToAdd').on('click', function() {
-                var productId = $('#productSelect').val();
-                if (productId) {
-                    window.location.href = '/SupplierProduct/Add?productId=' + productId;
+                    
+                    if (selectedProductIdFromUrl) {
+                        $('#productFilter').val(selectedProductIdFromUrl).trigger('change');
+                    }
                 }
             });
 
@@ -154,6 +220,7 @@
                     type: 'POST',
                     data: function(d) {
                         d.search = $('#searchInput').val();
+                        d.productId = $('#productFilter').val();
                         d.supplierId = $('#supplierFilter').val();
                         d.isActive = $('#statusFilter').val();
                         return d;
@@ -186,10 +253,13 @@
                         }
                     },
                     {
-                        data: 'supplierSku',
-                        render: function(data) {
-                            if (!data || data === '-') return '-';
-                            return '<code>' + data + '</code>';
+                        data: 'supplierProductCode',
+                        render: function(data, type, row) {
+                            var res = '<code>' + (data || '-') + '</code>';
+                            if (row.supplierProductName) {
+                                res += '<div class="small text-muted">' + row.supplierProductName + '</div>';
+                            }
+                            return res;
                         }
                     },
                     {
@@ -218,9 +288,8 @@
                         className: 'text-end',
                         render: function(data, type, row) {
                             var actions = '<div class="btn-group" role="group">' +
-                                '<a href="/SupplierProduct/ByProduct?productId=' + row.id + '" class="btn btn-sm btn-outline-primary" title="View Product"><i class="bi bi-eye"></i></a>' +
-                                '<a href="/SupplierProduct/Edit?productId=' + row.id + '&supplierId=' + row.supplierId + '" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>' +
-                                '<a href="/SupplierProduct/Delete?productId=' + row.id + '&supplierId=' + row.supplierId + '" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>' +
+                                '<button type="button" class="btn btn-sm btn-outline-primary btn-edit" data-product="' + row.id + '" data-supplier="' + row.supplierId + '" title="Edit"><i class="bi bi-pencil"></i></button>' +
+                                '<button type="button" class="btn btn-sm btn-outline-danger btn-delete" data-product="' + row.id + '" data-supplier="' + row.supplierId + '" data-name="' + row.productName + ' - ' + row.supplierName + '" title="Delete"><i class="bi bi-trash"></i></button>' +
                                 '</div>';
                             return actions;
                         }
@@ -230,8 +299,91 @@
                 lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]]
             });
 
+            // Add New button
+            $('#btnAddNew').on('click', function() {
+                $('#supplierProductModalLabel').text('Add Supplier Mapping');
+                $('#supplierProductForm')[0].reset();
+                $('#modalAlert').addClass('d-none');
+                
+                var currentProdId = $('#productFilter').val();
+                if (currentProdId) {
+                    $('#ProductId').val(currentProdId).trigger('change').prop('disabled', true);
+                } else {
+                    $('#ProductId').val('').trigger('change').prop('disabled', false);
+                }
+                
+                $('#SupplierId').val('').trigger('change').prop('disabled', false);
+                supplierProductModal.show();
+            });
+
+            // Edit button click
+            $('#supplierProductsTable').on('click', '.btn-edit', function() {
+                var productId = $(this).data('product');
+                var supplierId = $(this).data('supplier');
+                
+                $('#supplierProductModalLabel').text('Edit Supplier Mapping');
+                $('#modalAlert').addClass('d-none');
+                
+                $.get('/SupplierProduct/GetMapping', { productId: productId, supplierId: supplierId }, function(data) {
+                    $('#ProductId').val(data.productId).trigger('change').prop('disabled', true);
+                    $('#SupplierId').val(data.supplierId).trigger('change').prop('disabled', true);
+                    $('#SupplierProductCode').val(data.supplierProductCode);
+                    $('#SupplierProductName').val(data.supplierProductName);
+                    $('#CostPrice').val(data.costPrice);
+                    $('#Seq').val(data.seq);
+                    $('#IsActive').prop('checked', data.isActive);
+                    
+                    supplierProductModal.show();
+                });
+            });
+
+            // Delete button click
+            $('#supplierProductsTable').on('click', '.btn-delete', function() {
+                deleteContext.productId = $(this).data('product');
+                deleteContext.supplierId = $(this).data('supplier');
+                $('#deleteItemName').text($(this).data('name'));
+                deleteConfirmModal.show();
+            });
+
+            // Save Mapping
+            $('#supplierProductForm').on('submit', function(e) {
+                e.preventDefault();
+                
+                // Enable disabled fields for serializing
+                var disabledItems = $('#ProductId, #SupplierId').filter(':disabled');
+                disabledItems.prop('disabled', false);
+                var formData = $(this).serialize();
+                disabledItems.prop('disabled', true);
+
+                $.post('/SupplierProduct/Save', formData, function(response) {
+                    if (response.success) {
+                        supplierProductModal.hide();
+                        table.ajax.reload();
+                    } else {
+                        $('#modalAlert').text(response.message).removeClass('d-none');
+                    }
+                });
+            });
+
+            // Confirm Delete
+            $('#btnConfirmDelete').on('click', function() {
+                var token = $('input[name="__RequestVerificationToken"]').val();
+                $.post('/SupplierProduct/DeleteAjax', { 
+                    productId: deleteContext.productId, 
+                    supplierId: deleteContext.supplierId,
+                    __RequestVerificationToken: token
+                }, function(response) {
+                    if (response.success) {
+                        deleteConfirmModal.hide();
+                        table.ajax.reload();
+                    } else {
+                        alert(response.message);
+                    }
+                });
+            });
+
             // Apply filters on change
-            $('#searchInput, #supplierFilter, #statusFilter').on('change', function() {
+            $('#searchInput, #productFilter, #supplierFilter, #statusFilter').on('change', function() {
                 table.ajax.reload();
             });
 
@@ -244,7 +396,8 @@
             // Reset filters
             $('#resetFilters').on('click', function() {
                 $('#searchInput').val('');
-                $('#supplierFilter').val('');
+                $('#productFilter').val('').trigger('change');
+                $('#supplierFilter').val('').trigger('change');
                 $('#statusFilter').val('');
                 table.ajax.reload();
             });

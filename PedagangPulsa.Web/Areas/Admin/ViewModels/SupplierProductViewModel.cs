@@ -15,8 +15,19 @@ public class SupplierProductViewModel
     [Range(0, double.MaxValue, ErrorMessage = "Cost price must be greater than or equal to 0")]
     public decimal CostPrice { get; set; }
 
-    [StringLength(100, ErrorMessage = "Supplier SKU cannot be longer than 100 characters")]
-    public string? SupplierSku { get; set; }
+    [Required(ErrorMessage = "Supplier Product Code is required")]
+    [StringLength(100, ErrorMessage = "Supplier Product Code cannot be longer than 100 characters")]
+    public string SupplierProductCode { get; set; } = string.Empty;
+
+    [StringLength(150, ErrorMessage = "Supplier Product Name cannot be longer than 150 characters")]
+    public string? SupplierProductName { get; set; }
+
+    // Alias for compatibility with older code
+    public string? SupplierSku 
+    { 
+        get => SupplierProductCode; 
+        set => SupplierProductCode = value ?? string.Empty; 
+    }
 
     [Required]
     [Range(1, int.MaxValue, ErrorMessage = "Sequence must be at least 1")]

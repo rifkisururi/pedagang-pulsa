@@ -14,31 +14,19 @@ public class ProductViewModel
     [StringLength(200, ErrorMessage = "Name cannot be longer than 200 characters")]
     public string Name { get; set; } = string.Empty;
 
-    [StringLength(100, ErrorMessage = "SKU cannot be longer than 100 characters")]
-    public string? Sku { get; set; }
-
     [Required(ErrorMessage = "Category is required")]
     public int CategoryId { get; set; }
 
     [Range(0, double.MaxValue, ErrorMessage = "Denomination must be greater than or equal to 0")]
     public decimal? Denomination { get; set; }
 
-    [Required(ErrorMessage = "Price is required")]
-    [Range(0, double.MaxValue, ErrorMessage = "Price must be greater than or equal to 0")]
-    public decimal Price { get; set; }
-
-    [Required(ErrorMessage = "Cost price is required")]
-    [Range(0, double.MaxValue, ErrorMessage = "Cost price must be greater than or equal to 0")]
-    public decimal CostPrice { get; set; }
+    [StringLength(50, ErrorMessage = "Operator cannot be longer than 50 characters")]
+    public string? Operator { get; set; }
 
     [StringLength(1000, ErrorMessage = "Description cannot be longer than 1000 characters")]
     public string? Description { get; set; }
 
-    public bool IsAvailable { get; set; } = true;
-
     public bool IsActive { get; set; } = true;
-
-    public int SortOrder { get; set; }
 
     public List<LevelPriceItem>? LevelPrices { get; set; }
 

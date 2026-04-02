@@ -33,8 +33,9 @@ public class SupplierProductController : Controller
 
     // Index page for all supplier products (menu navigation)
     [HttpGet]
-    public IActionResult Index()
+    public IActionResult Index(Guid? productId)
     {
+        ViewBag.SelectedProductId = productId;
         return View();
     }
 
@@ -42,38 +43,7 @@ public class SupplierProductController : Controller
     [HttpGet]
     public async Task<IActionResult> ByProduct(Guid productId)
     {
-        var product = await _productService.GetProductByIdAsync(productId);
-        if (product == null)
-        {
-            return NotFound();
-        }
-
-        var supplierProducts = await _supplierProductService.GetSupplierProductsByProductIdAsync(productId);
-        var availableSuppliers = await _supplierProductService.GetAvailableSuppliersForProductAsync(productId);
-
-        var model = new SupplierProductListViewModel
-        {
-            ProductId = product.Id,
-            ProductCode = product.Code,
-            ProductName = product.Name,
-            ProductCategory = product.Category?.Name ?? "Unknown",
-            SupplierProducts = supplierProducts.Select(sp => new SupplierProductListViewModel.SupplierProductItem
-            {
-                SupplierId = sp.SupplierId,
-                SupplierName = sp.Supplier?.Name ?? "Unknown",
-                CostPrice = sp.CostPrice,
-                SupplierSku = sp.SupplierProductCode,
-                Seq = sp.Seq,
-                IsActive = sp.IsActive
-            }).ToList(),
-            AvailableSuppliers = availableSuppliers.Select(s => new SupplierProductListViewModel.AvailableSupplierItem
-            {
-                Id = s.Id,
-                Name = s.Name
-            }).ToList()
-        };
-
-        return View(model);
+        return RedirectToAction(nameof(Index), new { productId = productId });
     }
 
     [HttpGet]
@@ -134,7 +104,8 @@ public class SupplierProductController : Controller
             ProductId = model.ProductId,
             SupplierId = model.SupplierId,
             CostPrice = model.CostPrice,
-            SupplierProductCode = model.SupplierSku,
+            SupplierProductCode = model.SupplierProductCode,
+            SupplierProductName = model.SupplierProductName,
             Seq = model.Seq,
             IsActive = model.IsActive
         };
@@ -165,7 +136,8 @@ public class SupplierProductController : Controller
             ProductId = supplierProduct.ProductId,
             SupplierId = supplierProduct.SupplierId,
             CostPrice = supplierProduct.CostPrice,
-            SupplierSku = supplierProduct.SupplierProductCode,
+            SupplierProductCode = supplierProduct.SupplierProductCode,
+            SupplierProductName = supplierProduct.SupplierProductName,
             Seq = supplierProduct.Seq,
             IsActive = supplierProduct.IsActive,
             ProductCode = supplierProduct.Product?.Code ?? "",
@@ -191,7 +163,8 @@ public class SupplierProductController : Controller
             ProductId = model.ProductId,
             SupplierId = model.SupplierId,
             CostPrice = model.CostPrice,
-            SupplierProductCode = model.SupplierSku,
+            SupplierProductCode = model.SupplierProductCode,
+            SupplierProductName = model.SupplierProductName,
             Seq = model.Seq,
             IsActive = model.IsActive
         };
@@ -271,12 +244,86 @@ public class SupplierProductController : Controller
 
     #region AJAX Endpoints
 
+    [HttpGet]
+    public async Task<IActionResult> GetMapping(Guid productId, int supplierId)
+    {
+        var sp = await _supplierProductService.GetSupplierProductAsync(productId, supplierId);
+        if (sp == null) return NotFound();
+
+        return Json(new
+        {
+            productId = sp.ProductId,
+            supplierId = sp.SupplierId,
+            costPrice = sp.CostPrice,
+            supplierProductCode = sp.SupplierProductCode,
+            supplierProductName = sp.SupplierProductName,
+            seq = sp.Seq,
+            isActive = sp.IsActive
+        });
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "SuperAdmin,Admin")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Save([FromForm] SupplierProductViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return Json(new { success = false, message = "Invalid data", errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage) });
+        }
+
+        var supplierProduct = new SupplierProduct
+        {
+            ProductId = model.ProductId,
+            SupplierId = model.SupplierId,
+            CostPrice = model.CostPrice,
+            SupplierProductCode = model.SupplierProductCode,
+            SupplierProductName = model.SupplierProductName,
+            Seq = model.Seq,
+            IsActive = model.IsActive
+        };
+
+        // Check if it's an update or new
+        var existing = await _supplierProductService.GetSupplierProductAsync(model.ProductId, model.SupplierId);
+        
+        SupplierProduct? result;
+        if (existing != null)
+        {
+            result = await _supplierProductService.UpdateSupplierProductAsync(supplierProduct);
+        }
+        else
+        {
+            result = await _supplierProductService.AddSupplierProductAsync(supplierProduct);
+        }
+
+        if (result == null)
+        {
+            return Json(new { success = false, message = "Failed to save mapping. It might already exist or data is invalid." });
+        }
+
+        return Json(new { success = true, message = "Mapping saved successfully." });
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "SuperAdmin,Admin")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteAjax(Guid productId, int supplierId)
+    {
+        var result = await _supplierProductService.DeleteSupplierProductAsync(productId, supplierId);
+        if (result)
+        {
+            return Json(new { success = true, message = "Mapping deleted successfully." });
+        }
+        return Json(new { success = false, message = "Failed to delete mapping." });
+    }
+
     [HttpPost]
     public async Task<IActionResult> GetData(
         [FromForm] int draw,
         [FromForm] int start = 1,
         [FromForm] int length = 10,
         [FromForm] string? search = null,
+        [FromForm] string? productId = null,
         [FromForm] string? supplierId = null,
         [FromForm] string? isActive = null)
     {
@@ -288,6 +335,12 @@ public class SupplierProductController : Controller
             .Include(sp => sp.Product)
             .ThenInclude(p => p.Category)
             .AsQueryable();
+
+        // Apply product filter
+        if (!string.IsNullOrWhiteSpace(productId) && Guid.TryParse(productId, out var prodId))
+        {
+            query = query.Where(sp => sp.ProductId == prodId);
+        }
 
         // Apply search filter
         if (!string.IsNullOrWhiteSpace(search))
@@ -343,7 +396,8 @@ public class SupplierProductController : Controller
             productCode = sp.Product?.Code ?? "Unknown",
             productCategory = sp.Product?.Category?.Name ?? "Unknown",
             supplierName = sp.Supplier?.Name ?? "Unknown",
-            supplierSku = sp.SupplierProductCode ?? "-",
+            supplierProductCode = sp.SupplierProductCode,
+            supplierProductName = sp.SupplierProductName,
             costPrice = sp.CostPrice,
             seq = sp.Seq,
             isActive = sp.IsActive ? "Active" : "Inactive"

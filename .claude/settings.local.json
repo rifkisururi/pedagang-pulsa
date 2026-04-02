@@ -23,7 +23,15 @@
       "Bash(taskkill:*)",
       "Bash(psql -h localhost -U postgres -d pedagangpulsa_db -f drop-enums.sql)",
       "Bash(powershell:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(wc:*)",
+      "Bash(npx add-mcp:*)",
+      "mcp__neon__list_projects",
+      "mcp__neon__describe_branch",
+      "mcp__neon__describe_project",
+      "mcp__neon__get_database_tables",
+      "mcp__neon__describe_table_schema",
+      "mcp__neon__run_sql"
     ]
   },
   "enabledPlugins": {

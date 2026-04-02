@@ -14,7 +14,12 @@ public class SupplierProductListViewModel
         public int SupplierId { get; set; }
         public string SupplierName { get; set; } = string.Empty;
         public decimal CostPrice { get; set; }
-        public string? SupplierSku { get; set; }
+        public string SupplierProductCode { get; set; } = string.Empty;
+        public string? SupplierProductName { get; set; }
+        
+        // Alias for compatibility
+        public string? SupplierSku => SupplierProductCode;
+
         public short Seq { get; set; }
         public bool IsActive { get; set; }
 

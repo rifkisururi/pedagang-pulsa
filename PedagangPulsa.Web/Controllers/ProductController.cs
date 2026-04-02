@@ -42,6 +42,7 @@ public class ProductController : Controller
             Description = product.Description,
             CategoryId = product.CategoryId,
             CategoryName = product.Category?.Name ?? "Unknown",
+            Operator = product.Operator,
             Denomination = product.Denomination,
             IsActive = product.IsActive,
             LevelPrices = product.ProductLevelPrices.Select(lp => new ProductDetailViewModel.PriceItem
@@ -126,6 +127,7 @@ public class ProductController : Controller
             Code = model.Code,
             Name = model.Name,
             CategoryId = model.CategoryId,
+            Operator = model.Operator,
             Description = model.Description,
             Denomination = model.Denomination,
             IsActive = model.IsActive,
@@ -178,6 +180,7 @@ public class ProductController : Controller
             Name = product.Name,
             CategoryId = product.CategoryId,
             Denomination = product.Denomination,
+            Operator = product.Operator,
             Description = product.Description,
             IsActive = product.IsActive,
             AvailableCategories = categories.Select(c => new ProductViewModel.CategoryItem
@@ -229,6 +232,7 @@ public class ProductController : Controller
             Name = model.Name,
             CategoryId = model.CategoryId,
             Denomination = model.Denomination,
+            Operator = model.Operator,
             Description = model.Description,
             IsActive = model.IsActive,
             UpdatedAt = DateTime.UtcNow
@@ -331,6 +335,7 @@ public class ProductController : Controller
             Id = p.Id,
             Code = p.Code,
             Name = p.Name,
+            Operator = p.Operator,
             Category = p.Category?.Name ?? "Unknown",
             Denomination = p.Denomination,
             IsActive = p.IsActive ? "Active" : "Inactive"

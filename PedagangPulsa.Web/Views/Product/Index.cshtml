@@ -53,11 +53,10 @@
                     <tr>
                         <th>Code</th>
                         <th>Name</th>
+                        <th>Operator</th>
                         <th>Category</th>
-                        <th>Price</th>
-                        <th>Cost Price</th>
+                        <th>Denom</th>
                         <th>Status</th>
-                        <th>Available</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -93,7 +92,7 @@
                         return d;
                     }
                 },
-                order: [[0, 'asc']],
+                order: [[1, 'asc']],
                 columns: [
                     {
                         data: 'code',
@@ -107,30 +106,22 @@
                             return '<a href="/Product/Details/' + row.id + '" class="text-decoration-none fw-bold">' + data + '</a>';
                         }
                     },
+                    { 
+                        data: 'operator',
+                        render: function(data) { return data || '-'; }
+                    },
                     { data: 'category' },
                     {
-                        data: 'price',
+                        data: 'denomination',
                         render: function(data) {
-                            return  'Rp '.+toLocaleString('id-ID');
-                        }
-                    },
-                    {
-                        data: 'costPrice',
-                        render: function(data) {
-                            return  'Rp '.+toLocaleString('id-ID');
+                            if (!data) return '-';
+                            return Number(data).toLocaleString('id-ID');
                         }
                     },
                     {
                         data: 'isActive',
                         render: function(data) {
                             var badgeClass = data === 'Active' ? 'bg-success' : 'bg-secondary';
-                            return '<span class="badge ' + badgeClass + '">' + data + '</span>';
-                        }
-                    },
-                    {
-                        data: 'isAvailable',
-                        render: function(data) {
-                            var badgeClass = data === 'Yes' ? 'bg-primary' : 'bg-warning';
                             return '<span class="badge ' + badgeClass + '">' + data + '</span>';
                         }
                     },
@@ -176,9 +167,5 @@
                 table.ajax.reload();
             });
         });
-
-        function  'Rp '.+toLocaleString('id-ID') {
-            return 'Rp ' + amount.toLocaleString('id-ID');
-        }
     </script>
 }

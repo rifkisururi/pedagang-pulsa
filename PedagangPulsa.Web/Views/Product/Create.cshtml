@@ -29,9 +29,9 @@
                             <span asp-validation-for="Code" class="text-danger small"></span>
                         </div>
                         <div class="col-md-6">
-                            <label asp-for="Sku" class="form-label">SKU</label>
-                            <input asp-for="Sku" class="form-control" placeholder="e.g., TSEL-10K" />
-                            <span asp-validation-for="Sku" class="text-danger small"></span>
+                            <label asp-for="Operator" class="form-label">Operator</label>
+                            <input asp-for="Operator" class="form-control" placeholder="e.g., Telkomsel" />
+                            <span asp-validation-for="Operator" class="text-danger small"></span>
                         </div>
                         <div class="col-12">
                             <label asp-for="Name" class="form-label">Product Name <span class="text-danger">*</span></label>
@@ -53,34 +53,17 @@
                             <span asp-validation-for="CategoryId" class="text-danger small"></span>
                         </div>
                         <div class="col-md-6">
-                            <label asp-for="SortOrder" class="form-label">Sort Order</label>
-                            <input asp-for="SortOrder" class="form-control" type="number" value="0" />
-                            <span asp-validation-for="SortOrder" class="text-danger small"></span>
+                            <label asp-for="Denomination" class="form-label">Denomination</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rp</span>
+                                <input asp-for="Denomination" class="form-control" type="number" step="1" min="0" />
+                            </div>
+                            <span asp-validation-for="Denomination" class="text-danger small"></span>
                         </div>
                         <div class="col-12">
                             <label asp-for="Description" class="form-label">Description</label>
                             <textarea asp-for="Description" class="form-control" rows="2" placeholder="Product description..."></textarea>
                             <span asp-validation-for="Description" class="text-danger small"></span>
-                        </div>
-                    </div>
-
-                    <h5 class="mb-3">Pricing</h5>
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-6">
-                            <label asp-for="Price" class="form-label">Base Price <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <span class="input-group-text">Rp</span>
-                                <input asp-for="Price" class="form-control" type="number" step="0.01" min="0" required />
-                            </div>
-                            <span asp-validation-for="Price" class="text-danger small"></span>
-                        </div>
-                        <div class="col-md-6">
-                            <label asp-for="CostPrice" class="form-label">Cost Price <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <span class="input-group-text">Rp</span>
-                                <input asp-for="CostPrice" class="form-control" type="number" step="0.01" min="0" required id="costPriceInput" />
-                            </div>
-                            <span asp-validation-for="CostPrice" class="text-danger small"></span>
                         </div>
                     </div>
 
@@ -91,7 +74,6 @@
                                 <tr>
                                     <th>Level</th>
                                     <th>Sell Price</th>
-                                    <th>Margin</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -105,11 +87,11 @@
                                                 <input type="hidden" name="LevelPrices[@i].LevelId" value="@Model.AvailableLevels[i].Id" />
                                             </td>
                                             <td>
-                                                <input type="number" name="LevelPrices[@i].SellPrice" class="form-control form-control-sm level-price-input"
-                                                       step="0.01" min="0" value="@Model.Price" data-level="@Model.AvailableLevels[i].Name" />
-                                            </td>
-                                            <td>
-                                                <span class="margin-display">-</span>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">Rp</span>
+                                                    <input type="number" name="LevelPrices[@i].SellPrice" class="form-control form-control-sm"
+                                                           step="0.01" min="0" value="0" />
+                                                </div>
                                             </td>
                                         </tr>
                                     }
@@ -118,7 +100,7 @@
                         </table>
                         <small class="text-muted">
                             <i class="bi bi-info-circle"></i>
-                            Set sell price for each user level. If left empty, base price will be used.
+                            Set sell price for each user level.
                         </small>
                     </div>
 
@@ -128,12 +110,6 @@
                             <div class="form-check form-switch">
                                 <input asp-for="IsActive" class="form-check-input" type="checkbox" checked />
                                 <label asp-for="IsActive" class="form-check-label">Active</label>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-check form-switch">
-                                <input asp-for="IsAvailable" class="form-check-input" type="checkbox" checked />
-                                <label asp-for="IsAvailable" class="form-check-label">Available for Purchase</label>
                             </div>
                         </div>
                     </div>
@@ -154,31 +130,4 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-    <script>
-        $(document).ready(function() {
-            function calculateMargins() {
-                const costPrice = parseFloat($('#costPriceInput').val()) || 0;
-
-                $('.level-price-input').each(function() {
-                    const sellPrice = parseFloat($(this).val()) || 0;
-                    const margin = sellPrice - costPrice;
-                    const marginRow = $(this).closest('tr').find('.margin-display');
-
-                    marginRow.text('Rp ' + margin.toLocaleString('id-ID'));
-                    marginRow.removeClass('text-danger text-success');
-                    if (margin < 0) {
-                        marginRow.addClass('text-danger');
-                    } else if (margin > 0) {
-                        marginRow.addClass('text-success');
-                    }
-                });
-            }
-
-            $('#costPriceInput').on('input', calculateMargins);
-            $('.level-price-input').on('input', calculateMargins);
-
-            // Initial calculation
-            calculateMargins();
-        });
-    </script>
 }
