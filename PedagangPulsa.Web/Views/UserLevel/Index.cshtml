@@ -98,13 +98,13 @@
                             if (row.markupType === 'Percentage') {
                                 return data + '%';
                             }
-                            return  'Rp '.+toLocaleString('id-ID');
+                            return 'Rp ' + data.toLocaleString('id-ID');
                         }
                     },
                     {
                         data: 'minDeposit',
                         render: function(data) {
-                            return  'Rp '.+toLocaleString('id-ID');
+                            return 'Rp ' + data.toLocaleString('id-ID');
                         }
                     },
                     {
@@ -155,9 +155,5 @@
                 table.ajax.reload();
             });
         });
-
-        function  'Rp '.+toLocaleString('id-ID') {
-            return 'Rp ' + amount.toLocaleString('id-ID');
-        }
     </script>
 }

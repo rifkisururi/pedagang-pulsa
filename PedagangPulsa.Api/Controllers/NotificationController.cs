@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using PedagangPulsa.Api.DTOs;
 using PedagangPulsa.Infrastructure.Data;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace PedagangPulsa.Api.Controllers;
 
@@ -13,12 +15,10 @@ namespace PedagangPulsa.Api.Controllers;
 public class NotificationController : ControllerBase
 {
     private readonly AppDbContext _context;
-    private readonly ILogger<NotificationController> _logger;
 
-    public NotificationController(AppDbContext context, ILogger<NotificationController> logger)
+    public NotificationController(AppDbContext context)
     {
         _context = context;
-        _logger = logger;
     }
 
     [HttpGet]
@@ -27,8 +27,8 @@ public class NotificationController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null)
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
         {
             return Unauthorized(new ErrorResponse
             {
@@ -37,10 +37,18 @@ public class NotificationController : ControllerBase
             });
         }
 
-        var userGuid = Guid.Parse(userId);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
 
         var query = _context.NotificationLogs
-            .Where(n => n.UserId == userGuid);
+            .AsNoTracking()
+            .Where(n => n.UserId == userId);
 
         if (isRead.HasValue)
         {
@@ -49,7 +57,8 @@ public class NotificationController : ControllerBase
 
         var totalRecords = await query.CountAsync();
         var unreadCount = await _context.NotificationLogs
-            .Where(n => n.UserId == userGuid && n.Status == "pending")
+            .AsNoTracking()
+            .Where(n => n.UserId == userId && n.Status == "pending")
             .CountAsync();
 
         var notifications = await query
@@ -58,10 +67,10 @@ public class NotificationController : ControllerBase
             .Take(pageSize)
             .Select(n => new NotificationItem
             {
-                Id = Guid.NewGuid(),
-                Type = n.TemplateCode,
+                Id = CreateNotificationId(n.Id, n.CreatedAt),
+                Type = n.TemplateCode ?? "general",
                 Title = n.Subject ?? "Notification",
-                Message = n.Body,
+                Message = n.Body ?? string.Empty,
                 IsRead = n.Status == "read",
                 CreatedAt = n.CreatedAt,
                 ReadAt = null
@@ -82,8 +91,8 @@ public class NotificationController : ControllerBase
     [HttpPost("{id}/read")]
     public async Task<IActionResult> MarkAsRead(Guid id)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null)
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
         {
             return Unauthorized(new ErrorResponse
             {
@@ -92,10 +101,33 @@ public class NotificationController : ControllerBase
             });
         }
 
-        var userGuid = Guid.Parse(userId);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
+
+        var notificationKeys = await _context.NotificationLogs
+            .AsNoTracking()
+            .Where(n => n.UserId == userId)
+            .Select(n => new { n.Id, n.CreatedAt })
+            .ToListAsync();
+
+        var match = notificationKeys.FirstOrDefault(n => CreateNotificationId(n.Id, n.CreatedAt) == id);
+        if (match == null)
+        {
+            return NotFound(new ErrorResponse
+            {
+                Message = "Notification not found",
+                ErrorCode = "NOTIFICATION_NOT_FOUND"
+            });
+        }
 
         var notification = await _context.NotificationLogs
-            .Where(n => n.TemplateCode == id.ToString() && n.UserId == userGuid)
+            .Where(n => n.UserId == userId && n.Id == match.Id && n.CreatedAt == match.CreatedAt)
             .FirstOrDefaultAsync();
 
         if (notification == null)
@@ -121,8 +153,8 @@ public class NotificationController : ControllerBase
     [HttpPost("read-all")]
     public async Task<IActionResult> MarkAllAsRead()
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null)
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
         {
             return Unauthorized(new ErrorResponse
             {
@@ -131,16 +163,31 @@ public class NotificationController : ControllerBase
             });
         }
 
-        var userGuid = Guid.Parse(userId);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
 
         await _context.NotificationLogs
-            .Where(n => n.UserId == userGuid && n.Status == "pending")
-            .ExecuteUpdateAsync(n => n.SetProperty(n => n.Status, "read"));
+            .Where(n => n.UserId == userId && n.Status == "pending")
+            .ExecuteUpdateAsync(n => n.SetProperty(notification => notification.Status, "read"));
 
         return Ok(new
         {
             success = true,
             message = "All notifications marked as read"
         });
+    }
+
+    // Keep a stable public identifier without exposing the composite database key.
+    private static Guid CreateNotificationId(long id, DateTime createdAt)
+    {
+        var source = $"{id}:{createdAt.ToUniversalTime():O}";
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(source));
+        return new Guid(hash.AsSpan(0, 16));
     }
 }

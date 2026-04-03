@@ -258,7 +258,7 @@
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    return context.dataset.label + ': ' +  'Rp '.+toLocaleString('id-ID');
+                                    return context.dataset.label + ': Rp ' + context.parsed.y.toLocaleString('id-ID');
                                 }
                             }
                         }
@@ -267,7 +267,7 @@
                         y: {
                             ticks: {
                                 callback: function(value) {
-                                    return  'Rp '.+toLocaleString('id-ID');
+                                    return 'Rp ' + value.toLocaleString('id-ID');
                                 }
                             }
                         }
@@ -318,10 +318,6 @@
                     $('#productReportContent').html('<div class="alert alert-danger">Error loading report</div>');
                 }
             });
-        }
-
-        function  'Rp '.+toLocaleString('id-ID') {
-            return 'Rp ' + (amount / 1).toLocaleString('id-ID');
         }
     </script>
 }

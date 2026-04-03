@@ -344,6 +344,8 @@ temp/
 
 # Output folders
 out/
+.out/
+.tmpobj/
 dist/
 build/
 

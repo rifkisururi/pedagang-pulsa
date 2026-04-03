@@ -121,7 +121,7 @@ public class UserLevelController : Controller
 
         var level = new UserLevel
         {
-            Id = model.Id.Value,
+            Id = model.Id!.Value,
             Name = model.Name,
             MarkupType = model.MarkupType,
             MarkupValue = model.MarkupValue,

@@ -36,7 +36,7 @@ public class SupplierController : Controller
         {
             Id = supplier.Id,
             Name = supplier.Name,
-            ApiUrl = supplier.ApiBaseUrl,
+            ApiUrl = supplier.ApiBaseUrl ?? string.Empty,
             MemberId = supplier.MemberId ?? string.Empty,
             Pin = supplier.Pin ?? string.Empty,
             Password = supplier.Password ?? string.Empty,
@@ -103,7 +103,7 @@ public class SupplierController : Controller
         {
             Id = supplier.Id,
             Name = supplier.Name,
-            ApiUrl = supplier.ApiBaseUrl,
+            ApiUrl = supplier.ApiBaseUrl ?? string.Empty,
             MemberId = supplier.MemberId ?? string.Empty,
             Pin = string.Empty, // Don't show existing PIN
             Password = string.Empty, // Don't show existing password
@@ -126,7 +126,7 @@ public class SupplierController : Controller
         }
 
         // Get existing supplier to preserve PIN/Password if not provided
-        var existingSupplier = await _supplierService.GetSupplierByIdAsync(model.Id.Value);
+        var existingSupplier = await _supplierService.GetSupplierByIdAsync(model.Id!.Value);
         if (existingSupplier == null)
         {
             return NotFound();

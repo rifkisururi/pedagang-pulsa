@@ -9,6 +9,6 @@ public class SupplierPurchaseRequest
     public string SupplierApiUrl { get; set; } = string.Empty;
     public string SupplierProductCode { get; set; } = string.Empty;
     public string DestinationNumber { get; set; } = string.Empty;
-    public Guid ReferenceId { get; set; }
+    public string ReferenceId { get; set; } = string.Empty;
     public int TimeoutSeconds { get; set; } = 30;
 }

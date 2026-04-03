@@ -21,7 +21,7 @@ public class ExportController : Controller
         DateTime? startDate = null,
         DateTime? endDate = null,
         string? status = null,
-        int? userId = null)
+        Guid? userId = null)
     {
         try
         {

@@ -43,7 +43,7 @@ public class UserService
                 // Use case-insensitive Contains for InMemory
                 var searchLower = search.ToLower();
                 query = query.Where(u =>
-                    u.Username.ToLower().Contains(searchLower) ||
+                    u.UserName.ToLower().Contains(searchLower) ||
                     (u.FullName != null && u.FullName.ToLower().Contains(searchLower)) ||
                     (u.Email != null && u.Email.ToLower().Contains(searchLower)) ||
                     (u.Phone != null && u.Phone.ToLower().Contains(searchLower)));
@@ -52,7 +52,7 @@ public class UserService
             {
                 // Use ILike for PostgreSQL
                 query = query.Where(u =>
-                    EF.Functions.ILike(u.Username, $"%{search}%") ||
+                    EF.Functions.ILike(u.UserName, $"%{search}%") ||
                     EF.Functions.ILike(u.FullName ?? "", $"%{search}%") ||
                     EF.Functions.ILike(u.Email ?? "", $"%{search}%") ||
                     EF.Functions.ILike(u.Phone ?? "", $"%{search}%"));
@@ -107,7 +107,7 @@ public class UserService
             {
                 query = sortCol switch
                 {
-                    "username" => query.OrderByDescending(u => u.Username),
+                    "username" => query.OrderByDescending(u => u.UserName),
                     "fullname" => query.OrderByDescending(u => u.FullName),
                     "email" => query.OrderByDescending(u => u.Email),
                     "phone" => query.OrderByDescending(u => u.Phone),
@@ -122,7 +122,7 @@ public class UserService
             {
                 query = sortCol switch
                 {
-                    "username" => query.OrderBy(u => u.Username),
+                    "username" => query.OrderBy(u => u.UserName),
                     "fullname" => query.OrderBy(u => u.FullName),
                     "email" => query.OrderBy(u => u.Email),
                     "phone" => query.OrderBy(u => u.Phone),

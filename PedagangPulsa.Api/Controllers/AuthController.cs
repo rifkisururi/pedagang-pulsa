@@ -6,6 +6,8 @@ using PedagangPulsa.Api.DTOs;
 using PedagangPulsa.Domain.Entities;
 using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Infrastructure.Data;
+using System.Data;
+using System.Data.Common;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -47,120 +49,125 @@ public class AuthController : ControllerBase
             });
         }
 
-        // Check unique username
-        var existingUser = await _context.Users
-            .FirstOrDefaultAsync(u => u.Username == request.Username || u.Email == request.Email || u.Phone == request.Phone);
-
-        if (existingUser != null)
-        {
-            var fieldName = existingUser.Username == request.Username ? "Username" :
-                           existingUser.Email == request.Email ? "Email" : "Phone";
-            return BadRequest(new ErrorResponse
-            {
-                Message = $"{fieldName} already exists",
-                ErrorCode = "DUPLICATE_FIELD"
-            });
-        }
-
-        // Get default level (first active level as default)
-        var defaultLevel = await _context.UserLevels
-            .FirstOrDefaultAsync(l => l.IsActive);
-
-        if (defaultLevel == null)
-        {
-            _logger.LogError("No default user level configured");
-            return StatusCode(500, new ErrorResponse
-            {
-                Message = "System configuration error",
-                ErrorCode = "CONFIG_ERROR"
-            });
-        }
-
-        // Hash PIN with BCrypt
-        var pinHash = BCrypt.Net.BCrypt.HashPassword(request.Pin, workFactor: 12);
-
-        // Generate unique referral code
-        var referralCode = await GenerateUniqueReferralCode();
-
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        var connection = await OpenConnectionAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
         try
         {
-            // Create user
-            var user = new User
+            await using (var duplicateCommand = CreateCommand(connection, """
+                SELECT "Id", "Username", "Email", "Phone"
+                FROM "Users"
+                WHERE "Username" = @username OR "Email" = @email OR "Phone" = @phone
+                LIMIT 1
+                """, transaction))
             {
-                Id = Guid.NewGuid(),
-                Username = request.Username,
-                FullName = request.FullName,
-                Email = request.Email,
-                Phone = request.Phone,
-                PinHash = pinHash,
-                PinFailedAttempts = 0,
-                LevelId = defaultLevel.Id,
-                ReferralCode = referralCode,
-                Status = UserStatus.Active,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
+                AddParameter(duplicateCommand, "@username", request.Username);
+                AddParameter(duplicateCommand, "@email", request.Email);
+                AddParameter(duplicateCommand, "@phone", request.Phone);
 
-            _context.Users.Add(user);
-
-            // Create user balance
-            var userBalance = new UserBalance
-            {
-                UserId = user.Id,
-                ActiveBalance = 0,
-                HeldBalance = 0
-            };
-            _context.UserBalances.Add(userBalance);
-
-            // Handle referral logic
-            Guid? referrerId = null;
-            if (!string.IsNullOrWhiteSpace(request.ReferralCode))
-            {
-                var referrer = await _context.Users
-                    .FirstOrDefaultAsync(u => u.ReferralCode == request.ReferralCode);
-
-                if (referrer != null && referrer.Id != user.Id)
+                await using var duplicateReader = await duplicateCommand.ExecuteReaderAsync();
+                if (await duplicateReader.ReadAsync())
                 {
-                    referrerId = referrer.Id;
-                    user.ReferredBy = referrer.Id;
+                    var existingUsername = duplicateReader["Username"] as string;
+                    var existingEmail = duplicateReader["Email"] as string;
+                    var existingPhone = duplicateReader["Phone"] as string;
+                    var fieldName = existingUsername == request.Username ? "Username" :
+                                   existingEmail == request.Email ? "Email" : "Phone";
 
-                    // Create referral log
-                    var referralLog = new ReferralLog
+                    return BadRequest(new ErrorResponse
                     {
-                        Id = Guid.NewGuid(),
-                        ReferrerId = referrer.Id,
-                        RefereeId = user.Id,
-                        BonusStatus = ReferralBonusStatus.Pending,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    };
-                    _context.ReferralLogs.Add(referralLog);
-
-                    _logger.LogInformation("User {UserId} registered with referral code {ReferralCode} from {ReferrerId}",
-                        user.Id, request.ReferralCode, referrer.Id);
+                        Message = $"{fieldName} already exists",
+                        ErrorCode = "DUPLICATE_FIELD"
+                    });
                 }
             }
 
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            // Generate tokens
-            var accessToken = GenerateJwtToken(user);
-            var refreshToken = GenerateRefreshToken();
-
-            // Store refresh token
-            var refreshTokenEntity = new RefreshToken
+            int defaultLevelId;
+            string defaultLevelName;
+            await using (var levelCommand = CreateCommand(connection, """
+                SELECT "Id", "Name"
+                FROM "UserLevels"
+                WHERE "IsActive" = TRUE
+                ORDER BY "Id"
+                LIMIT 1
+                """, transaction))
+            await using (var levelReader = await levelCommand.ExecuteReaderAsync())
             {
-                Id = Guid.NewGuid(),
-                UserId = user.Id,
-                Token = refreshToken,
-                ExpiresAt = DateTime.UtcNow.AddDays(30),
-                IsRevoked = false,
-                CreatedAt = DateTime.UtcNow
-            };
-            _context.RefreshTokens.Add(refreshTokenEntity);
-            await _context.SaveChangesAsync();
+                if (!await levelReader.ReadAsync())
+                {
+                    _logger.LogError("No default user level configured");
+                    return StatusCode(500, new ErrorResponse
+                    {
+                        Message = "System configuration error",
+                        ErrorCode = "CONFIG_ERROR"
+                    });
+                }
+
+                defaultLevelId = levelReader.GetInt32(levelReader.GetOrdinal("Id"));
+                defaultLevelName = levelReader.GetString(levelReader.GetOrdinal("Name"));
+            }
+
+            var createdAt = DateTime.UtcNow;
+            var userId = Guid.NewGuid();
+            var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 12);
+            var pinHash = BCrypt.Net.BCrypt.HashPassword(request.Pin, workFactor: 12);
+            var referralCode = await GenerateUniqueReferralCodeAsync(connection, transaction);
+
+            await using (var insertUserCommand = CreateCommand(connection, """
+                INSERT INTO "Users"
+                    ("Id", "Username", "FullName", "Email", "Phone", "PasswordHash", "PinHash", "PinFailedAttempts", "LevelId", "ReferralCode", "Status", "CreatedAt", "UpdatedAt")
+                VALUES
+                    (@id, @username, @fullName, @email, @phone, @passwordHash, @pinHash, @pinFailedAttempts, @levelId, @referralCode, @status, @createdAt, @updatedAt)
+                """, transaction))
+            {
+                AddParameter(insertUserCommand, "@id", userId);
+                AddParameter(insertUserCommand, "@username", request.Username);
+                AddParameter(insertUserCommand, "@fullName", request.FullName);
+                AddParameter(insertUserCommand, "@email", request.Email);
+                AddParameter(insertUserCommand, "@phone", request.Phone);
+                AddParameter(insertUserCommand, "@passwordHash", passwordHash);
+                AddParameter(insertUserCommand, "@pinHash", pinHash);
+                AddParameter(insertUserCommand, "@pinFailedAttempts", 0);
+                AddParameter(insertUserCommand, "@levelId", defaultLevelId);
+                AddParameter(insertUserCommand, "@referralCode", referralCode);
+                AddParameter(insertUserCommand, "@status", UserStatus.Active.ToString());
+                AddParameter(insertUserCommand, "@createdAt", createdAt);
+                AddParameter(insertUserCommand, "@updatedAt", createdAt);
+                await insertUserCommand.ExecuteNonQueryAsync();
+            }
+
+            await using (var insertBalanceCommand = CreateCommand(connection, """
+                INSERT INTO "UserBalances" ("UserId", "ActiveBalance", "HeldBalance", "UpdatedAt")
+                VALUES (@userId, @activeBalance, @heldBalance, @updatedAt)
+                """, transaction))
+            {
+                AddParameter(insertBalanceCommand, "@userId", userId);
+                AddParameter(insertBalanceCommand, "@activeBalance", 0m);
+                AddParameter(insertBalanceCommand, "@heldBalance", 0m);
+                AddParameter(insertBalanceCommand, "@updatedAt", createdAt);
+                await insertBalanceCommand.ExecuteNonQueryAsync();
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.ReferralCode))
+            {
+                await using var referralCommand = CreateCommand(connection, """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM "Users"
+                        WHERE "ReferralCode" = @referralCode
+                    )
+                    """, transaction);
+                AddParameter(referralCommand, "@referralCode", request.ReferralCode);
+                var referrerExists = Convert.ToBoolean(await referralCommand.ExecuteScalarAsync());
+
+                if (referrerExists)
+                {
+                    _logger.LogInformation("Referral code {ReferralCode} received during registration for {Username}", request.ReferralCode, request.Username);
+                }
+            }
+
+            var refreshToken = GenerateRefreshToken();
+            await InsertRefreshTokenAsync(connection, transaction, userId, refreshToken, DateTime.UtcNow.AddDays(30));
+            await transaction.CommitAsync();
 
             var response = new RegisterResponse
             {
@@ -168,16 +175,16 @@ public class AuthController : ControllerBase
                 Message = "Registration successful",
                 User = new UserDto
                 {
-                    Id = user.Id,
-                    Username = user.Username,
-                    Email = user.Email,
-                    FullName = user.FullName,
-                    Phone = user.Phone,
-                    Level = defaultLevel.Name,
-                    LevelId = user.LevelId,
+                    Id = userId,
+                    Username = request.Username,
+                    Email = request.Email,
+                    FullName = request.FullName,
+                    Phone = request.Phone,
+                    Level = defaultLevelName,
+                    LevelId = defaultLevelId,
                     Balance = 0,
-                    ReferralCode = user.ReferralCode,
-                    CreatedAt = user.CreatedAt
+                    ReferralCode = referralCode,
+                    CreatedAt = createdAt
                 }
             };
 
@@ -207,21 +214,55 @@ public class AuthController : ControllerBase
             });
         }
 
-        var user = await _context.Users
-            .Include(u => u.Balance)
-            .Include(u => u.Level)
-            .FirstOrDefaultAsync(u => u.Username == request.Username);
+        var connection = await OpenConnectionAsync();
 
-        if (user == null)
+        await using var loginCommand = CreateCommand(connection, """
+            SELECT
+                u."Id",
+                u."Username",
+                u."Email",
+                u."FullName",
+                u."Phone",
+                u."PasswordHash",
+                u."LevelId",
+                u."Status",
+                u."ReferralCode",
+                u."CreatedAt",
+                COALESCE(ub."ActiveBalance", 0) AS "Balance",
+                COALESCE(ul."Name", 'Regular') AS "LevelName"
+            FROM "Users" AS u
+            LEFT JOIN "UserBalances" AS ub ON ub."UserId" = u."Id"
+            LEFT JOIN "UserLevels" AS ul ON ul."Id" = u."LevelId"
+            WHERE u."Username" = @username
+            LIMIT 1
+            """);
+        AddParameter(loginCommand, "@username", request.Username);
+
+        await using var loginReader = await loginCommand.ExecuteReaderAsync();
+        if (!await loginReader.ReadAsync())
         {
             return Unauthorized(new ErrorResponse
             {
-                Message = "Invalid username or PIN",
+                Message = "Invalid username or password",
                 ErrorCode = "INVALID_CREDENTIALS"
             });
         }
 
-        if (user.Status != UserStatus.Active)
+        var userId = loginReader.GetGuid(loginReader.GetOrdinal("Id"));
+        var username = loginReader.GetString(loginReader.GetOrdinal("Username"));
+        var email = loginReader["Email"] as string;
+        var fullName = loginReader["FullName"] as string;
+        var phone = loginReader["Phone"] as string;
+        var passwordHash = loginReader["PasswordHash"] as string;
+        var levelId = loginReader.GetInt32(loginReader.GetOrdinal("LevelId"));
+        var status = loginReader.GetString(loginReader.GetOrdinal("Status"));
+        var referralCode = loginReader.GetString(loginReader.GetOrdinal("ReferralCode"));
+        var createdAt = loginReader.GetDateTime(loginReader.GetOrdinal("CreatedAt"));
+        var balance = loginReader.GetDecimal(loginReader.GetOrdinal("Balance"));
+        var levelName = loginReader.GetString(loginReader.GetOrdinal("LevelName"));
+        await loginReader.DisposeAsync();
+
+        if (!string.Equals(status, UserStatus.Active.ToString(), StringComparison.OrdinalIgnoreCase))
         {
             return Unauthorized(new ErrorResponse
             {
@@ -230,34 +271,22 @@ public class AuthController : ControllerBase
             });
         }
 
-        // Verify PIN
-        if (!BCrypt.Net.BCrypt.Verify(request.Pin, user.PinHash))
+        // Verify password
+        if (string.IsNullOrWhiteSpace(passwordHash) || !BCrypt.Net.BCrypt.Verify(request.Password, passwordHash))
         {
             // Log failed login attempt
             _logger.LogWarning("Failed login attempt for user {Username}", request.Username);
             return Unauthorized(new ErrorResponse
             {
-                Message = "Invalid username or PIN",
+                Message = "Invalid username or password",
                 ErrorCode = "INVALID_CREDENTIALS"
             });
         }
 
         // Generate tokens
-        var accessToken = GenerateJwtToken(user);
+        var accessToken = GenerateJwtToken(userId, username, email, levelId);
         var refreshToken = GenerateRefreshToken();
-
-        // Store refresh token
-        var refreshTokenEntity = new RefreshToken
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            Token = refreshToken,
-            ExpiresAt = DateTime.UtcNow.AddDays(30),
-            IsRevoked = false,
-            CreatedAt = DateTime.UtcNow
-        };
-        _context.RefreshTokens.Add(refreshTokenEntity);
-        await _context.SaveChangesAsync();
+        await InsertRefreshTokenAsync(connection, null, userId, refreshToken, DateTime.UtcNow.AddDays(30));
 
         var response = new LoginResponse
         {
@@ -268,16 +297,16 @@ public class AuthController : ControllerBase
             ExpiresIn = 900, // 15 minutes
             User = new UserDto
             {
-                Id = user.Id,
-                Username = user.Username,
-                Email = user.Email,
-                FullName = user.FullName,
-                Phone = user.Phone,
-                Level = user.Level?.Name ?? "Regular",
-                LevelId = user.LevelId,
-                Balance = user.Balance?.ActiveBalance ?? 0,
-                ReferralCode = user.ReferralCode,
-                CreatedAt = user.CreatedAt
+                Id = userId,
+                Username = username,
+                Email = email,
+                FullName = fullName,
+                Phone = phone,
+                Level = levelName,
+                LevelId = levelId,
+                Balance = balance,
+                ReferralCode = referralCode,
+                CreatedAt = createdAt
             }
         };
 
@@ -296,12 +325,26 @@ public class AuthController : ControllerBase
             });
         }
 
-        var refreshToken = await _context.RefreshTokens
-            .Include(rt => rt.User)
-            .ThenInclude(u => u.Level)
-            .FirstOrDefaultAsync(rt => rt.Token == request.RefreshToken && !rt.IsRevoked && rt.ExpiresAt > DateTime.UtcNow);
+        var connection = await OpenConnectionAsync();
 
-        if (refreshToken == null)
+        await using var refreshCommand = CreateCommand(connection, """
+            SELECT
+                rt."Id" AS "RefreshTokenId",
+                rt."UserId",
+                u."Username",
+                u."Email",
+                u."LevelId",
+                u."Status"
+            FROM "RefreshTokens" AS rt
+            INNER JOIN "Users" AS u ON u."Id" = rt."UserId"
+            WHERE rt."Token" = @refreshToken AND rt."IsRevoked" = FALSE AND rt."ExpiresAt" > @now
+            LIMIT 1
+            """);
+        AddParameter(refreshCommand, "@refreshToken", request.RefreshToken);
+        AddParameter(refreshCommand, "@now", DateTime.UtcNow);
+
+        await using var refreshReader = await refreshCommand.ExecuteReaderAsync();
+        if (!await refreshReader.ReadAsync())
         {
             return Unauthorized(new ErrorResponse
             {
@@ -310,7 +353,14 @@ public class AuthController : ControllerBase
             });
         }
 
-        if (refreshToken.User.Status != UserStatus.Active)
+        var refreshTokenId = refreshReader.GetGuid(refreshReader.GetOrdinal("RefreshTokenId"));
+        var userId = refreshReader.GetGuid(refreshReader.GetOrdinal("UserId"));
+        var username = refreshReader.GetString(refreshReader.GetOrdinal("Username"));
+        var email = refreshReader["Email"] as string;
+        var levelId = refreshReader.GetInt32(refreshReader.GetOrdinal("LevelId"));
+        var status = refreshReader.GetString(refreshReader.GetOrdinal("Status"));
+
+        if (!string.Equals(status, UserStatus.Active.ToString(), StringComparison.OrdinalIgnoreCase))
         {
             return Unauthorized(new ErrorResponse
             {
@@ -320,25 +370,25 @@ public class AuthController : ControllerBase
         }
 
         // Generate new tokens
-        var accessToken = GenerateJwtToken(refreshToken.User);
+        await refreshReader.DisposeAsync();
+
+        var accessToken = GenerateJwtToken(userId, username, email, levelId);
         var newRefreshToken = GenerateRefreshToken();
+        await using var transaction = await connection.BeginTransactionAsync();
 
-        // Revoke old refresh token
-        refreshToken.IsRevoked = true;
-        refreshToken.RevokedAt = DateTime.UtcNow;
-
-        // Store new refresh token
-        var refreshTokenEntity = new RefreshToken
+        await using (var revokeCommand = CreateCommand(connection, """
+            UPDATE "RefreshTokens"
+            SET "IsRevoked" = TRUE, "RevokedAt" = @revokedAt
+            WHERE "Id" = @id
+            """, transaction))
         {
-            Id = Guid.NewGuid(),
-            UserId = refreshToken.User.Id,
-            Token = newRefreshToken,
-            ExpiresAt = DateTime.UtcNow.AddDays(30),
-            IsRevoked = false,
-            CreatedAt = DateTime.UtcNow
-        };
-        _context.RefreshTokens.Add(refreshTokenEntity);
-        await _context.SaveChangesAsync();
+            AddParameter(revokeCommand, "@revokedAt", DateTime.UtcNow);
+            AddParameter(revokeCommand, "@id", refreshTokenId);
+            await revokeCommand.ExecuteNonQueryAsync();
+        }
+
+        await InsertRefreshTokenAsync(connection, transaction, userId, newRefreshToken, DateTime.UtcNow.AddDays(30));
+        await transaction.CommitAsync();
 
         var response = new RefreshTokenResponse
         {
@@ -365,8 +415,8 @@ public class AuthController : ControllerBase
             });
         }
 
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null)
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
         {
             return Unauthorized(new ErrorResponse
             {
@@ -375,10 +425,17 @@ public class AuthController : ControllerBase
             });
         }
 
-        var userGuid = Guid.Parse(userId);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
 
         var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Id == userGuid);
+            .FirstOrDefaultAsync(u => u.Id == userId);
 
         if (user == null)
         {
@@ -390,7 +447,7 @@ public class AuthController : ControllerBase
         }
 
         // Check Redis for lockout
-        var lockoutKey = $"pin_lockout:{userGuid}";
+        var lockoutKey = $"pin_lockout:{userId}";
         var isLockedOut = await _redisService.ExistsAsync(lockoutKey);
 
         if (isLockedOut)
@@ -417,7 +474,7 @@ public class AuthController : ControllerBase
                 await _redisService.SetAsync(lockoutKey, "locked", TimeSpan.FromMinutes(15));
                 user.PinFailedAttempts = 0; // Reset after lockout
 
-                _logger.LogWarning("User {UserId} locked out due to 3 failed PIN attempts", userGuid);
+                _logger.LogWarning("User {UserId} locked out due to 3 failed PIN attempts", userId);
             }
 
             await _context.SaveChangesAsync();
@@ -439,8 +496,8 @@ public class AuthController : ControllerBase
 
         // Generate PIN session token (store in Redis, TTL 5 min)
         var pinSessionToken = Guid.NewGuid().ToString();
-        var sessionKey = $"pin_session:{userGuid}:{pinSessionToken}";
-        await _redisService.SetAsync(sessionKey, userGuid.ToString(), TimeSpan.FromMinutes(5));
+        var sessionKey = $"pin_session:{userId}:{pinSessionToken}";
+        await _redisService.SetAsync(sessionKey, userId.ToString(), TimeSpan.FromMinutes(5));
 
         var response = new VerifyPinResponse
         {
@@ -453,7 +510,7 @@ public class AuthController : ControllerBase
         return Ok(response);
     }
 
-    private string GenerateJwtToken(User user)
+    private string GenerateJwtToken(Guid userId, string username, string? email, int levelId)
     {
         var key = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
         var issuer = _configuration["Jwt:Issuer"] ?? throw new InvalidOperationException("JWT Issuer not configured");
@@ -464,11 +521,11 @@ public class AuthController : ControllerBase
 
         var claims = new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.Username),
-            new Claim(ClaimTypes.Email, user.Email ?? ""),
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+            new Claim(ClaimTypes.Name, username),
+            new Claim(ClaimTypes.Email, email ?? ""),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new Claim("level_id", user.LevelId.ToString())
+            new Claim("level_id", levelId.ToString())
         };
 
         var token = new JwtSecurityToken(
@@ -490,7 +547,7 @@ public class AuthController : ControllerBase
         return Convert.ToBase64String(randomNumber);
     }
 
-    private async Task<string> GenerateUniqueReferralCode()
+    private async Task<string> GenerateUniqueReferralCodeAsync(DbConnection connection, DbTransaction? transaction = null)
     {
         const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Removed similar looking chars
         var random = new Random();
@@ -501,9 +558,15 @@ public class AuthController : ControllerBase
             code = new string(Enumerable.Repeat(chars, 8)
                 .Select(s => s[random.Next(s.Length)]).ToArray());
 
-            // Check uniqueness
-            var exists = await _context.Users
-                .AnyAsync(u => u.ReferralCode == code);
+            await using var existsCommand = CreateCommand(connection, """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM "Users"
+                    WHERE "ReferralCode" = @referralCode
+                )
+                """, transaction);
+            AddParameter(existsCommand, "@referralCode", code);
+            var exists = Convert.ToBoolean(await existsCommand.ExecuteScalarAsync());
 
             if (!exists)
                 break;
@@ -511,6 +574,52 @@ public class AuthController : ControllerBase
         } while (true);
 
         return code;
+    }
+
+    private async Task<DbConnection> OpenConnectionAsync()
+    {
+        var connection = _context.Database.GetDbConnection();
+        if (connection.State != ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
+
+        return connection;
+    }
+
+    private static DbCommand CreateCommand(DbConnection connection, string commandText, DbTransaction? transaction = null)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText = commandText;
+        command.Transaction = transaction;
+        return command;
+    }
+
+    private static void AddParameter(DbCommand command, string parameterName, object? value)
+    {
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = parameterName;
+        parameter.Value = value ?? DBNull.Value;
+        command.Parameters.Add(parameter);
+    }
+
+    private static async Task InsertRefreshTokenAsync(
+        DbConnection connection,
+        DbTransaction? transaction,
+        Guid userId,
+        string token,
+        DateTime expiresAt)
+    {
+        await using var command = CreateCommand(connection, """
+            INSERT INTO "RefreshTokens" ("Id", "UserId", "Token", "ExpiresAt", "IsRevoked", "CreatedAt")
+            VALUES (@id, @userId, @token, @expiresAt, FALSE, @createdAt)
+            """, transaction);
+        AddParameter(command, "@id", Guid.NewGuid());
+        AddParameter(command, "@userId", userId);
+        AddParameter(command, "@token", token);
+        AddParameter(command, "@expiresAt", expiresAt);
+        AddParameter(command, "@createdAt", DateTime.UtcNow);
+        await command.ExecuteNonQueryAsync();
     }
 }
 

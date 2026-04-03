@@ -30,15 +30,28 @@
 
 ---
 
+## Interactive API Reference
+
+For local development, the API now exposes a Scalar reference that is easier to read and explore for mobile integration work.
+
+- `https://localhost:7202/scalar`
+- `http://localhost:5079/scalar`
+
+Scalar is only enabled when `ASPNETCORE_ENVIRONMENT=Development`. The underlying OpenAPI JSON is still available from Swagger at `/swagger/v1/swagger.json`.
+
+---
+
 ## Authentication
 
 The API uses JWT (JSON Web Token) based authentication. All endpoints except `/api/auth/register` and `/api/auth/login` require authentication.
 
 ### Authentication Flow
 
-1. **Login/Register**: Get access token and refresh token
-2. **Access Token**: Use in `Authorization: Bearer {token}` header
-3. **Token Refresh**: Use refresh token to get new access token
+1. **Register**: Create account with password and PIN
+2. **Login**: Use username and password to get access token and refresh token
+3. **Access Token**: Use in `Authorization: Bearer {token}` header
+4. **PIN Verify**: Use PIN only for sensitive operations
+5. **Token Refresh**: Use refresh token to get new access token
 
 ### Token Expiration
 
@@ -77,7 +90,7 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
 | Error Code | HTTP Status | Description |
 |------------|-------------|-------------|
 | `INVALID_TOKEN` | 401 | Access token is invalid or expired |
-| `INVALID_CREDENTIALS` | 401 | Username or PIN is incorrect |
+| `INVALID_CREDENTIALS` | 401 | Username or password is incorrect |
 | `ACCOUNT_INACTIVE` | 401 | User account is not active |
 | `ACCOUNT_LOCKED` | 429 | Account locked due to multiple failed attempts |
 | `INVALID_PIN` | 401 | PIN verification failed |
@@ -96,6 +109,11 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
 | `INVALID_AMOUNT` | 400 | Invalid amount specified |
 | `TRANSACTION_NOT_FOUND` | 404 | Transaction not found |
 | `TRANSACTION_ERROR` | 500 | Error processing transaction |
+| `TOPUP_NOT_FOUND` | 404 | Topup request not found |
+| `INVALID_TOPUP_STATUS` | 400 | Cannot upload proof for current status |
+| `PROOF_ALREADY_UPLOADED` | 400 | Transfer proof already uploaded |
+| `CREATE_TOPUP_FAILED` | 400 | Failed to create topup request |
+| `UPLOAD_ERROR` | 500 | Error uploading transfer proof |
 
 ---
 
@@ -116,6 +134,7 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
   "fullName": "string (required, 2-100 chars)",
   "email": "string (required, valid email)",
   "phone": "string (required, 10-15 digits)",
+  "password": "string (required, 8-100 chars)",
   "pin": "string (required, 6 digits)",
   "referralCode": "string (optional)"
 }
@@ -161,7 +180,7 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
 ```json
 {
   "username": "string (required)",
-  "pin": "string (required, 6 digits)"
+  "password": "string (required, 8-100 chars)"
 }
 ```
 
@@ -191,7 +210,7 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
 **Error Response** (401):
 ```json
 {
-  "message": "Invalid username or PIN",
+  "message": "Invalid username or password",
   "errorCode": "INVALID_CREDENTIALS"
 }
 ```
@@ -284,7 +303,8 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
 
 **Description**: Get all product categories
 
-**Authentication**: Not required
+**Headers**:
+- `Authorization: Bearer {access_token}`
 
 **Success Response** (200):
 ```json
@@ -608,46 +628,156 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
 
 ### Top-up Endpoints
 
-#### 1. Create Top-up Request
+**New 2-Step Topup Flow:**
 
-**Endpoint**: `POST /api/topup`
+1. **Request Topup** → Get payment details with unique code
+2. **Upload Proof** → Submit transfer proof for admin verification
 
-**Description**: Submit a top-up request with transfer proof
+---
+
+#### 1. Get Bank Accounts
+
+**Endpoint**: `GET /api/topup/banks`
+
+**Description**: Get list of available bank accounts for top-up
 
 **Headers**:
 - `Authorization: Bearer {access_token}`
 
-**Request Body** (multipart/form-data):
+**Success Response** (200):
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "bankName": "BCA",
+      "accountNumber": "1234567890",
+      "accountName": "PT PedagangPulsa",
+      "isActive": true
+    }
+  ]
+}
 ```
-bankAccountId: integer (required)
-amount: decimal (required, min: 10000)
-notes: string (optional)
-transferProof: file (required, JPG/PNG/PDF, max 5MB)
+
+---
+
+#### 2. Request Topup (Step 1)
+
+**Endpoint**: `POST /api/topup/request`
+
+**Description**: Create a topup request and get payment details with unique code
+
+**Headers**:
+- `Authorization: Bearer {access_token}`
+- `Content-Type: application/json`
+
+**Request Body**:
+```json
+{
+  "bankAccountId": 1,
+  "amount": 100000
+}
 ```
 
 **Success Response** (201):
 ```json
 {
   "success": true,
-  "message": "Topup request submitted successfully. Please wait for admin approval.",
+  "message": "Topup request created. Please transfer the specified amount.",
   "topupId": "guid",
   "status": "pending",
-  "amount": "decimal",
-  "createdAt": "datetime"
+  "payment": {
+    "bankName": "BCA",
+    "accountNumber": "1234567890",
+    "accountName": "PT PedagangPulsa",
+    "originalAmount": 100000,
+    "uniqueCode": 123,
+    "totalAmount": 100123,
+    "expiresAt": "2026-04-04T10:30:00Z"
+  },
+  "createdAt": "2026-04-03T10:30:00Z"
+}
+```
+
+**About Unique Code:**
+- Range: 1-999 (3 digits)
+- Purpose: Verify transfer amount matches request
+- Generated randomly from unused codes today
+- Total Amount = Original Amount + Unique Code
+- Request expires in 24 hours
+
+---
+
+#### 3. Upload Transfer Proof (Step 2)
+
+**Endpoint**: `POST /api/topup/{id}/proof`
+
+**Description**: Upload transfer proof for the created topup request
+
+**Headers**:
+- `Authorization: Bearer {access_token}`
+- `Content-Type: multipart/form-data`
+
+**Request Body**:
+```
+transferProof: file (required, JPG/PNG/PDF, max 5MB)
+```
+
+**Success Response** (200):
+```json
+{
+  "success": true,
+  "message": "Transfer proof uploaded successfully. Waiting for admin approval.",
+  "topupId": "guid",
+  "status": "pending",
+  "uploadedAt": "2026-04-03T11:00:00Z"
 }
 ```
 
 **Error Response** (400):
 ```json
 {
-  "message": "Invalid file type. Only JPG, PNG, and PDF files are allowed",
-  "errorCode": "INVALID_FILE_TYPE"
+  "message": "Transfer proof already uploaded",
+  "errorCode": "PROOF_ALREADY_UPLOADED"
 }
 ```
 
 ---
 
-#### 2. Get Top-up History
+#### 4. Get Topup Detail
+
+**Endpoint**: `GET /api/topup/{id}`
+
+**Description**: Get details of a specific topup request
+
+**Headers**:
+- `Authorization: Bearer {access_token}`
+
+**Success Response** (200):
+```json
+{
+  "success": true,
+  "data": {
+    "id": "guid",
+    "amount": 100000,
+    "uniqueCode": 123,
+    "totalAmount": 100123,
+    "status": "pending",
+    "transferProofUrl": "string",
+    "bankName": "BCA",
+    "accountNumber": "1234567890",
+    "accountName": "PT PedagangPulsa",
+    "rejectReason": "string",
+    "createdAt": "datetime",
+    "updatedAt": "datetime"
+  }
+}
+```
+
+---
+
+#### 5. Get Top-up History
 
 **Endpoint**: `GET /api/topup/history`
 
@@ -667,8 +797,10 @@ transferProof: file (required, JPG/PNG/PDF, max 5MB)
   "data": [
     {
       "id": "guid",
-      "amount": "decimal",
-      "status": "string",
+      "amount": 100000,
+      "uniqueCode": 123,
+      "totalAmount": 100123,
+      "status": "pending",
       "transferProofUrl": "string",
       "bankName": "string",
       "bankAccountNumber": "string",
@@ -684,36 +816,9 @@ transferProof: file (required, JPG/PNG/PDF, max 5MB)
 ```
 
 **Top-up Statuses**:
-- `pending`: Waiting for admin approval
+- `pending`: Waiting for transfer proof or admin approval
 - `approved`: Top-up approved and balance added
 - `rejected`: Top-up rejected
-
----
-
-#### 3. Get Bank Accounts
-
-**Endpoint**: `GET /api/topup/banks`
-
-**Description**: Get list of available bank accounts for top-up
-
-**Headers**:
-- `Authorization: Bearer {access_token}`
-
-**Success Response** (200):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "integer",
-      "bankName": "string",
-      "accountNumber": "string",
-      "accountName": "string",
-      "isActive": "boolean"
-    }
-  ]
-}
-```
 
 ---
 
@@ -863,7 +968,7 @@ const loginResponse = await fetch('https://api.pedagangpulsa.com/api/auth/login'
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     username: 'user123',
-    pin: '123456'
+    password: 'your-password'
   })
 });
 const { accessToken } = await loginResponse.json();
@@ -934,6 +1039,7 @@ const refreshToken = async (refreshToken) => {
 **Staging Environment**:
 - URL: `https://staging-api.pedagangpulsa.com/api`
 - Test User: `testuser`
+- Test Password: `your-password`
 - Test PIN: `123456`
 
 ### Postman Collection
@@ -954,6 +1060,13 @@ For API integration support:
 
 ## Changelog
 
+### v1.1.0 (2026-04-03)
+- **BREAKING**: Topup flow changed to 2-step process
+  - Step 1: `POST /api/topup/request` - Get payment details with unique code
+  - Step 2: `POST /api/topup/{id}/proof` - Upload transfer proof
+  - Unique code (1-999) generated for verification
+  - Request expires in 24 hours
+
 ### v1.0.0 (2026-04-03)
 - Initial API release
 - Authentication endpoints
@@ -962,6 +1075,8 @@ For API integration support:
 - Balance operations
 - Top-up requests
 - Peer-to-peer transfers
+- Added Scalar-based interactive API reference for local development
+- Login now uses username and password, while PIN remains for sensitive operations
 
 ---
 

@@ -165,7 +165,7 @@
                     {
                         data: 'balanceAfter',
                         render: function(data) {
-                            return '<strong>' +  'Rp '.+toLocaleString('id-ID') + '</strong>';
+                            return '<strong>' + 'Rp ' + data.toLocaleString('id-ID') + '</strong>';
                         }
                     },
                     { data: 'description' },
@@ -195,10 +195,6 @@
                 table.ajax.reload();
             });
         });
-
-        function  'Rp '.+toLocaleString('id-ID') {
-            return 'Rp ' + amount.toLocaleString('id-ID');
-        }
     </script>
 }
 
@@ -314,7 +310,7 @@
             $('#displayUsername').text(data.username);
             $('#displayFullName').text(data.fullName || '-');
             $('#displayEmail').text(data.email || '-');
-            $('#displayCurrentBalance').text( 'Rp '.+toLocaleString('id-ID'));
+            $('#displayCurrentBalance').text('Rp ' + data.currentBalance.toLocaleString('id-ID'));
 
             $('#userInfoSection').show();
             $('#submitAdjustBtn').prop('disabled', false);

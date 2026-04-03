@@ -39,7 +39,7 @@ public class TransactionController : Controller
             CreatedAt = transaction.CreatedAt,
             CompletedAt = transaction.CompletedAt,
             UserId = transaction.UserId,
-            Username = transaction.User?.Username ?? "Unknown",
+            Username = transaction.User?.UserName ?? "Unknown",
             ProductId = transaction.ProductId,
             ProductName = transaction.Product?.Name ?? "Unknown",
             Destination = transaction.Destination,
@@ -113,9 +113,9 @@ public class TransactionController : Controller
         var transactionData = transactions.Select(t => new TransactionListViewModel.TransactionDataRow
         {
             Id = t.Id,
-            ReferenceId = t.Id.ToString(),
+            ReferenceId = t.ReferenceId,
             CreatedAt = t.CreatedAt.ToString("dd MMM yyyy HH:mm"),
-            Username = t.User?.Username ?? "Unknown",
+            Username = t.User?.UserName ?? "Unknown",
             ProductName = t.Product?.Name ?? "Unknown",
             Destination = t.Destination,
             SellPrice = t.SellPrice,

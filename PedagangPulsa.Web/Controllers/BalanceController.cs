@@ -28,8 +28,8 @@ public class BalanceController : Controller
         var results = users.Select(u => new
         {
             id = u.Id.ToString(),
-            text = $"{u.Username} ({u.Email ?? "No Email"})",
-            username = u.Username,
+            text = $"{u.UserName} ({u.Email ?? "No Email"})",
+            username = u.UserName,
             email = u.Email,
             fullName = u.FullName
         }).ToList();
@@ -49,7 +49,7 @@ public class BalanceController : Controller
         var model = new AdjustBalanceViewModel
         {
             UserId = user.Id,
-            Username = user.Username,
+            Username = user.UserName,
             FullName = user.FullName,
             Email = user.Email,
             CurrentBalance = user.Balance?.ActiveBalance ?? 0
@@ -139,7 +139,7 @@ public class BalanceController : Controller
         {
             Id = l.Id,
             CreatedAt = l.CreatedAt.ToString("dd MMM yyyy HH:mm"),
-            Username = l.User?.Username ?? "Unknown",
+            Username = l.User?.UserName ?? "Unknown",
             Type = l.Type.ToString(),
             Amount = l.Amount,
             BalanceBefore = l.ActiveBefore,

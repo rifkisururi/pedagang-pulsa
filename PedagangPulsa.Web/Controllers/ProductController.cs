@@ -227,7 +227,7 @@ public class ProductController : Controller
 
         var product = new Product
         {
-            Id = model.Id.Value,
+            Id = model.Id!.Value,
             Code = model.Code,
             Name = model.Name,
             CategoryId = model.CategoryId,

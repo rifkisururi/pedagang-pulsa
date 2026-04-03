@@ -292,6 +292,10 @@
                 <i class="bi bi-people"></i>
                 <span>Users</span>
             </a>
+            <a asp-controller="Topup" asp-action="Index" class="sidebar-menu-item">
+                <i class="bi bi-cash-coin"></i>
+                <span>Topup Requests</span>
+            </a>
             <a asp-controller="Supplier" asp-action="Index" class="sidebar-menu-item">
                 <i class="bi bi-truck"></i>
                 <span>Suppliers</span>
@@ -308,8 +312,16 @@
                 <i class="bi bi-receipt"></i>
                 <span>Transactions</span>
             </a>
-            <a asp-controller="Finance" asp-action="Index" class="sidebar-menu-item">
+            <a asp-controller="Balance" asp-action="Index" class="sidebar-menu-item">
                 <i class="bi bi-wallet2"></i>
+                <span>Balance Ledger</span>
+            </a>
+            <a asp-controller="SupplierBalance" asp-action="Index" class="sidebar-menu-item">
+                <i class="bi bi-bank"></i>
+                <span>Supplier Balance</span>
+            </a>
+            <a asp-controller="Finance" asp-action="Index" class="sidebar-menu-item">
+                <i class="bi bi-cash-stack"></i>
                 <span>Finance</span>
             </a>
             <a asp-controller="Report" asp-action="Index" class="sidebar-menu-item">

@@ -34,8 +34,8 @@ public class TopupController : Controller
         var model = new TopupDetailViewModel
         {
             Id = topup.Id,
-            Username = topup.User?.Username ?? "Unknown",
-            FullName = topup.User?.FullName,
+            Username = topup.User?.UserName ?? "Unknown",
+            FullName = topup.User?.FullName ?? string.Empty,
             Amount = topup.Amount,
             BankName = topup.BankAccount?.BankName ?? "-",
             AccountNumber = topup.BankAccount?.AccountNumber ?? "-",
@@ -66,15 +66,18 @@ public class TopupController : Controller
             return NotFound();
         }
 
+        var currentBalance = topup.User?.Balance?.ActiveBalance ?? 0;
+
         var model = new ApproveTopupViewModel
         {
             Id = topup.Id,
-            Username = topup.User?.Username ?? "Unknown",
-            FullName = topup.User?.FullName,
+            Username = topup.User?.UserName ?? "Unknown",
+            FullName = topup.User?.FullName ?? string.Empty,
             Amount = topup.Amount,
             FinalAmount = topup.Amount,
             BankName = topup.BankAccount?.BankName ?? "-",
-            TransferProof = topup.TransferProofUrl
+            TransferProof = topup.TransferProofUrl,
+            CurrentBalance = currentBalance
         };
 
         return PartialView("_ApproveModal", model);
@@ -86,7 +89,10 @@ public class TopupController : Controller
     {
         if (!ModelState.IsValid)
         {
-            return Json(new { success = false, message = "Invalid data" });
+            var errors = ModelState.Where(x => x.Value?.Errors.Count > 0)
+                .Select(x => $"{x.Key}: {string.Join(", ", x.Value!.Errors.Select(e => e.ErrorMessage))}")
+                .ToList();
+            return Json(new { success = false, message = "Invalid data: " + string.Join("; ", errors) });
         }
 
         var result = await _topupService.ApproveTopupAsync(
@@ -115,8 +121,8 @@ public class TopupController : Controller
         var model = new RejectTopupViewModel
         {
             Id = topup.Id,
-            Username = topup.User?.Username ?? "Unknown",
-            FullName = topup.User?.FullName,
+            Username = topup.User?.UserName ?? "Unknown",
+            FullName = topup.User?.FullName ?? string.Empty,
             Amount = topup.Amount,
             BankName = topup.BankAccount?.BankName ?? "-"
         };
@@ -195,7 +201,7 @@ public class TopupController : Controller
         {
             Id = t.Id,
             CreatedAt = t.CreatedAt.ToString("dd MMM yyyy HH:mm"),
-            Username = t.User?.Username ?? "Unknown",
+            Username = t.User?.UserName ?? "Unknown",
             Amount = t.Amount,
             BankName = t.BankAccount?.BankName ?? "-",
             TransferProof = t.TransferProofUrl,

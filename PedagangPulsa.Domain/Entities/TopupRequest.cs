@@ -8,6 +8,7 @@ public class TopupRequest
     public Guid UserId { get; set; }
     public int? BankAccountId { get; set; }
     public decimal Amount { get; set; }
+    public int UniqueCode { get; set; }
     public string? TransferProofUrl { get; set; }
     public TopupStatus Status { get; set; } = TopupStatus.Pending;
     public string? RejectReason { get; set; }

@@ -9,10 +9,100 @@ namespace PedagangPulsa.Application.Services;
 public class TopupService
 {
     private readonly AppDbContext _context;
+    private readonly Random _random = new();
 
     public TopupService(AppDbContext context)
     {
         _context = context;
+    }
+
+    /// <summary>
+    /// Generate unique code 3 digit (1-999) yang belum digunakan untuk topup hari ini
+    /// </summary>
+    public async Task<int> GenerateUniqueCodeAsync()
+    {
+        var today = DateTime.UtcNow.Date;
+        var todayEnd = today.AddDays(1);
+
+        // Ambil semua unique code yang sudah digunakan hari ini
+        var usedCodes = await _context.TopupRequests
+            .Where(t => t.CreatedAt >= today && t.CreatedAt < todayEnd)
+            .Select(t => t.UniqueCode)
+            .Distinct()
+            .ToListAsync();
+
+        // Cari kode unik dari 1-999 yang belum digunakan
+        var availableCodes = Enumerable.Range(1, 999).Except(usedCodes).ToList();
+
+        // Jika semua kode sudah terpakai (sangat jarang terjadi), cari yang paling jarang digunakan
+        if (!availableCodes.Any())
+        {
+            // Fallback: cari kode yang paling sedikit digunakan secara historis
+            var codeCounts = await _context.TopupRequests
+                .GroupBy(t => t.UniqueCode)
+                .Select(g => new { Code = g.Key, Count = g.Count() })
+                .OrderBy(g => g.Count)
+                .FirstOrDefaultAsync();
+
+            return codeCounts?.Code ?? _random.Next(1, 1000);
+        }
+
+        // Ambil kode secara acak dari yang tersedia
+        return availableCodes[_random.Next(availableCodes.Count)];
+    }
+
+    /// <summary>
+    /// Create topup request dengan unique code
+    /// </summary>
+    public async Task<TopupRequest?> CreateTopupRequestAsync(Guid userId, int bankAccountId, decimal amount)
+    {
+        // Validate bank account
+        var bankAccount = await _context.BankAccounts
+            .FirstOrDefaultAsync(b => b.Id == bankAccountId && b.IsActive);
+
+        if (bankAccount == null)
+        {
+            return null;
+        }
+
+        // Generate unique code
+        var uniqueCode = await GenerateUniqueCodeAsync();
+
+        var topupRequest = new TopupRequest
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            BankAccountId = bankAccountId,
+            Amount = amount,
+            UniqueCode = uniqueCode,
+            Status = TopupStatus.Pending,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.TopupRequests.Add(topupRequest);
+        await _context.SaveChangesAsync();
+
+        return topupRequest;
+    }
+
+    /// <summary>
+    /// Upload transfer proof untuk topup request
+    /// </summary>
+    public async Task<bool> UploadTransferProofAsync(Guid topupId, string transferProofUrl)
+    {
+        var topup = await _context.TopupRequests.FindAsync(topupId);
+
+        if (topup == null)
+        {
+            return false;
+        }
+
+        topup.TransferProofUrl = transferProofUrl;
+        topup.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return true;
     }
 
     public async Task<(List<TopupRequest> Topups, int TotalFiltered, int TotalRecords)> GetTopupRequestsPagedAsync(
@@ -33,7 +123,7 @@ public class TopupService
         if (!string.IsNullOrWhiteSpace(search))
         {
             query = query.Where(t =>
-                EF.Functions.ILike(t.User.Username, $"%{search}%") ||
+                EF.Functions.ILike(t.User.UserName, $"%{search}%") ||
                 (t.BankAccount != null && EF.Functions.ILike(t.BankAccount.BankName, $"%{search}%")));
         }
 
@@ -76,7 +166,7 @@ public class TopupService
             {
                 query = sortCol switch
                 {
-                    "username" => query.OrderByDescending(t => t.User.Username),
+                    "username" => query.OrderByDescending(t => t.User.UserName),
                     "amount" => query.OrderByDescending(t => t.Amount),
                     "bank" => query.OrderByDescending(t => t.BankAccount != null ? t.BankAccount.BankName : ""),
                     "status" => query.OrderByDescending(t => t.Status),
@@ -88,7 +178,7 @@ public class TopupService
             {
                 query = sortCol switch
                 {
-                    "username" => query.OrderBy(t => t.User.Username),
+                    "username" => query.OrderBy(t => t.User.UserName),
                     "amount" => query.OrderBy(t => t.Amount),
                     "bank" => query.OrderBy(t => t.BankAccount != null ? t.BankAccount.BankName : ""),
                     "status" => query.OrderBy(t => t.Status),
@@ -202,7 +292,7 @@ public class TopupService
         // Update topup request
         topup.Status = TopupStatus.Approved;
         topup.Notes = notes;
-        topup.ApprovedBy = approvedBy != null ? Guid.Parse(approvedBy) : null;
+        // ApprovedBy/RejectedBy store username in Notes, not as Guid since we don't have user ID
         topup.ApprovedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -220,7 +310,7 @@ public class TopupService
 
         topup.Status = TopupStatus.Rejected;
         topup.RejectReason = reason;
-        topup.RejectedBy = rejectedBy != null ? Guid.Parse(rejectedBy) : null;
+        // RejectedBy store username in Notes, not as Guid since we don't have user ID
         topup.RejectedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();

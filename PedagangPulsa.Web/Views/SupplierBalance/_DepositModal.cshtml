@@ -12,7 +12,7 @@
         </div>
         <div class="row">
             <div class="col-sm-4"><strong>Current Balance:</strong></div>
-            <div class="col-sm-8">Rp Model.CurrentBalance.ToString("N0")</div>
+            <div class="col-sm-8">Rp @Model.CurrentBalance.ToString("N0")</div>
         </div>
     </div>
 
@@ -28,7 +28,7 @@
             </div>
             <span asp-validation-for="Amount" class="text-danger"></span>
             <small class="form-text text-muted">
-                After deposit: <strong id="finalBalance">Rp Model.CurrentBalance + Model.Amount.ToString("N0")</strong>
+                After deposit: <strong id="finalBalance">Rp @(Model.CurrentBalance + Model.Amount).ToString("N0")</strong>
             </small>
         </div>
 
@@ -51,16 +51,12 @@
 </div>
 
 <script>
-    function  'Rp '.+toLocaleString('id-ID') {
-        return 'Rp ' + amount.toLocaleString('id-ID');
-    }
-
     const currentBalance = @Model.CurrentBalance;
 
     $('#Amount').on('input', function() {
         const amount = parseFloat($(this).val()) || 0;
         const total = currentBalance + amount;
-        $('#finalBalance').text( 'Rp '.+toLocaleString('id-ID'));
+        $('#finalBalance').text('Rp ' + total.toLocaleString('id-ID'));
     });
 
     function submitDeposit() {

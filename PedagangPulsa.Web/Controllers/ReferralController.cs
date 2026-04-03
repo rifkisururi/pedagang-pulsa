@@ -66,8 +66,8 @@ public class ReferralController : Controller
         {
             Id = l.Id,
             CreatedAt = l.CreatedAt.ToString("dd MMM yyyy HH:mm"),
-            ReferrerUsername = l.Referrer?.Username ?? "Unknown",
-            RefereeUsername = l.Referee?.Username ?? "Unknown",
+            ReferrerUsername = l.Referrer?.UserName ?? "Unknown",
+            RefereeUsername = l.Referee?.UserName ?? "Unknown",
             BonusAmount = l.BonusAmount ?? 0,
             BonusStatus = l.BonusStatus.ToString(),
             BonusPaidAt = l.PaidAt?.ToString("dd MMM yyyy HH:mm"),

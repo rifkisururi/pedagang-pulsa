@@ -5,10 +5,11 @@ namespace PedagangPulsa.Domain.Entities;
 public class User
 {
     public Guid Id { get; set; }
-    public string Username { get; set; } = string.Empty;
-    public string? FullName { get; set; }
+    public string UserName { get; set; } = string.Empty;
     public string? Email { get; set; }
+    public string? FullName { get; set; }
     public string? Phone { get; set; }
+    public string? PasswordHash { get; set; }
     public string PinHash { get; set; } = string.Empty;
     public short PinFailedAttempts { get; set; }
     public DateTime? PinLockedAt { get; set; }

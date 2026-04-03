@@ -31,8 +31,8 @@ public class TransactionController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateTransaction([FromBody] CreateTransactionRequest request)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null)
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
         {
             return Unauthorized(new ErrorResponse
             {
@@ -41,7 +41,14 @@ public class TransactionController : ControllerBase
             });
         }
 
-        var userGuid = Guid.Parse(userId);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
 
         if (!ModelState.IsValid)
         {
@@ -53,10 +60,10 @@ public class TransactionController : ControllerBase
         }
 
         // Validate PIN session token
-        var sessionKey = $"pin_session:{userGuid}:{request.PinSessionToken}";
+        var sessionKey = $"pin_session:{userId}:{request.PinSessionToken}";
         var sessionValue = await _redisService.GetAsync(sessionKey);
 
-        if (sessionValue == null || sessionValue != userGuid.ToString())
+        if (sessionValue == null || sessionValue != userId.ToString())
         {
             return Unauthorized(new ErrorResponse
             {
@@ -69,7 +76,7 @@ public class TransactionController : ControllerBase
         var referenceId = Request.Headers["X-Reference-Id"].FirstOrDefault();
         if (!string.IsNullOrWhiteSpace(referenceId))
         {
-            var existingKey = await _context.IdempotencyKeys.FindAsync(referenceId, userGuid);
+            var existingKey = await _context.IdempotencyKeys.FindAsync(referenceId, userId);
             if (existingKey != null)
             {
                 if (existingKey.ExpiresAt > DateTime.UtcNow && !string.IsNullOrEmpty(existingKey.ResponseCache))
@@ -84,7 +91,7 @@ public class TransactionController : ControllerBase
             // Get user with balance
             var user = await _context.Users
                 .Include(u => u.Balance)
-                .FirstOrDefaultAsync(u => u.Id == userGuid);
+                .FirstOrDefaultAsync(u => u.Id == userId);
 
             if (user?.Balance == null)
             {
@@ -144,7 +151,7 @@ public class TransactionController : ControllerBase
             var holdLedger = new BalanceLedger
             {
                 Id = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                UserId = userGuid,
+                UserId = userId,
                 Type = BalanceTransactionType.PurchaseHold,
                 Amount = -levelPrice.SellPrice,
                 ActiveBefore = activeBalanceBefore,
@@ -160,12 +167,11 @@ public class TransactionController : ControllerBase
             await _context.SaveChangesAsync();
 
             // Create transaction
-            var referenceIdGen = $"{userGuid}{DateTime.UtcNow:yyyyMMddHHmmss}{Random.Shared.Next(1000, 9999)}";
+            var referenceIdGen = $"{userId}{DateTime.UtcNow:yyyyMMddHHmmss}{Random.Shared.Next(1000, 9999)}";
             var transaction = new Transaction
             {
-                Id = Guid.NewGuid(),
                 ReferenceId = referenceIdGen,
-                UserId = userGuid,
+                UserId = userId,
                 ProductId = request.ProductId,
                 Destination = request.DestinationNumber,
                 SellPrice = levelPrice.SellPrice,
@@ -200,7 +206,7 @@ public class TransactionController : ControllerBase
             // Cache response for idempotency
             if (!string.IsNullOrWhiteSpace(referenceId))
             {
-                var key = await _context.IdempotencyKeys.FindAsync(referenceId, userGuid);
+                var key = await _context.IdempotencyKeys.FindAsync(referenceId, userId);
                 if (key != null)
                 {
                     key.ResponseCache = System.Text.Json.JsonSerializer.Serialize(response);
@@ -210,7 +216,7 @@ public class TransactionController : ControllerBase
                 {
                     var newKey = new IdempotencyKey
                     {
-                        UserId = userGuid,
+                        UserId = userId,
                         Key = referenceId,
                         ExpiresAt = DateTime.UtcNow.AddHours(24),
                         ResponseCache = System.Text.Json.JsonSerializer.Serialize(response)
@@ -235,7 +241,7 @@ public class TransactionController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating transaction for user {UserId}", userGuid);
+            _logger.LogError(ex, "Error creating transaction for user {UserId}", userId);
             return StatusCode(500, new ErrorResponse
             {
                 Message = "An error occurred while processing your transaction",
@@ -247,8 +253,8 @@ public class TransactionController : ControllerBase
     [HttpGet("{referenceId}")]
     public async Task<IActionResult> GetTransaction(string referenceId)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null)
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
         {
             return Unauthorized(new ErrorResponse
             {
@@ -257,11 +263,18 @@ public class TransactionController : ControllerBase
             });
         }
 
-        var userGuid = Guid.Parse(userId);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
 
         var transaction = await _context.Transactions
             .Include(t => t.Product)
-            .Where(t => t.ReferenceId == referenceId && t.UserId == userGuid)
+            .Where(t => t.ReferenceId == referenceId && t.UserId == userId)
             .Select(t => new TransactionDetailItem
             {
                 ReferenceId = t.ReferenceId,
@@ -297,8 +310,8 @@ public class TransactionController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null)
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
         {
             return Unauthorized(new ErrorResponse
             {
@@ -307,11 +320,18 @@ public class TransactionController : ControllerBase
             });
         }
 
-        var userGuid = Guid.Parse(userId);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
 
         var query = _context.Transactions
             .Include(t => t.Product)
-            .Where(t => t.UserId == userGuid);
+            .Where(t => t.UserId == userId);
 
         if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<TransactionStatus>(status, true, out var statusEnum))
         {

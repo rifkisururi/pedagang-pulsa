@@ -37,6 +37,7 @@ This folder contains complete API documentation for the PedagangPulsa Member Mob
 3. Select `Postman_Collection.json`
 4. Set environment variables:
    - `username`: testuser
+   - `password`: your-password
    - `pin`: 123456
 5. Start with "Login" request
 
@@ -76,6 +77,7 @@ Base URL: https://sandbox-api.pedagangpulsa.com/api/v1
 **Test Credentials (Sandbox):**
 ```
 Username: testuser
+Password: your-password
 PIN: 123456
 ```
 
@@ -87,7 +89,7 @@ PIN: 123456
 Step 1: POST /auth/login
 {
   "username": "testuser",
-  "pin": "123456"
+  "password": "your-password"
 }
 
 Response:
@@ -217,7 +219,7 @@ For sensitive operations:
 # Login
 curl -X POST https://sandbox-api.pedagangpulsa.com/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"testuser","pin":"123456"}'
+  -d '{"username":"testuser","password":"your-password"}'
 
 # Get Balance (replace {token})
 curl -X GET https://sandbox-api.pedagangpulsa.com/api/v1/balance \

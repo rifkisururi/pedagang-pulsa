@@ -24,8 +24,8 @@ public class BalanceController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetBalance()
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null)
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
         {
             return Unauthorized(new ErrorResponse
             {
@@ -34,11 +34,18 @@ public class BalanceController : ControllerBase
             });
         }
 
-        var userGuid = Guid.Parse(userId);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
 
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstOrDefaultAsync(u => u.Id == userGuid);
+            .FirstOrDefaultAsync(u => u.Id == userId);
 
         if (user == null)
         {
@@ -63,8 +70,8 @@ public class BalanceController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null)
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
         {
             return Unauthorized(new ErrorResponse
             {
@@ -73,17 +80,24 @@ public class BalanceController : ControllerBase
             });
         }
 
-        var userGuid = Guid.Parse(userId);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
 
         var ledgers = await _context.BalanceLedgers
-            .Where(bl => bl.UserId == userGuid)
+            .Where(bl => bl.UserId == userId)
             .OrderByDescending(bl => bl.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
 
         var totalRecords = await _context.BalanceLedgers
-            .Where(bl => bl.UserId == userGuid)
+            .Where(bl => bl.UserId == userId)
             .CountAsync();
 
         var ledgerItems = ledgers.Select(bl => new BalanceHistoryItem

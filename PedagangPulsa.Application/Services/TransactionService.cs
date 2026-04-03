@@ -57,7 +57,7 @@ public class TransactionService
         }
 
         // Hold balance
-        var holdResult = await HoldBalanceAsync(userId, amount, "PurchaseHold", Guid.NewGuid());
+        var holdResult = await HoldBalanceAsync(userId, amount, "PurchaseHold", null);
         if (!holdResult)
         {
             return (null, "Failed to hold balance");
@@ -66,8 +66,6 @@ public class TransactionService
         // Create transaction
         var transaction = new Transaction
         {
-            Id = Guid.NewGuid(),
-            ReferenceId = Guid.NewGuid().ToString(),
             UserId = userId,
             ProductId = productId,
             Destination = destination,
@@ -87,7 +85,7 @@ public class TransactionService
     /// <summary>
     /// Hold balance (move from active to held)
     /// </summary>
-    public async Task<bool> HoldBalanceAsync(Guid userId, decimal amount, string type, Guid refId)
+    public async Task<bool> HoldBalanceAsync(Guid userId, decimal amount, string type, Guid? refId)
     {
         try
         {
@@ -356,7 +354,7 @@ public class TransactionService
             SupplierApiUrl = supplierProduct.Supplier?.ApiBaseUrl ?? "",
             SupplierProductCode = supplierProduct.SupplierProductCode ?? "",
             DestinationNumber = transaction.Destination,
-            ReferenceId = transaction.Id,
+            ReferenceId = transaction.ReferenceId,
             TimeoutSeconds = supplierProduct.Supplier?.TimeoutSeconds ?? 30
         };
 

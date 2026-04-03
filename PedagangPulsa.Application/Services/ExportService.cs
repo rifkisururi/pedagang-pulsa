@@ -22,7 +22,7 @@ public class ExportService
         DateTime? startDate = null,
         DateTime? endDate = null,
         string? status = null,
-        int? userId = null)
+        Guid? userId = null)
     {
         var query = _context.Transactions
             .Include(t => t.User)
@@ -48,7 +48,7 @@ public class ExportService
 
         if (userId.HasValue)
         {
-            query = query.Where(t => t.User.Id == Guid.Parse(userId.Value.ToString()));
+            query = query.Where(t => t.User.Id == userId.Value);
         }
 
         var transactions = await query
@@ -100,7 +100,7 @@ public class ExportService
             worksheet.Cell(row, 1).Value = no++;
             worksheet.Cell(row, 2).Value = trx.CreatedAt.ToString("dd MMM yyyy");
             worksheet.Cell(row, 3).Value = trx.ReferenceId;
-            worksheet.Cell(row, 4).Value = trx.User?.Username ?? "-";
+            worksheet.Cell(row, 4).Value = trx.User?.UserName ?? "-";
             worksheet.Cell(row, 5).Value = trx.Product?.Category?.Name ?? "-";
             worksheet.Cell(row, 6).Value = trx.Product?.Name ?? "-";
             worksheet.Cell(row, 7).Value = trx.Destination;
@@ -211,7 +211,7 @@ public class ExportService
         {
             worksheet.Cell(row, 1).Value = no++;
             worksheet.Cell(row, 2).Value = topup.CreatedAt.ToString("dd MMM yyyy");
-            worksheet.Cell(row, 3).Value = topup.User?.Username ?? "-";
+            worksheet.Cell(row, 3).Value = topup.User?.UserName ?? "-";
             worksheet.Cell(row, 4).Value = topup.User?.FullName ?? "-";
             worksheet.Cell(row, 5).Value = topup.Amount;
             worksheet.Cell(row, 5).Style.NumberFormat.Format = "#,##0";
@@ -328,7 +328,7 @@ public class ExportService
         {
             worksheet.Cell(row, 1).Value = no++;
             worksheet.Cell(row, 2).Value = ledger.CreatedAt.ToString("dd MMM yyyy HH:mm");
-            worksheet.Cell(row, 3).Value = ledger.User?.Username ?? "-";
+            worksheet.Cell(row, 3).Value = ledger.User?.UserName ?? "-";
             worksheet.Cell(row, 4).Value = ledger.Type.ToString();
             worksheet.Cell(row, 5).Value = ledger.Amount;
             worksheet.Cell(row, 5).Style.NumberFormat.Format = "#,##0";

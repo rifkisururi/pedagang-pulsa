@@ -108,8 +108,10 @@
 </div>
 
 @{
+#pragma warning disable CS8321 // Unused local function
     string formatCurrency(decimal amount)
     {
         return "Rp " + amount.ToString("N0", new System.Globalization.CultureInfo("id-ID"));
     }
+#pragma warning restore CS8321
 }

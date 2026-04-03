@@ -36,7 +36,7 @@ The API uses **JWT (JSON Web Token)** based authentication with a **2-step verif
 ### Authentication Flow
 
 ```
-Step 1: Login with username + PIN
+Step 1: Login with username + password
   ↓
 Receive: access_token (15min) + refresh_token (7days)
   ↓
@@ -104,7 +104,7 @@ All errors follow this format:
 
 | Error Code | HTTP Status | Description | Retry |
 |---|---|---|---|
-| `INVALID_CREDENTIALS` | 401 | Username or PIN is incorrect | No |
+| `INVALID_CREDENTIALS` | 401 | Username or password is incorrect | No |
 | `UNAUTHORIZED` | 401 | Token is invalid or expired | Yes (refresh token) |
 | `PIN_INVALID` | 400 | PIN is incorrect | No |
 | `PIN_LOCKED` | 403 | Account locked (3 failed PIN attempts) | No (wait 15 min) |
@@ -117,6 +117,12 @@ All errors follow this format:
 | `SUPPLIER_TIMEOUT` | 503 | All suppliers are timeout | Yes (auto retry) |
 | `VALIDATION_ERROR` | 400 | Invalid input data | No |
 | `INTERNAL_ERROR` | 500 | Server error | Yes |
+| `BANK_ACCOUNT_NOT_FOUND` | 404 | Bank account not found | No |
+| `TOPUP_NOT_FOUND` | 404 | Topup request not found | No |
+| `INVALID_TOPUP_STATUS` | 400 | Cannot upload proof for current status | No |
+| `PROOF_ALREADY_UPLOADED` | 400 | Transfer proof already uploaded | No |
+| `CREATE_TOPUP_FAILED` | 400 | Failed to create topup request | Yes |
+| `UPLOAD_ERROR` | 500 | Error uploading transfer proof | Yes |
 
 ---
 
@@ -180,6 +186,7 @@ Content-Type: application/json
   "full_name": "John Doe",
   "email": "john@example.com",
   "phone": "08123456789",
+  "password": "your-password",
   "pin": "123456",
   "referral_code": "AGUS2026"
 }
@@ -193,6 +200,7 @@ Content-Type: application/json
 | `full_name` | string | Yes | Max 100 chars | User's full name |
 | `email` | string | Yes | Valid email format | Email address |
 | `phone` | string | Yes | Indonesia format (08xxx or 628xxx) | Phone number |
+| `password` | string | Yes | 8-100 chars | Login password |
 | `pin` | string | Yes | Exactly 6 digits | 6-digit PIN |
 | `referral_code` | string | No | Must exist if provided | Referral code |
 
@@ -238,7 +246,7 @@ Content-Type: application/json
 
 ### 2. Login
 
-Authenticate with username and PIN.
+Authenticate with username and password.
 
 **Endpoint:** `POST /auth/login`
 **Authentication:** No
@@ -252,7 +260,7 @@ Content-Type: application/json
 
 {
   "username": "user123",
-  "pin": "123456"
+  "password": "your-password"
 }
 ```
 
@@ -287,7 +295,7 @@ Content-Type: application/json
 {
   "success": false,
   "error_code": "INVALID_CREDENTIALS",
-  "message": "Username atau PIN salah"
+  "message": "Username atau password salah"
 }
 ```
 
@@ -497,55 +505,283 @@ Authorization: Bearer {access_token}
 
 ## Topup
 
-### 7. Request Topup
+### Topup Flow
 
-Submit a topup request with proof of transfer.
+The topup process now uses a **2-step flow** with unique code for verification:
 
-**Endpoint:** `POST /topup`
+```
+Step 1: Request Topup
+  ↓
+Get payment details with unique code (3 digit)
+  ↓
+User transfers amount + unique code
+  ↓
+Step 2: Upload Transfer Proof
+  ↓
+Admin verifies & approves/rejects
+```
+
+### 7. Get Bank Accounts
+
+Get list of available bank accounts for topup.
+
+**Endpoint:** `GET /topup/banks`
 **Authentication:** Required (Bearer token)
 
 #### Request
 
 ```http
-POST /api/v1/topup
+GET /api/v1/topup/banks
 Authorization: Bearer {access_token}
-Content-Type: multipart/form-data
-
-amount: 100000
-bank_code: BCA
-transfer_proof: [file]
-notes: Optional notes
 ```
 
-#### Form Fields
+#### Success Response (200 OK)
 
-| Field | Type | Required | Validation |
-|---|---|---|---|
-| `amount` | decimal | Yes | Min: 10,000, Max: 10,000,000 |
-| `bank_code` | string | Yes | Valid bank code |
-| `transfer_proof` | file | Yes | Image (JPG/PNG), Max 5MB |
-| `notes` | string | No | Max 500 chars |
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "bankName": "BCA",
+      "accountNumber": "1234567890",
+      "accountName": "PT PedagangPulsa",
+      "isActive": true
+    },
+    {
+      "id": 2,
+      "bankName": "Mandiri",
+      "accountNumber": "0987654321",
+      "accountName": "PT PedagangPulsa",
+      "isActive": true
+    }
+  ]
+}
+```
+
+---
+
+### 8. Request Topup (Step 1)
+
+Create a topup request and get payment details with unique code.
+
+**Endpoint:** `POST /topup/request`
+**Authentication:** Required (Bearer token)
+
+#### Request
+
+```http
+POST /api/v1/topup/request
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{
+  "bankAccountId": 1,
+  "amount": 100000
+}
+```
+
+#### Request Fields
+
+| Field | Type | Required | Validation | Description |
+|---|---|---|---|---|
+| `bankAccountId` | integer | Yes | Must exist & active | Bank account ID from `/topup/banks` |
+| `amount` | decimal | Yes | Min: 10,000 | Topup amount (without unique code) |
 
 #### Success Response (201 Created)
 
 ```json
 {
   "success": true,
-  "message": "Permintaan topup berhasil dibuat",
+  "message": "Topup request created. Please transfer the specified amount.",
+  "topupId": "550e8400-e29b-41d4-a716-446655440004",
+  "status": "pending",
+  "payment": {
+    "bankName": "BCA",
+    "accountNumber": "1234567890",
+    "accountName": "PT PedagangPulsa",
+    "originalAmount": 100000,
+    "uniqueCode": 123,
+    "totalAmount": 100123,
+    "expiresAt": "2026-04-04T10:30:00Z"
+  },
+  "createdAt": "2026-04-03T10:30:00Z"
+}
+```
+
+#### About Unique Code
+
+- **Purpose**: Verify transfer amount matches the request
+- **Range**: 1-999 (3 digits)
+- **Generation**: Random unused code for the day
+- **Formula**: `Total Amount = Original Amount + Unique Code`
+- **Expiry**: Request expires in 24 hours
+
+#### Error Responses
+
+**404 BANK_ACCOUNT_NOT_FOUND**
+```json
+{
+  "message": "Bank account not found",
+  "errorCode": "BANK_ACCOUNT_NOT_FOUND"
+}
+```
+
+---
+
+### 9. Upload Transfer Proof (Step 2)
+
+Upload transfer proof image for the created topup request.
+
+**Endpoint:** `POST /topup/{id}/proof`
+**Authentication:** Required (Bearer token)
+
+#### Request
+
+```http
+POST /api/v1/topup/550e8400-e29b-41d4-a716-446655440004/proof
+Authorization: Bearer {access_token}
+Content-Type: multipart/form-data
+
+transferProof: [file]
+```
+
+#### Form Fields
+
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `transferProof` | file | Yes | JPG/PNG/PDF, Max 5MB |
+
+#### Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "message": "Transfer proof uploaded successfully. Waiting for admin approval.",
+  "topupId": "550e8400-e29b-41d4-a716-446655440004",
+  "status": "pending",
+  "uploadedAt": "2026-04-03T11:00:00Z"
+}
+```
+
+#### Error Responses
+
+**400 PROOF_ALREADY_UPLOADED**
+```json
+{
+  "message": "Transfer proof already uploaded",
+  "errorCode": "PROOF_ALREADY_UPLOADED"
+}
+```
+
+**400 INVALID_FILE_TYPE**
+```json
+{
+  "message": "Invalid file type. Only JPG, PNG, and PDF files are allowed",
+  "errorCode": "INVALID_FILE_TYPE"
+}
+```
+
+---
+
+### 10. Get Topup Detail
+
+Get details of a specific topup request.
+
+**Endpoint:** `GET /topup/{id}`
+**Authentication:** Required (Bearer token)
+
+#### Request
+
+```http
+GET /api/v1/topup/550e8400-e29b-41d4-a716-446655440004
+Authorization: Bearer {access_token}
+```
+
+#### Success Response (200 OK)
+
+```json
+{
+  "success": true,
   "data": {
-    "request_id": "550e8400-e29b-41d4-a716-446655440004",
+    "id": "550e8400-e29b-41d4-a716-446655440004",
     "amount": 100000,
+    "uniqueCode": 123,
+    "totalAmount": 100123,
     "status": "pending",
-    "bank_code": "BCA",
-    "transfer_proof_url": "https://cdn.pedagangpulsa.com/proof/abc123.jpg",
-    "created_at": "2026-03-12T10:30:00Z"
+    "transferProofUrl": null,
+    "bankName": "BCA",
+    "accountNumber": "1234567890",
+    "accountName": "PT PedagangPulsa",
+    "rejectReason": null,
+    "createdAt": "2026-04-03T10:30:00Z",
+    "updatedAt": null
   }
 }
 ```
 
 ---
 
-### 8. Get Topup History
+### 11. Get Topup History
+
+Get user's topup request history.
+
+**Endpoint:** `GET /topup/history`
+**Authentication:** Required (Bearer token)
+
+#### Request
+
+```http
+GET /api/v1/topup/history?page=1&page_size=20
+Authorization: Bearer {access_token}
+```
+
+#### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `page` | integer | No | 1 | Page number |
+| `page_size` | integer | No | 20 | Items per page |
+
+#### Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440004",
+      "amount": 100000,
+      "uniqueCode": 123,
+      "totalAmount": 100123,
+      "status": "pending",
+      "transferProofUrl": "https://cdn.pedagangpulsa.com/proof/abc123.jpg",
+      "bankName": "BCA",
+      "bankAccountNumber": "1234567890",
+      "rejectReason": null,
+      "createdAt": "2026-04-03T10:30:00Z",
+      "updatedAt": "2026-04-03T11:00:00Z"
+    }
+  ],
+  "totalRecords": 5,
+  "page": 1,
+  "pageSize": 20
+}
+```
+
+#### Topup Status Values
+
+| Status | Description |
+|---|---|
+| `pending` | Waiting for transfer proof or admin approval |
+| `approved` | Topup approved and balance added |
+| `rejected` | Topup rejected by admin |
+
+---
+
+### 12. Get Topup History (Alternative - Paginated)
+
+Alternative endpoint with full pagination support.
 
 Get user's topup request history.
 
@@ -1158,6 +1394,7 @@ For API-related questions, contact:
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1 | 2026-04-03 | **BREAKING**: Topup flow changed to 2-step process with unique code verification |
 | 1.0 | 2026-03-12 | Initial API documentation for mobile team |
 
 ---

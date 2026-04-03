@@ -14,7 +14,7 @@ public class BalanceLedger
     public decimal HeldAfter { get; set; }
     public string? RefType { get; set; }
     public Guid? RefId { get; set; }
-    public string? Notes { get; set; }
+    public string? Notes { set; get; }
     public Guid? CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

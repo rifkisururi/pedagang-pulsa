@@ -22,6 +22,11 @@ public class RegisterRequest
     [StringLength(20, ErrorMessage = "Phone number cannot exceed 20 characters")]
     public string Phone { get; set; } = string.Empty;
 
+    [Required(ErrorMessage = "Password is required")]
+    [StringLength(100, MinimumLength = 8, ErrorMessage = "Password must be between 8 and 100 characters")]
+    [DataType(DataType.Password)]
+    public string Password { get; set; } = string.Empty;
+
     [Required(ErrorMessage = "PIN is required")]
     [StringLength(6, MinimumLength = 6, ErrorMessage = "PIN must be exactly 6 digits")]
     [RegularExpression(@"^\d{6}$", ErrorMessage = "PIN must be 6 digits")]
@@ -43,10 +48,10 @@ public class LoginRequest
     [Required(ErrorMessage = "Username is required")]
     public string Username { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "PIN is required")]
-    [StringLength(6, MinimumLength = 6, ErrorMessage = "PIN must be exactly 6 digits")]
-    [RegularExpression(@"^\d{6}$", ErrorMessage = "PIN must be 6 digits")]
-    public string Pin { get; set; } = string.Empty;
+    [Required(ErrorMessage = "Password is required")]
+    [StringLength(100, MinimumLength = 8, ErrorMessage = "Password must be between 8 and 100 characters")]
+    [DataType(DataType.Password)]
+    public string Password { get; set; } = string.Empty;
 }
 
 public class LoginResponse

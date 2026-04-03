@@ -35,7 +35,7 @@ public class UserController : Controller
         var model = new UserDetailViewModel
         {
             Id = user.Id,
-            Username = user.Username,
+            Username = user.UserName,
             FullName = user.FullName,
             Email = user.Email,
             Phone = user.Phone,
@@ -45,7 +45,7 @@ public class UserController : Controller
             HeldBalance = user.Balance?.HeldBalance ?? 0,
             CreatedAt = user.CreatedAt.ToString("dd MMM yyyy HH:mm"),
             ReferralCode = user.ReferralCode,
-            ReferredBy = user.Referrer?.Username
+            ReferredBy = user.Referrer?.UserName
         };
 
         // Map balance ledger
@@ -77,7 +77,7 @@ public class UserController : Controller
         var model = new EditLevelUserViewModel
         {
             UserId = user.Id,
-            Username = user.Username,
+            Username = user.UserName,
             FullName = user.FullName,
             CurrentLevelId = user.LevelId,
             CurrentLevelName = user.Level?.Name ?? "Unknown",
@@ -125,7 +125,7 @@ public class UserController : Controller
         var model = new SuspendUserViewModel
         {
             UserId = user.Id,
-            Username = user.Username,
+            Username = user.UserName,
             FullName = user.FullName,
             IsSuspended = user.Status == Domain.Enums.UserStatus.Suspended
         };
@@ -217,7 +217,7 @@ public class UserController : Controller
         var userData = users.Select(u => new UserListViewModel.UserDataRow
         {
             Id = u.Id,
-            Username = u.Username,
+            Username = u.UserName,
             FullName = u.FullName,
             Email = u.Email,
             Phone = u.Phone,

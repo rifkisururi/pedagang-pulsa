@@ -1,12 +1,14 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
 using PedagangPulsa.Api.Middleware;
 using PedagangPulsa.Api.Controllers;
 using PedagangPulsa.Domain.Entities;
 using PedagangPulsa.Infrastructure.Data;
+using PedagangPulsa.Infrastructure.Suppliers;
+using Scalar.AspNetCore;
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("PedagangPulsa.Tests")]
@@ -19,19 +21,8 @@ builder.Services.AddControllers();
 // Configure Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString));
-
-// Configure Identity
-builder.Services.AddIdentity<User, IdentityRole<int>>(options =>
-{
-    options.Password.RequireDigit = false;
-    options.Password.RequireLowercase = false;
-    options.Password.RequireUppercase = false;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequiredLength = 6;
-})
-.AddEntityFrameworkStores<AppDbContext>()
-.AddDefaultTokenProviders();
+    options.UseNpgsql(connectionString)
+        .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning)));
 
 // Configure JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
@@ -65,6 +56,8 @@ builder.Services.AddScoped<PedagangPulsa.Application.Services.TransactionService
 builder.Services.AddScoped<PedagangPulsa.Application.Services.TopupService>();
 builder.Services.AddScoped<PedagangPulsa.Application.Services.BalanceService>();
 builder.Services.AddScoped<IRedisService, RedisService>();
+builder.Services.AddScoped<ISupplierAdapterFactory, SupplierAdapterFactory>();
+builder.Services.AddHttpClient();
 
 // Add FormOptions for file upload
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
@@ -99,11 +92,14 @@ using (var scope = app.Services.CreateScope())
 
         // Apply pending migrations
         await context.Database.MigrateAsync();
+
+        // Seed minimum reference data required by the API.
+        await DataSeeder.SeedAsync(context);
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred migrating the database.");
+        logger.LogError(ex, "An error occurred migrating or seeding the database.");
     }
 }
 
@@ -112,6 +108,13 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    app.MapScalarApiReference("/scalar", options =>
+    {
+        options.WithTitle("PedagangPulsa API Reference")
+            .WithOpenApiRoutePattern("/swagger/{documentName}/swagger.json")
+            .DisableAgent();
+    });
 }
 
 app.UseHttpsRedirection();
@@ -119,8 +122,8 @@ app.UseHttpsRedirection();
 // Enable static files for uploads
 app.UseStaticFiles();
 
-// Use rate limiting middleware
-app.UseRateLimiting();
+// Use rate limiting middleware (DISABLED)
+// app.UseRateLimiting();
 
 app.UseCors("AllowAll");
 

@@ -18,6 +18,9 @@ public static class DataSeeder
 
         // Seed User Levels
         await SeedUserLevelsAsync(context);
+
+        // Seed bank accounts used by topup requests
+        await SeedBankAccountsAsync(context);
     }
 
     private static async Task SeedAdminUserAsync(AppDbContext context)
@@ -211,6 +214,43 @@ public static class DataSeeder
         Console.WriteLine("===========================================");
         Console.WriteLine("USER_LEVELS: Default user levels created.");
         Console.WriteLine($"Total levels: {levels.Count}");
+        Console.WriteLine("===========================================");
+    }
+
+    private static async Task SeedBankAccountsAsync(AppDbContext context)
+    {
+        if (await context.BankAccounts.AnyAsync())
+        {
+            Console.WriteLine("Bank accounts already exist.");
+            return;
+        }
+
+        var bankAccounts = new List<BankAccount>
+        {
+            new()
+            {
+                BankName = "BCA",
+                AccountNumber = "1234567890",
+                AccountName = "PT Pedagang Pulsa",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new()
+            {
+                BankName = "BRI",
+                AccountNumber = "9876543210",
+                AccountName = "PT Pedagang Pulsa",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+        await context.BankAccounts.AddRangeAsync(bankAccounts);
+        await context.SaveChangesAsync();
+
+        Console.WriteLine("===========================================");
+        Console.WriteLine("BANK_ACCOUNTS: Default bank accounts created.");
+        Console.WriteLine($"Total bank accounts: {bankAccounts.Count}");
         Console.WriteLine("===========================================");
     }
 }

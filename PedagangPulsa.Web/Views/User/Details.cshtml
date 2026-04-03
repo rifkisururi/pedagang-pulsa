@@ -258,7 +258,7 @@
                                         <td>${tx.createdAt}</td>
                                         <td>${tx.productName}</td>
                                         <td><code>${tx.destinationNumber}</code></td>
-                                        <td>${ 'Rp '.+toLocaleString('id-ID')}</td>
+                                        <td>${'Rp ' + tx.amount.toLocaleString('id-ID')}</td>
                                         <td><span class="badge ${statusClass}">${statusIcon} ${tx.status}</span></td>
                                         <td>
                                             <a href="/Transaction/Details/${tx.id}" class="btn btn-sm btn-outline-primary">
@@ -299,10 +299,6 @@
                 }
             }
         });
-
-        function  'Rp '.+toLocaleString('id-ID') {
-            return 'Rp ' + amount.toLocaleString('id-ID');
-        }
     </script>
 }
 

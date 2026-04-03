@@ -187,7 +187,7 @@ public class ProductService
                 }
                 else
                 {
-                    newPrice.ProductId = product.Id;
+                    newPrice.ProductId = existing.Id;
                     _context.ProductLevelPrices.Add(newPrice);
                 }
             }

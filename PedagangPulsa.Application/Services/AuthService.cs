@@ -46,7 +46,7 @@ public class AuthService
     {
         // Check if username already exists
         var existingUser = await _context.Users
-            .FirstOrDefaultAsync(u => u.Username == username);
+            .FirstOrDefaultAsync(u => u.UserName == username);
 
         if (existingUser != null)
         {
@@ -106,8 +106,7 @@ public class AuthService
         // Create user
         var user = new User
         {
-            Id = Guid.NewGuid(),
-            Username = username,
+            UserName = username,
             FullName = fullName,
             Email = email,
             Phone = phone,
@@ -170,7 +169,7 @@ public class AuthService
         var user = await _context.Users
             .Include(u => u.Balance)
             .Include(u => u.Level)
-            .FirstOrDefaultAsync(u => u.Username == username);
+            .FirstOrDefaultAsync(u => u.UserName == username);
 
         if (user == null)
         {
@@ -383,7 +382,7 @@ public class AuthService
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim(JwtRegisteredClaimNames.UniqueName, user.Username),
+            new Claim(JwtRegisteredClaimNames.UniqueName, user.UserName),
             new Claim("level_id", user.LevelId.ToString()),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)

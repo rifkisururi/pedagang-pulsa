@@ -38,7 +38,7 @@ public class BalanceService
         {
             query = query.Where(bl =>
                 bl.User != null &&
-                (bl.User.Username.Contains(search) ||
+                (bl.User.UserName.Contains(search) ||
                  bl.User.Email != null && bl.User.Email.Contains(search) ||
                  bl.Notes != null && bl.Notes.Contains(search)));
         }
@@ -86,7 +86,7 @@ public class BalanceService
         var columnMappings = new Dictionary<string, System.Linq.Expressions.Expression<Func<BalanceLedger, object>>>
         {
             { "createdAt", bl => bl.CreatedAt },
-            { "username", bl => bl.User != null ? bl.User.Username : "" },
+            { "username", bl => bl.User != null ? bl.User.UserName : "" },
             { "type", bl => bl.Type },
             { "amount", bl => bl.Amount },
             { "activeBefore", bl => bl.ActiveBefore },
@@ -220,7 +220,7 @@ public class BalanceService
             HeldBefore = heldBefore,
             HeldAfter = heldAfter,
             Notes = description,
-            CreatedBy = performedBy != null ? Guid.Parse(performedBy) : (Guid?)null,
+            CreatedBy = performedBy != null ? Guid.Parse(performedBy) : null,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -241,7 +241,7 @@ public class BalanceService
     public async Task<List<Domain.Entities.User>> SearchUsersAsync(string search)
     {
         return await _context.Users
-            .Where(u => u.Username.Contains(search) ||
+            .Where(u => u.UserName.Contains(search) ||
                        (u.Email != null && u.Email.Contains(search)) ||
                        (u.FullName != null && u.FullName.Contains(search)) ||
                        (u.Phone != null && u.Phone.Contains(search)))

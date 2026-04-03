@@ -26,8 +26,8 @@ public class TransferController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Transfer([FromBody] TransferRequestDto request)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null)
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
         {
             return Unauthorized(new ErrorResponse
             {
@@ -36,7 +36,14 @@ public class TransferController : ControllerBase
             });
         }
 
-        var userGuid = Guid.Parse(userId);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
 
         if (!ModelState.IsValid)
         {
@@ -54,7 +61,7 @@ public class TransferController : ControllerBase
             var fromUser = await _context.Users
                 .Include(u => u.Balance)
                 .Include(u => u.Level)
-                .FirstOrDefaultAsync(u => u.Id == userGuid);
+                .FirstOrDefaultAsync(u => u.Id == userId);
 
             if (fromUser == null || fromUser.Balance == null)
             {
@@ -80,7 +87,7 @@ public class TransferController : ControllerBase
             // Get to user
             var toUser = await _context.Users
                 .Include(u => u.Balance)
-                .FirstOrDefaultAsync(u => u.Username == request.ToUsername);
+                .FirstOrDefaultAsync(u => u.UserName == request.ToUsername);
 
             if (toUser == null)
             {
@@ -143,7 +150,7 @@ public class TransferController : ControllerBase
                 HeldBefore = fromUser.Balance.HeldBalance,
                 HeldAfter = fromUser.Balance.HeldBalance,
                 RefType = "PeerTransfer",
-                Notes = $"Transfer to {toUser.Username}",
+                Notes = $"Transfer to {toUser.UserName}",
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -158,7 +165,7 @@ public class TransferController : ControllerBase
                 HeldBefore = toUser.Balance.HeldBalance,
                 HeldAfter = toUser.Balance.HeldBalance,
                 RefType = "PeerTransfer",
-                Notes = $"Transfer from {fromUser.Username}",
+                Notes = $"Transfer from {fromUser.UserName}",
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -168,7 +175,6 @@ public class TransferController : ControllerBase
             // Create transfer record
             var transfer = new PeerTransfer
             {
-                Id = Guid.NewGuid(),
                 FromUserId = fromUser.Id,
                 ToUserId = toUser.Id,
                 Amount = request.Amount,
@@ -188,8 +194,8 @@ public class TransferController : ControllerBase
                 data = new
                 {
                     transferId = transfer.Id,
-                    from = fromUser.Username,
-                    to = toUser.Username,
+                    from = fromUser.UserName,
+                    to = toUser.UserName,
                     amount = request.Amount,
                     notes = request.Notes,
                     createdAt = transfer.CreatedAt
@@ -201,7 +207,7 @@ public class TransferController : ControllerBase
         catch (Exception ex)
         {
             await transaction.RollbackAsync();
-            _logger.LogError(ex, "Error processing transfer for user {UserId}", userGuid);
+            _logger.LogError(ex, "Error processing transfer for user {UserId}", userId);
             return StatusCode(500, new ErrorResponse
             {
                 Message = "An error occurred while processing your transfer",
@@ -215,8 +221,8 @@ public class TransferController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null)
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
         {
             return Unauthorized(new ErrorResponse
             {
@@ -225,28 +231,35 @@ public class TransferController : ControllerBase
             });
         }
 
-        var userGuid = Guid.Parse(userId);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
 
         var transfers = await _context.PeerTransfers
-            .Where(pt => pt.FromUserId == userGuid || pt.ToUserId == userGuid)
+            .Where(pt => pt.FromUserId == userId || pt.ToUserId == userId)
             .OrderByDescending(pt => pt.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
 
         var totalRecords = await _context.PeerTransfers
-            .Where(pt => pt.FromUserId == userGuid || pt.ToUserId == userGuid)
+            .Where(pt => pt.FromUserId == userId || pt.ToUserId == userId)
             .CountAsync();
 
         var transferData = transfers.Select(t => new
         {
             id = t.Id,
-            from = _context.Users.Where(u => u.Id == t.FromUserId).Select(u => u.Username).FirstOrDefault(),
-            to = _context.Users.Where(u => u.Id == t.ToUserId).Select(u => u.Username).FirstOrDefault(),
+            from = _context.Users.Where(u => u.Id == t.FromUserId).Select(u => u.UserName).FirstOrDefault(),
+            to = _context.Users.Where(u => u.Id == t.ToUserId).Select(u => u.UserName).FirstOrDefault(),
             amount = t.Amount,
             notes = t.Notes,
             status = "Success",
-            direction = t.FromUserId == userGuid ? "out" : "in",
+            direction = t.FromUserId == userId ? "out" : "in",
             createdAt = t.CreatedAt
         }).ToList();
 

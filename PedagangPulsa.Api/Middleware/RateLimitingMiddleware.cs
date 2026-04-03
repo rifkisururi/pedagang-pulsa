@@ -6,78 +6,68 @@ public class RateLimitingMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<RateLimitingMiddleware> _logger;
-    private readonly IServiceProvider _serviceProvider;
 
     // In-memory counter (for production, use Redis)
     private static readonly ConcurrentDictionary<string, RateLimitCounter> _counters = new();
+    private static readonly RateLimitRule[] _rules =
+    [
+        new("login", "/api/auth/login", HttpMethods.Post, 60, TimeSpan.FromMinutes(1), RateLimitKeyType.IP),
+        new("register", "/api/auth/register", HttpMethods.Post, 60, TimeSpan.FromMinutes(1), RateLimitKeyType.IP),
+        new("transaction", "/api/transaction", HttpMethods.Post, 60, TimeSpan.FromMinutes(1), RateLimitKeyType.User),
+        new("pin_verify", "/api/auth/pin/verify", HttpMethods.Post, 60, TimeSpan.FromMinutes(1), RateLimitKeyType.User),
+        new("transfer", "/api/transfer", HttpMethods.Post, 60, TimeSpan.FromMinutes(1), RateLimitKeyType.User),
+        new("topup", "/api/topup", HttpMethods.Post, 60, TimeSpan.FromMinutes(1), RateLimitKeyType.User)
+    ];
 
     public RateLimitingMiddleware(
         RequestDelegate next,
-        ILogger<RateLimitingMiddleware> logger,
-        IServiceProvider serviceProvider)
+        ILogger<RateLimitingMiddleware> logger)
     {
         _next = next;
         _logger = logger;
-        _serviceProvider = serviceProvider;
     }
 
     public async Task InvokeAsync(HttpContext context)
     {
-        var endpoint = context.GetEndpoint();
-        var path = context.Request.Path.Value ?? string.Empty;
-
-        // Define rate limit rules
-        var rateLimitRule = GetRateLimitRule(path, context.Request.Method);
-
-        if (rateLimitRule != null)
+        if (GetRateLimitRule(context.Request.Path.Value, context.Request.Method) is not RateLimitRule rule)
         {
-            var identifier = GetIdentifier(context, rateLimitRule.KeyType);
-            var key = $"{rateLimitRule.Prefix}:{identifier}";
+            await _next(context);
+            return;
+        }
 
-            var counter = _counters.GetOrAdd(key, _ => new RateLimitCounter());
+        var identifier = GetIdentifier(context, rule.KeyType);
+        var key = $"{rule.Prefix}:{identifier}";
+        var counter = _counters.GetOrAdd(key, static _ => new RateLimitCounter());
+        var now = DateTime.UtcNow;
+        var snapshot = counter.RegisterRequest(now, rule.Window);
 
-            // Simple thread-safe implementation using Interlocked
-            var newCount = Interlocked.Increment(ref counter.Count);
+        ApplyRateLimitHeaders(context.Response.Headers, rule, snapshot);
 
-            // Reset counter if window expired
-            var now = DateTime.UtcNow;
-            if ((now - counter.WindowStart) > rateLimitRule.Window)
+        if (snapshot.Count > rule.Limit)
+        {
+            _logger.LogWarning(
+                "Rate limit exceeded for {Key}. Count: {Count}, Limit: {Limit}",
+                key,
+                snapshot.Count,
+                rule.Limit);
+
+            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            context.Response.ContentType = "application/json";
+            context.Response.Headers["Retry-After"] = GetRetryAfterSeconds(snapshot.ResetAt, now).ToString();
+
+            await context.Response.WriteAsJsonAsync(new
             {
-                Interlocked.Exchange(ref counter.Count, 1);
-                counter.WindowStart = now;
-                newCount = 1;
-            }
-
-            if (newCount > rateLimitRule.Limit)
-            {
-                _logger.LogWarning("Rate limit exceeded for {Key}. Count: {Count}, Limit: {Limit}",
-                    key, newCount, rateLimitRule.Limit);
-
-                context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-                context.Response.Headers.Add("Retry-After", ((int)rateLimitRule.Window.TotalSeconds).ToString());
-
-                var response = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    success = false,
-                    message = $"Rate limit exceeded. Maximum {rateLimitRule.Limit} requests per {rateLimitRule.Window.TotalMinutes} minute(s).",
-                    errorCode = "RATE_LIMIT_EXCEEDED"
-                });
-
-                context.Response.ContentType = "application/json";
-                context.Response.WriteAsync(response);
-                return;
-            }
-
-            // Add rate limit headers
-            context.Response.Headers.Add("X-RateLimit-Limit", rateLimitRule.Limit.ToString());
-            context.Response.Headers.Add("X-RateLimit-Remaining", (rateLimitRule.Limit - newCount).ToString());
-            context.Response.Headers.Add("X-RateLimit-Reset", counter.WindowStart.Add(rateLimitRule.Window).ToString("yyyy-MM-ddTHH:mm:ssZ"));
+                success = false,
+                message = $"Rate limit exceeded. Maximum {rule.Limit} requests per {rule.Window.TotalMinutes} minute(s).",
+                errorCode = "RATE_LIMIT_EXCEEDED"
+            });
+            return;
         }
 
         await _next(context);
     }
 
-    private string GetIdentifier(HttpContext context, RateLimitKeyType keyType)
+    private static string GetIdentifier(HttpContext context, RateLimitKeyType keyType)
     {
         return keyType switch
         {
@@ -87,96 +77,62 @@ public class RateLimitingMiddleware
         };
     }
 
-    private RateLimitRule? GetRateLimitRule(string path, string method)
+    private static RateLimitRule? GetRateLimitRule(string? path, string method)
     {
-        // Login endpoint: 5 requests per minute per IP
-        if (path.Contains("/api/auth/login", StringComparison.OrdinalIgnoreCase) && method == "POST")
-        {
-            return new RateLimitRule
-            {
-                Prefix = "login",
-                Limit = 5,
-                Window = TimeSpan.FromMinutes(1),
-                KeyType = RateLimitKeyType.IP
-            };
-        }
+        var requestPath = path ?? string.Empty;
 
-        // Register endpoint: 3 requests per hour per IP
-        if (path.Contains("/api/auth/register", StringComparison.OrdinalIgnoreCase) && method == "POST")
-        {
-            return new RateLimitRule
-            {
-                Prefix = "register",
-                Limit = 3,
-                Window = TimeSpan.FromHours(1),
-                KeyType = RateLimitKeyType.IP
-            };
-        }
-
-        // Transaction endpoints: 10 requests per minute per user
-        if (path.Contains("/api/transactions", StringComparison.OrdinalIgnoreCase))
-        {
-            return new RateLimitRule
-            {
-                Prefix = "transaction",
-                Limit = 10,
-                Window = TimeSpan.FromMinutes(1),
-                KeyType = RateLimitKeyType.User
-            };
-        }
-
-        // PIN verify: 10 requests per minute per user
-        if (path.Contains("/api/auth/pin/verify", StringComparison.OrdinalIgnoreCase) && method == "POST")
-        {
-            return new RateLimitRule
-            {
-                Prefix = "pin_verify",
-                Limit = 10,
-                Window = TimeSpan.FromMinutes(1),
-                KeyType = RateLimitKeyType.User
-            };
-        }
-
-        // Transfer endpoint: 10 requests per minute per user
-        if (path.Contains("/api/transfer", StringComparison.OrdinalIgnoreCase) && method == "POST")
-        {
-            return new RateLimitRule
-            {
-                Prefix = "transfer",
-                Limit = 10,
-                Window = TimeSpan.FromMinutes(1),
-                KeyType = RateLimitKeyType.User
-            };
-        }
-
-        // Topup request: 5 requests per hour per user
-        if (path.Contains("/api/topup", StringComparison.OrdinalIgnoreCase) && method == "POST")
-        {
-            return new RateLimitRule
-            {
-                Prefix = "topup",
-                Limit = 5,
-                Window = TimeSpan.FromHours(1),
-                KeyType = RateLimitKeyType.User
-            };
-        }
-
-        return null;
+        return _rules.FirstOrDefault(rule =>
+            string.Equals(method, rule.Method, StringComparison.OrdinalIgnoreCase) &&
+            requestPath.StartsWith(rule.PathPrefix, StringComparison.OrdinalIgnoreCase));
     }
 
-    private class RateLimitCounter
+    private static void ApplyRateLimitHeaders(
+        IHeaderDictionary headers,
+        RateLimitRule rule,
+        RateLimitSnapshot snapshot)
     {
-        public int Count;
-        public DateTime WindowStart = DateTime.UtcNow;
+        headers["X-RateLimit-Limit"] = rule.Limit.ToString();
+        headers["X-RateLimit-Remaining"] = Math.Max(rule.Limit - snapshot.Count, 0).ToString();
+        headers["X-RateLimit-Reset"] = snapshot.ResetAt.ToString("yyyy-MM-ddTHH:mm:ssZ");
     }
 
-    private class RateLimitRule
+    private static int GetRetryAfterSeconds(DateTime resetAt, DateTime now)
     {
-        public required string Prefix { get; set; }
-        public int Limit { get; set; }
-        public TimeSpan Window { get; set; }
-        public RateLimitKeyType KeyType { get; set; }
+        return Math.Max((int)Math.Ceiling((resetAt - now).TotalSeconds), 1);
     }
+
+    private sealed class RateLimitCounter
+    {
+        private readonly Lock _lock = new();
+        private int _count;
+        private DateTime _windowStart = DateTime.UtcNow;
+
+        public RateLimitSnapshot RegisterRequest(DateTime now, TimeSpan window)
+        {
+            lock (_lock)
+            {
+                if ((now - _windowStart) > window)
+                {
+                    _count = 0;
+                    _windowStart = now;
+                }
+
+                _count++;
+
+                return new RateLimitSnapshot(_count, _windowStart.Add(window));
+            }
+        }
+    }
+
+    private readonly record struct RateLimitSnapshot(int Count, DateTime ResetAt);
+
+    private readonly record struct RateLimitRule(
+        string Prefix,
+        string PathPrefix,
+        string Method,
+        int Limit,
+        TimeSpan Window,
+        RateLimitKeyType KeyType);
 
     private enum RateLimitKeyType
     {

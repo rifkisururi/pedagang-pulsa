@@ -21,7 +21,7 @@ public class ProductController : Controller
     }
 
     [HttpGet("categories")]
-    [AllowAnonymous]
+    [Authorize]
     public async Task<IActionResult> GetCategories()
     {
         var categories = await _context.ProductCategories
@@ -50,8 +50,8 @@ public class ProductController : Controller
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null)
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
         {
             return Unauthorized(new ErrorResponse
             {
@@ -60,11 +60,18 @@ public class ProductController : Controller
             });
         }
 
-        var userGuid = Guid.Parse(userId);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
 
         // Get user's level
         var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Id == userGuid);
+            .FirstOrDefaultAsync(u => u.Id == userId);
 
         if (user == null)
         {
@@ -128,8 +135,8 @@ public class ProductController : Controller
     [Authorize]
     public async Task<IActionResult> GetPrice(Guid id)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null)
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
         {
             return Unauthorized(new ErrorResponse
             {
@@ -138,10 +145,17 @@ public class ProductController : Controller
             });
         }
 
-        var userGuid = Guid.Parse(userId);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
 
         var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Id == userGuid);
+            .FirstOrDefaultAsync(u => u.Id == userId);
 
         if (user == null)
         {

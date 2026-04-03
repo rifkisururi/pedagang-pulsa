@@ -1,5 +1,10 @@
 # Development Rules
 
+## Project Execution
+- **Rule**: Jika ada kebutuhan untuk menjalankan (run) project, pastikan untuk kill atau stop project tersebut setelah selesai.
+- **Alasan**: Agar proses yang berjalan tidak menggantung (zombie process) dan port yang digunakan tidak terblokir, sehingga tidak mengganggu proses lain.
+- **Implementation**: Gunakan perintah penghentian proses di terminal (misal `Ctrl+C`) atau kill process pada port yang relevan jika project berjalan di background.
+
 ## Database Operations
 - **Rule**: Selalu gunakan Neon MCP untuk semua operasi database
 - **Tools**: `mcp__neon__*`

@@ -38,8 +38,8 @@ public class ReferralService
         if (!string.IsNullOrWhiteSpace(search))
         {
             query = query.Where(rl =>
-                rl.Referrer != null && rl.Referrer.Username.Contains(search) ||
-                rl.Referee != null && rl.Referee.Username.Contains(search));
+                rl.Referrer != null && rl.Referrer.UserName.Contains(search) ||
+                rl.Referee != null && rl.Referee.UserName.Contains(search));
         }
 
         // Status filter
@@ -82,8 +82,8 @@ public class ReferralService
         var columnMappings = new Dictionary<string, System.Linq.Expressions.Expression<Func<ReferralLog, object>>>
         {
             { "createdAt", rl => rl.CreatedAt },
-            { "referrer", rl => rl.Referrer != null ? rl.Referrer.Username : "" },
-            { "referee", rl => rl.Referee != null ? rl.Referee.Username : "" },
+            { "referrer", rl => rl.Referrer != null ? rl.Referrer.UserName : "" },
+            { "referee", rl => rl.Referee != null ? rl.Referee.UserName : "" },
             { "bonusAmount", rl => rl.BonusAmount ?? 0 },
             { "bonusStatus", rl => rl.BonusStatus.ToString() }
         };
@@ -112,7 +112,7 @@ public class ReferralService
             .Select(u => new ReferralSummary
             {
                 UserId = u.Id,
-                Username = u.Username,
+                Username = u.UserName,
                 FullName = u.FullName,
                 TotalReferrals = u.ReferralLogsAsReferrer.Count,
                 TotalBonusPaid = u.ReferralLogsAsReferrer
@@ -161,11 +161,10 @@ public class ReferralService
 
     private async Task<bool> ProcessPayBonusAsync(Guid logId, string? performedBy)
     {
-        var logIdGuid = logId;
         var log = await _context.ReferralLogs
             .Include(rl => rl.Referrer)
             .ThenInclude(r => r.Balance)
-            .Where(rl => rl.Id == logIdGuid && rl.BonusStatus == ReferralBonusStatus.Pending)
+            .Where(rl => rl.Id == logId && rl.BonusStatus == ReferralBonusStatus.Pending)
             .FirstOrDefaultAsync();
 
         if (log == null || log.Referrer?.Balance == null)
@@ -202,7 +201,7 @@ public class ReferralService
             HeldAfter = log.Referrer.Balance.HeldBalance,
             RefType = "ReferralLog",
             RefId = log.Id,
-            Notes = $"Referral bonus from {log.Referee?.Username ?? "user"}",
+            Notes = $"Referral bonus from {log.Referee?.UserName ?? "user"}",
             CreatedBy = performedBy != null ? Guid.Parse(performedBy) : null,
             CreatedAt = DateTime.UtcNow
         };
@@ -220,7 +219,7 @@ public class ReferralService
 
         _logger.LogInformation(
             "Referral bonus paid: LogId={LogId}, Referrer={Referrer}, Amount={Amount}, PerformedBy={PerformedBy}",
-            logId, log.Referrer.Username, log.BonusAmount, performedBy);
+            logId, log.Referrer.UserName, log.BonusAmount, performedBy);
 
         return true;
     }
@@ -259,9 +258,8 @@ public class ReferralService
 
     private async Task<bool> ProcessCancelBonusAsync(Guid logId, string? reason, string? performedBy)
     {
-        var logIdGuid = logId;
         var log = await _context.ReferralLogs
-            .Where(rl => rl.Id == logIdGuid && rl.BonusStatus == ReferralBonusStatus.Pending)
+            .Where(rl => rl.Id == logId && rl.BonusStatus == ReferralBonusStatus.Pending)
             .FirstOrDefaultAsync();
 
         if (log == null)

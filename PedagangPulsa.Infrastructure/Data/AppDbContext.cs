@@ -136,24 +136,23 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<User>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.Username).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.UserName).HasColumnName("Username").IsRequired().HasMaxLength(50);
             entity.Property(e => e.Email).HasMaxLength(100);
             entity.Property(e => e.Phone).HasMaxLength(20);
+            entity.Property(e => e.PasswordHash).HasMaxLength(255);
             entity.Property(e => e.PinHash).IsRequired().HasMaxLength(255);
             entity.Property(e => e.ReferralCode).IsRequired().HasMaxLength(20);
+            entity.Ignore(e => e.ReferredBy);
+            entity.Ignore(e => e.Referrer);
+            entity.Ignore(e => e.Referees);
             entity.HasIndex(e => e.Email).IsUnique();
             entity.HasIndex(e => e.Phone).IsUnique();
-            entity.HasIndex(e => e.Username).IsUnique();
+            entity.HasIndex(e => e.UserName).IsUnique();
             entity.HasIndex(e => e.LevelId);
             entity.HasIndex(e => e.ReferralCode).IsUnique();
-            entity.HasIndex(e => e.ReferredBy);
             entity.HasOne(e => e.Level)
                 .WithMany(l => l.Users)
                 .HasForeignKey(e => e.LevelId);
-            entity.HasOne(e => e.Referrer)
-                .WithMany(r => r.Referees)
-                .HasForeignKey(e => e.ReferredBy)
-                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // UserBalance
