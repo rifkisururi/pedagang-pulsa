@@ -493,13 +493,11 @@ public class AuthController : ControllerBase
     private async Task<string> GenerateUniqueReferralCode()
     {
         const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Removed similar looking chars
-        var random = new Random();
         var code = string.Empty;
 
         do
         {
-            code = new string(Enumerable.Repeat(chars, 8)
-                .Select(s => s[random.Next(s.Length)]).ToArray());
+            code = System.Security.Cryptography.RandomNumberGenerator.GetString(chars, 8);
 
             // Check uniqueness
             var exists = await _context.Users

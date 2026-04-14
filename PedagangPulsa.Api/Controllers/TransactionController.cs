@@ -160,7 +160,7 @@ public class TransactionController : ControllerBase
             await _context.SaveChangesAsync();
 
             // Create transaction
-            var referenceIdGen = $"{userGuid}{DateTime.UtcNow:yyyyMMddHHmmss}{Random.Shared.Next(1000, 9999)}";
+            var referenceIdGen = System.Security.Cryptography.RandomNumberGenerator.GetString("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 8);
             var transaction = new Transaction
             {
                 Id = Guid.NewGuid(),
