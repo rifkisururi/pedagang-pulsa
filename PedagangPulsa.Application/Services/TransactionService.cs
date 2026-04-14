@@ -444,7 +444,9 @@ public class TransactionService
         string? sortColumn = null,
         string? sortDirection = null)
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only transaction list to eliminate change tracking overhead, saving CPU and memory per request.
         var query = _context.Transactions
+            .AsNoTracking()
             .Include(t => t.Product)
             .Include(t => t.User)
             .Include(t => t.Supplier)
