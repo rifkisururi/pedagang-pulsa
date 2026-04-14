@@ -416,9 +416,7 @@ public class AuthService
     {
         // Take first 6 chars of username and add 2 random chars
         var baseCode = username.ToUpper().Replace("[^A-Z0-9]", "")[..Math.Min(6, username.Length)];
-        var random = new Random();
-        var suffix = new string(Enumerable.Repeat("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 2)
-            .Select(s => s[random.Next(s.Length)]).ToArray());
+        var suffix = System.Security.Cryptography.RandomNumberGenerator.GetString("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 2);
 
         return $"{baseCode}{suffix}";
     }
