@@ -1,0 +1,3 @@
+## 2024-04-14 - Fix N+1 query problem by pushing iterations outside DB access
+**Learning:** Found an anti-pattern in `ReportService.cs` where database queries were running inside a loop (N+1 query issue) without tracking optimizations. Querying the full object inside a loop creates an incredible bottleneck for memory and database round trips.
+**Action:** When gathering summary metrics over a period of time, execute a single projection query covering the entire period first (e.g. `Where(date >= start && date <= end).Select(x => new { x.Date, x.Value })`), then perform any per-day/per-item grouping in-memory using LINQ `GroupBy` or a loop. Always apply `.AsNoTracking()` to purely read-only reporting queries.

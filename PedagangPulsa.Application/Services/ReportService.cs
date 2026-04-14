@@ -22,7 +22,9 @@ public class ReportService
         var startOfDay = date.Date;
         var endOfDay = date.Date.AddDays(1).AddTicks(-1);
 
+        // ⚡ Bolt Optimization: Add AsNoTracking for read-only reporting query to eliminate change-tracking overhead
         var transactions = await _context.Transactions
+            .AsNoTracking()
             .Include(t => t.Product)
             .Include(t => t.Attempts)
             .ThenInclude(a => a.Supplier)
@@ -75,6 +77,16 @@ public class ReportService
 
     public async Task<List<DailyProfitSummary>> GetDailyProfitSummaryAsync(DateTime startDate, DateTime endDate)
     {
+        // ⚡ Bolt Optimization: Replace DB queries in a loop with a single query using AsNoTracking and projection
+        var startOfPeriod = startDate.Date;
+        var endOfPeriod = endDate.Date.AddDays(1).AddTicks(-1);
+
+        var transactions = await _context.Transactions
+            .AsNoTracking()
+            .Where(t => t.Status == TransactionStatus.Success && t.CreatedAt >= startOfPeriod && t.CreatedAt <= endOfPeriod)
+            .Select(t => new { t.CreatedAt, t.SellPrice, t.CostPrice })
+            .ToListAsync();
+
         var summaries = new List<DailyProfitSummary>();
 
         for (var date = startDate.Date; date <= endDate.Date; date = date.AddDays(1))
@@ -82,12 +94,12 @@ public class ReportService
             var startOfDay = date;
             var endOfDay = date.AddDays(1).AddTicks(-1);
 
-            var transactions = await _context.Transactions
-                .Where(t => t.Status == TransactionStatus.Success && t.CreatedAt >= startOfDay && t.CreatedAt <= endOfDay)
-                .ToListAsync();
+            var dailyTransactions = transactions
+                .Where(t => t.CreatedAt >= startOfDay && t.CreatedAt <= endOfDay)
+                .ToList();
 
-            var totalRevenue = transactions.Sum(t => t.SellPrice);
-            var totalCost = transactions.Sum(t => t.CostPrice ?? 0);
+            var totalRevenue = dailyTransactions.Sum(t => t.SellPrice);
+            var totalCost = dailyTransactions.Sum(t => t.CostPrice ?? 0);
             var totalProfit = totalRevenue - totalCost;
 
             summaries.Add(new DailyProfitSummary
@@ -96,7 +108,7 @@ public class ReportService
                 TotalRevenue = totalRevenue,
                 TotalCost = totalCost,
                 TotalProfit = totalProfit,
-                TotalTransactions = transactions.Count,
+                TotalTransactions = dailyTransactions.Count,
                 ProfitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0
             });
         }
@@ -106,7 +118,9 @@ public class ReportService
 
     public async Task<ProfitBySupplierReport> GetProfitBySupplierAsync(DateTime? startDate = null, DateTime? endDate = null)
     {
+        // ⚡ Bolt Optimization: Add AsNoTracking for read-only reporting query to eliminate change-tracking overhead
         var query = _context.TransactionAttempts
+            .AsNoTracking()
             .Include(a => a.Supplier)
             .Include(a => a.Transaction)
             .Where(a => a.Status == AttemptStatus.Success);
@@ -155,7 +169,9 @@ public class ReportService
 
     public async Task<ProfitByProductReport> GetProfitByProductAsync(DateTime? startDate = null, DateTime? endDate = null)
     {
+        // ⚡ Bolt Optimization: Add AsNoTracking for read-only reporting query to eliminate change-tracking overhead
         var query = _context.Transactions
+            .AsNoTracking()
             .Include(t => t.Product)
             .Where(t => t.Status == TransactionStatus.Success);
 
