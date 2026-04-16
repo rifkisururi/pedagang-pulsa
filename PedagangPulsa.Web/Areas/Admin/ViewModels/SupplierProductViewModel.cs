@@ -23,10 +23,10 @@ public class SupplierProductViewModel
     public string? SupplierProductName { get; set; }
 
     // Alias for compatibility with older code
-    public string? SupplierSku 
-    { 
-        get => SupplierProductCode; 
-        set => SupplierProductCode = value ?? string.Empty; 
+    public string? SupplierSku
+    {
+        get => SupplierProductCode;
+        set => SupplierProductCode = value ?? string.Empty;
     }
 
     [Required]
