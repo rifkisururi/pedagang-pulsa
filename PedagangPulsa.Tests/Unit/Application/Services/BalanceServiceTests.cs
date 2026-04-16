@@ -470,6 +470,7 @@ public class BalanceServiceTests : IAsyncLifetime
         }
     }
 
+    [Fact]
     public void Dispose()
     {
         _context.Database.EnsureDeleted();

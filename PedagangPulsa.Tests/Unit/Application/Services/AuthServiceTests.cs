@@ -407,6 +407,7 @@ public class AuthServiceTests : IAsyncLifetime
         result.ErrorMessage.Should().Be("Refresh token has been revoked");
     }
 
+    [Fact]
     public void Dispose()
     {
         _context.Database.EnsureDeleted();
