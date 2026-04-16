@@ -17,7 +17,7 @@ public class ReferralService
         _logger = logger;
     }
 
-    public async Task<(List<ReferralLog> Logs, int TotalFiltered, int TotalRecords)> GetReferralLogsPagedAsync(
+    public virtual async Task<(List<ReferralLog> Logs, int TotalFiltered, int TotalRecords)> GetReferralLogsPagedAsync(
         int page,
         int pageSize,
         string? search = null,
@@ -104,7 +104,7 @@ public class ReferralService
         return (query, orderColumn!, orderDirection ?? "desc");
     }
 
-    public async Task<List<ReferralSummary>> GetTopReferrersAsync(int count = 20)
+    public virtual async Task<List<ReferralSummary>> GetTopReferrersAsync(int count = 20)
     {
         return await _context.Users
             .Include(u => u.ReferralLogsAsReferrer)
@@ -127,7 +127,7 @@ public class ReferralService
             .ToListAsync();
     }
 
-    public async Task<bool> PayPendingBonusAsync(Guid logId, string? performedBy = null)
+    public virtual async Task<bool> PayPendingBonusAsync(Guid logId, string? performedBy = null)
     {
         // Check if using InMemory database (for testing)
         var isInMemory = _context.Database.ProviderName?.Contains("InMemory") ?? false;
@@ -225,7 +225,7 @@ public class ReferralService
         return true;
     }
 
-    public async Task<bool> CancelReferralBonusAsync(Guid logId, string? reason = null, string? performedBy = null)
+    public virtual async Task<bool> CancelReferralBonusAsync(Guid logId, string? reason = null, string? performedBy = null)
     {
         // Check if using InMemory database (for testing)
         var isInMemory = _context.Database.ProviderName?.Contains("InMemory") ?? false;
