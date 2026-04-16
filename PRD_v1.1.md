@@ -576,7 +576,7 @@ Content-Type: application/json
 **Request:**
 ```json
 POST /api/v1/transactions
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Authorization: Bearer <REDACTED_JWT_TOKEN>
 X-Reference-Id: app-uuid-user-1710234567-a1b2c3
 Content-Type: application/json
 
@@ -641,7 +641,7 @@ Content-Type: application/json
 **Request:**
 ```
 GET /api/v1/balance
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Authorization: Bearer <REDACTED_JWT_TOKEN>
 ```
 
 **Response Success (200):**
@@ -664,7 +664,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 **Request:**
 ```json
 POST /api/v1/transfer
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Authorization: Bearer <REDACTED_JWT_TOKEN>
 X-Reference-Id: transfer-uuid-user-1710234567-d4e5f6
 Content-Type: application/json
 

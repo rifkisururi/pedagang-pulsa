@@ -22,7 +22,7 @@ public class AuthService
     public AuthService(
         AppDbContext context,
         ILogger<AuthService> logger,
-        string jwtSecret = "YourSuperSecretKeyThatIsAtLeast32CharactersLong!",
+        string jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? "FallbackLocalSecretKeyForJWTTokenGeneration123456789",
         string jwtIssuer = "PedagangPulsa",
         string jwtAudience = "PedagangPulsaMobile")
     {

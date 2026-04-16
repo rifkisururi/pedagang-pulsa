@@ -49,7 +49,7 @@ public class AuthControllerTests : IAsyncDisposable
 
     private void SetupConfiguration()
     {
-        _configurationMock.Setup(c => c["Jwt:Key"]).Returns("ThisIsASecretKeyForJWTTokenGeneration123456789");
+        _configurationMock.Setup(c => c["Jwt:Key"]).Returns("FallbackLocalSecretKeyForJWTTokenGeneration123456789");
         _configurationMock.Setup(c => c["Jwt:Issuer"]).Returns("PedagangPulsa");
         _configurationMock.Setup(c => c["Jwt:Audience"]).Returns("PedagangPulsaMobile");
     }
