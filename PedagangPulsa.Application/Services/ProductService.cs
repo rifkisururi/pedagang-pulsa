@@ -3,16 +3,25 @@ using Microsoft.EntityFrameworkCore;
 using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Domain.Entities;
 using PedagangPulsa.Infrastructure.Data;
+using Microsoft.Extensions.Caching.Memory;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace PedagangPulsa.Application.Services;
 
 public class ProductService
 {
     private readonly AppDbContext _context;
+    private readonly IMemoryCache? _cache;
+    private const string CategoriesCacheKey = "ProductCategories";
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(30);
 
-    public ProductService(AppDbContext context)
+    public ProductService(AppDbContext context, IMemoryCache? cache = null)
     {
         _context = context;
+        _cache = cache;
     }
 
     public async Task<(List<Product> Products, int TotalFiltered, int TotalRecords)> GetProductsPagedAsync(
@@ -124,12 +133,25 @@ public class ProductService
             .FirstOrDefaultAsync(p => p.Id == id);
     }
 
+    // Performance optimization: Using IMemoryCache to avoid repeated database calls
     public async Task<List<ProductCategory>> GetCategoriesAsync()
     {
-        return await _context.ProductCategories
+        if (_cache != null && _cache.TryGetValue(CategoriesCacheKey, out List<ProductCategory>? cachedCategories) && cachedCategories != null)
+        {
+            return cachedCategories;
+        }
+
+        var categories = await _context.ProductCategories
             .Where(c => c.IsActive)
             .OrderBy(c => c.SortOrder)
             .ToListAsync();
+
+        if (_cache != null)
+        {
+            _cache.Set(CategoriesCacheKey, categories, CacheDuration);
+        }
+
+        return categories;
     }
 
     public async Task<List<UserLevel>> GetLevelsAsync()
@@ -139,22 +161,22 @@ public class ProductService
             .ToListAsync();
     }
 
-     public async Task<Product?> CreateProductAsync(Product product, List<ProductLevelPrice>? levelPrices)
-     {
-         _context.Products.Add(product);
+    public async Task<Product?> CreateProductAsync(Product product, List<ProductLevelPrice>? levelPrices)
+    {
+        _context.Products.Add(product);
 
-         if (levelPrices != null && levelPrices.Any())
-         {
-             foreach (var price in levelPrices)
-             {
-                 price.Product = product;
-             }
-             _context.ProductLevelPrices.AddRange(levelPrices);
-         }
+        if (levelPrices != null && levelPrices.Any())
+        {
+            foreach (var price in levelPrices)
+            {
+                price.Product = product;
+            }
+            _context.ProductLevelPrices.AddRange(levelPrices);
+        }
 
-         await _context.SaveChangesAsync();
-         return product;
-     }
+        await _context.SaveChangesAsync();
+        return product;
+    }
 
     public async Task<Product?> UpdateProductAsync(Product product, List<ProductLevelPrice>? levelPrices)
     {
