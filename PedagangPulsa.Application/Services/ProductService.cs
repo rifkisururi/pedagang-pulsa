@@ -139,22 +139,22 @@ public class ProductService
             .ToListAsync();
     }
 
-     public async Task<Product?> CreateProductAsync(Product product, List<ProductLevelPrice>? levelPrices)
-     {
-         _context.Products.Add(product);
+    public async Task<Product?> CreateProductAsync(Product product, List<ProductLevelPrice>? levelPrices)
+    {
+        _context.Products.Add(product);
 
-         if (levelPrices != null && levelPrices.Any())
-         {
-             foreach (var price in levelPrices)
-             {
-                 price.Product = product;
-             }
-             _context.ProductLevelPrices.AddRange(levelPrices);
-         }
+        if (levelPrices != null && levelPrices.Any())
+        {
+            foreach (var price in levelPrices)
+            {
+                price.Product = product;
+            }
+            _context.ProductLevelPrices.AddRange(levelPrices);
+        }
 
-         await _context.SaveChangesAsync();
-         return product;
-     }
+        await _context.SaveChangesAsync();
+        return product;
+    }
 
     public async Task<Product?> UpdateProductAsync(Product product, List<ProductLevelPrice>? levelPrices)
     {
