@@ -18,7 +18,7 @@ public class ExportService
         _logger = logger;
     }
 
-    public async Task<byte[]> ExportTransactionsAsync(
+    public virtual async Task<byte[]> ExportTransactionsAsync(
         DateTime? startDate = null,
         DateTime? endDate = null,
         string? status = null,
@@ -139,7 +139,7 @@ public class ExportService
         return stream.ToArray();
     }
 
-    public async Task<byte[]> ExportTopupRequestsAsync(
+    public virtual async Task<byte[]> ExportTopupRequestsAsync(
         DateTime? startDate = null,
         DateTime? endDate = null,
         string? status = null)
@@ -250,7 +250,7 @@ public class ExportService
         return stream.ToArray();
     }
 
-    public async Task<byte[]> ExportBalanceLedgerAsync(
+    public virtual async Task<byte[]> ExportBalanceLedgerAsync(
         DateTime? startDate = null,
         DateTime? endDate = null,
         string? type = null,
@@ -365,7 +365,7 @@ public class ExportService
         return stream.ToArray();
     }
 
-    public async Task<byte[]> ExportProfitReportAsync(
+    public virtual async Task<byte[]> ExportProfitReportAsync(
         DateTime startDate,
         DateTime endDate)
     {
