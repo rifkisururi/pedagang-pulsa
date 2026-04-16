@@ -2,7 +2,7 @@
 
 **Date:** 2025-03-17
 **Database:** PostgreSQL (Neon)
-**Connection:** postgresql://neondb_owner@ep-noisy-rain-a1pqpydc-pooler.ap-southeast-1.aws.neon.tech/neondb
+**Connection:** postgresql://neondb_owner@********.aws.neon.tech/neondb
 
 ---
 

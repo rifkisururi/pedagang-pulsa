@@ -2,6 +2,6 @@
       "type": "http",
       "url": "https://mcp.neon.tech/mcp",
       "headers": {
-        "Authorization": "Bearer napi_97qug255knba5jl33uw9ujomz93tw1qiwz7fuf6shkdxq2h3h9yphr8sbjyc3s0g"
+        "Authorization": "Bearer ********"
       }
     }}}

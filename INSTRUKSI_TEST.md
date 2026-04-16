@@ -68,7 +68,7 @@ psql -h ep-noisy-rain-a1pqpydc-pooler.ap-southeast-1.aws.neon.tech \
 1. Connect ke database:
    - **Host:** `ep-noisy-rain-a1pqpydc-pooler.ap-southeast-1.aws.neon.tech`
    - **Username:** `neondb_owner`
-   - **Password:** `npg_a1pMW8UqCKVI`
+   - **Password:** `********`
    - **Database:** `neondb`
    - **SSL Mode:** Require
 

@@ -129,7 +129,7 @@ Diperbaiki melalui perbaikan TestDbContext (point 4 di atas).
 
 #### Option A: Menggunakan psql command line
 ```bash
-psql -h ep-noisy-rain-a1pqpydc-pooler.ap-southeast-1.aws.neon.tech \
+psql -h ********.aws.neon.tech \
       -U neondb_owner \
       -d neondb \
       -f D:\Code\saas\PedagangPulsa\CleanupDatabase.sql
