@@ -5,6 +5,7 @@
     <ProjectReference Include="..\PedagangPulsa.Application\PedagangPulsa.Application.csproj" />
     <ProjectReference Include="..\PedagangPulsa.Infrastructure\PedagangPulsa.Infrastructure.csproj" />
     <ProjectReference Include="..\PedagangPulsa.Api\PedagangPulsa.Api.csproj" />
+    <ProjectReference Include="..\PedagangPulsa.Web\PedagangPulsa.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>
