@@ -1,4 +1,12 @@
+using Microsoft.Extensions.Logging;
 using Npgsql;
+
+using var loggerFactory = LoggerFactory.Create(builder =>
+{
+    builder.AddConsole();
+});
+
+var logger = loggerFactory.CreateLogger<Program>();
 
 var connectionString = "Host=ep-cold-field-a111o43u-pooler.ap-southeast-1.aws.neon.tech;Username=neondb_owner;Password=npg_hWbvwU2O5Bur;Database=neondb;SSL Mode=Require;Trust Server Certificate=true";
 
@@ -24,12 +32,12 @@ foreach (var command in dropCommands)
     try
     {
         await cmd.ExecuteNonQueryAsync();
-        Console.WriteLine($"Executed: {command}");
+        logger.LogInformation("Executed: {Command}", command);
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Error: {ex.Message}");
+        logger.LogError(ex, "Error executing {Command}", command);
     }
 }
 
-Console.WriteLine("Done!");
+logger.LogInformation("Done!");
