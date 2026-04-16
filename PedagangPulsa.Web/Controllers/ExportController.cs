@@ -17,6 +17,7 @@ public class ExportController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ExportTransactions(
         DateTime? startDate = null,
         DateTime? endDate = null,
@@ -42,6 +43,7 @@ public class ExportController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ExportTopupRequests(
         DateTime? startDate = null,
         DateTime? endDate = null,
@@ -66,6 +68,7 @@ public class ExportController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ExportBalanceLedger(
         DateTime? startDate = null,
         DateTime? endDate = null,
@@ -91,6 +94,7 @@ public class ExportController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ExportProfitReport(
         DateTime startDate,
         DateTime endDate)
