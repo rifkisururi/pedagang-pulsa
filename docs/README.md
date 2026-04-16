@@ -92,8 +92,8 @@ Step 1: POST /auth/login
 
 Response:
 {
-  "access_token": "eyJhbGc...",
-  "refresh_token": "eyJhbGc...",
+  "access_token": "<REDACTED_JWT_TOKEN>",
+  "refresh_token": "<REDACTED_JWT_TOKEN>",
   "expires_in": 900
 }
 

@@ -146,8 +146,8 @@
       "success": true,
       "message": "Login berhasil",
       "data": {
-        "access_token": "eyJhbGc...",
-        "refresh_token": "eyJhbGc...",
+        "access_token": "<REDACTED_JWT_TOKEN>",
+        "refresh_token": "<REDACTED_JWT_TOKEN>",
         "expires_in": 900,
         "user": {
           "user_id": "uuid",
@@ -165,7 +165,7 @@
   - [ ] Request body:
     ```json
     {
-      "refresh_token": "eyJhbGc..."
+      "refresh_token": "<REDACTED_JWT_TOKEN>"
     }
     ```
   - [ ] Validate refresh token

@@ -26,7 +26,7 @@ public class TestDbContext : AppDbContext
     private static DbContextOptions<AppDbContext> CreateOptions()
     {
         // Use the dev database connection string
-        var connectionString = "Host=ep-noisy-rain-a1pqpydc-pooler.ap-southeast-1.aws.neon.tech;Username=neondb_owner;Password=npg_a1pMW8UqCKVI;Database=neondb;SSL Mode=Require;Trust Server Certificate=true";
+        var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL") ?? "Host=localhost;Database=pedagangpulsa;Username=postgres;Password=postgres";
 
         return new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(connectionString)

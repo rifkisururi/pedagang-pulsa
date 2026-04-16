@@ -285,7 +285,7 @@ public class SupplierProductController : Controller
 
         // Check if it's an update or new
         var existing = await _supplierProductService.GetSupplierProductAsync(model.ProductId, model.SupplierId);
-        
+
         SupplierProduct? result;
         if (existing != null)
         {

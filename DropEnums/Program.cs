@@ -1,6 +1,7 @@
+using System;
 using Npgsql;
 
-var connectionString = "Host=ep-cold-field-a111o43u-pooler.ap-southeast-1.aws.neon.tech;Username=neondb_owner;Password=npg_hWbvwU2O5Bur;Database=neondb;SSL Mode=Require;Trust Server Certificate=true";
+var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL") ?? "Host=localhost;Database=pedagangpulsa;Username=postgres;Password=postgres";
 
 var dropCommands = new[]
 {

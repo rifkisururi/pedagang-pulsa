@@ -263,8 +263,8 @@ Content-Type: application/json
   "success": true,
   "message": "Login berhasil",
   "data": {
-    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "access_token": "<REDACTED_JWT_TOKEN>",
+    "refresh_token": "<REDACTED_JWT_TOKEN>",
     "expires_in": 900,
     "token_type": "Bearer",
     "user": {
@@ -317,7 +317,7 @@ POST /api/v1/auth/refresh
 Content-Type: application/json
 
 {
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  "refresh_token": "<REDACTED_JWT_TOKEN>"
 }
 ```
 
@@ -328,8 +328,8 @@ Content-Type: application/json
   "success": true,
   "message": "Token berhasil diperbarui",
   "data": {
-    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "access_token": "<REDACTED_JWT_TOKEN>",
+    "refresh_token": "<REDACTED_JWT_TOKEN>",
     "expires_in": 900,
     "token_type": "Bearer"
   }
