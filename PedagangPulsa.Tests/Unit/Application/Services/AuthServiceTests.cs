@@ -270,7 +270,7 @@ public class AuthServiceTests : IAsyncLifetime
         result.PinSessionToken.Should().NotBeNullOrEmpty();
 
         // Refresh user from database
-        _context.Entry(user).ReloadAsync().Wait();
+        await _context.Entry(user).ReloadAsync();
         user.PinFailedAttempts.Should().Be(0);
         user.PinLockedAt.Should().BeNull();
     }
@@ -288,7 +288,7 @@ public class AuthServiceTests : IAsyncLifetime
         result.Success.Should().BeFalse();
         result.ErrorMessage.Should().Be("Invalid PIN. 2 attempts remaining");
 
-        _context.Entry(user).ReloadAsync().Wait();
+        await _context.Entry(user).ReloadAsync();
         user.PinFailedAttempts.Should().Be(1);
     }
 
@@ -307,7 +307,7 @@ public class AuthServiceTests : IAsyncLifetime
         result.Success.Should().BeFalse();
         result.ErrorMessage.Should().Be("Invalid PIN. 1 attempts remaining");
 
-        _context.Entry(user).ReloadAsync().Wait();
+        await _context.Entry(user).ReloadAsync();
         user.PinFailedAttempts.Should().Be(2);
     }
 
@@ -326,7 +326,7 @@ public class AuthServiceTests : IAsyncLifetime
         result.Success.Should().BeFalse();
         result.ErrorMessage.Should().Be("Account locked for 15 minutes due to too many failed attempts");
 
-        _context.Entry(user).ReloadAsync().Wait();
+        await _context.Entry(user).ReloadAsync();
         user.PinFailedAttempts.Should().Be(3);
         user.PinLockedAt.Should().NotBeNull();
         user.PinLockedAt.Should().BeCloseTo(DateTime.UtcNow, precision: TimeSpan.FromSeconds(5));
