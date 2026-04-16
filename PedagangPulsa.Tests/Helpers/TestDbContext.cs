@@ -71,7 +71,7 @@ public class TestDbContext : AppDbContext
         {
             try
             {
-                await Database.ExecuteSqlRawAsync($"TRUNCATE TABLE {table} CASCADE");
+                await Database.ExecuteSqlAsync($"TRUNCATE TABLE {table} CASCADE");
             }
             catch
             {
@@ -101,7 +101,7 @@ public class TestDbContext : AppDbContext
         {
             try
             {
-                await Database.ExecuteSqlRawAsync($"ALTER SEQUENCE {sequence} RESTART WITH 1");
+                await Database.ExecuteSqlAsync($"ALTER SEQUENCE {sequence} RESTART WITH 1");
             }
             catch
             {

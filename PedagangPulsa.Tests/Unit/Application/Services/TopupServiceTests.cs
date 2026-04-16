@@ -414,6 +414,7 @@ public class TopupServiceTests : IAsyncLifetime
         topup.Amount.Should().Be(invalidAmount);
     }
 
+    [Fact]
     public void Dispose()
     {
         _context.Database.EnsureDeleted();

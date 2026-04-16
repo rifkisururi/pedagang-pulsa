@@ -4,4 +4,5 @@
   <Project Path="PedagangPulsa.Application/PedagangPulsa.Application.csproj" />
   <Project Path="PedagangPulsa.Domain/PedagangPulsa.Domain.csproj" />
   <Project Path="PedagangPulsa.Infrastructure/PedagangPulsa.Infrastructure.csproj" />
+  <Project Path="PedagangPulsa.Tests/PedagangPulsa.Tests.csproj" />
 </Solution>

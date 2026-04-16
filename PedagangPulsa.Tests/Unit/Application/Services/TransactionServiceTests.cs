@@ -441,6 +441,7 @@ public class TransactionServiceTests : IAsyncLifetime
         user.Balance.HeldBalance.Should().Be(initialHeld - holdAmount);
     }
 
+    [Fact]
     public void Dispose()
     {
         _context.Database.EnsureDeleted();
