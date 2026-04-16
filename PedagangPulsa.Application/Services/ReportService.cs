@@ -17,7 +17,7 @@ public class ReportService
         _logger = logger;
     }
 
-    public async Task<DailyProfitReport> GetDailyProfitReportAsync(DateTime date)
+    public virtual async Task<DailyProfitReport> GetDailyProfitReportAsync(DateTime date)
     {
         var startOfDay = date.Date;
         var endOfDay = date.Date.AddDays(1).AddTicks(-1);
@@ -73,7 +73,7 @@ public class ReportService
         };
     }
 
-    public async Task<List<DailyProfitSummary>> GetDailyProfitSummaryAsync(DateTime startDate, DateTime endDate)
+    public virtual async Task<List<DailyProfitSummary>> GetDailyProfitSummaryAsync(DateTime startDate, DateTime endDate)
     {
         var summaries = new List<DailyProfitSummary>();
 
@@ -104,7 +104,7 @@ public class ReportService
         return summaries;
     }
 
-    public async Task<ProfitBySupplierReport> GetProfitBySupplierAsync(DateTime? startDate = null, DateTime? endDate = null)
+    public virtual async Task<ProfitBySupplierReport> GetProfitBySupplierAsync(DateTime? startDate = null, DateTime? endDate = null)
     {
         var query = _context.TransactionAttempts
             .Include(a => a.Supplier)
@@ -153,7 +153,7 @@ public class ReportService
         };
     }
 
-    public async Task<ProfitByProductReport> GetProfitByProductAsync(DateTime? startDate = null, DateTime? endDate = null)
+    public virtual async Task<ProfitByProductReport> GetProfitByProductAsync(DateTime? startDate = null, DateTime? endDate = null)
     {
         var query = _context.Transactions
             .Include(t => t.Product)
