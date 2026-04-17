@@ -346,7 +346,9 @@ public class TransactionController : ControllerBase
             });
         }
 
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only user transaction list to eliminate change tracking overhead, saving CPU and memory per request.
         var query = _context.Transactions
+            .AsNoTracking()
             .Include(t => t.Product)
             .Where(t => t.UserId == userId);
 
