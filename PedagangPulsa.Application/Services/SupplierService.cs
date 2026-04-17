@@ -1,16 +1,16 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
+using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Domain.Entities;
-using PedagangPulsa.Infrastructure.Data;
 
 namespace PedagangPulsa.Application.Services;
 
 public class SupplierService
 {
-    private readonly AppDbContext _context;
+    private readonly IAppDbContext _context;
 
-    public SupplierService(AppDbContext context)
+    public SupplierService(IAppDbContext context)
     {
         _context = context;
     }
@@ -26,24 +26,10 @@ public class SupplierService
         // Apply search filter
         if (!string.IsNullOrWhiteSpace(search))
         {
-            // Check if using InMemory database (for testing)
-            var isInMemory = _context.Database.ProviderName?.Contains("InMemory") ?? false;
-
-            if (isInMemory)
-            {
-                // Use case-insensitive Contains for InMemory
-                var searchLower = search.ToLower();
-                query = query.Where(s =>
-                    s.Name.ToLower().Contains(searchLower) ||
-                    (s.ApiBaseUrl != null && s.ApiBaseUrl.ToLower().Contains(searchLower)));
-            }
-            else
-            {
-                // Use ILike for PostgreSQL
-                query = query.Where(s =>
-                    EF.Functions.ILike(s.Name, $"%{search}%") ||
-                    EF.Functions.ILike(s.ApiBaseUrl ?? "", $"%{search}%"));
-            }
+            var searchLower = search.Trim().ToLower();
+            query = query.Where(s =>
+                s.Name.ToLower().Contains(searchLower) ||
+                (s.ApiBaseUrl != null && s.ApiBaseUrl.ToLower().Contains(searchLower)));
         }
 
         // Apply active filter

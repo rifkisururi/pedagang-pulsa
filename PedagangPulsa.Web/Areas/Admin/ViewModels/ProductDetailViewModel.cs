@@ -17,8 +17,9 @@ public class ProductDetailViewModel
     {
         public int LevelId { get; set; }
         public string LevelName { get; set; } = string.Empty;
-        public decimal SellPrice { get; set; }
         public decimal Margin { get; set; }
+        public decimal CostPrice { get; set; }
+        public decimal ComputedSellPrice { get; set; }
         public decimal MarginPercent { get; set; }
     }
 }

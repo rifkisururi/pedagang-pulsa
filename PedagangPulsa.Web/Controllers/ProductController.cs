@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Application.Services;
 using PedagangPulsa.Domain.Entities;
 using PedagangPulsa.Web.Areas.Admin.ViewModels;
@@ -10,11 +12,13 @@ namespace PedagangPulsa.Web.Controllers;
 public class ProductController : Controller
 {
     private readonly ProductService _productService;
+    private readonly IAppDbContext _context;
     private readonly ILogger<ProductController> _logger;
 
-    public ProductController(ProductService productService, ILogger<ProductController> logger)
+    public ProductController(ProductService productService, IAppDbContext context, ILogger<ProductController> logger)
     {
         _productService = productService;
+        _context = context;
         _logger = logger;
     }
 
@@ -34,6 +38,12 @@ public class ProductController : Controller
 
         var levels = await _productService.GetLevelsAsync();
 
+        var costPrice = await _context.SupplierProducts
+            .Where(sp => sp.ProductId == id && sp.IsActive)
+            .OrderBy(sp => sp.Seq)
+            .Select(sp => sp.CostPrice)
+            .FirstOrDefaultAsync();
+
         var model = new ProductDetailViewModel
         {
             Id = product.Id,
@@ -49,13 +59,13 @@ public class ProductController : Controller
             {
                 LevelId = lp.LevelId,
                 LevelName = lp.Level?.Name ?? "Unknown",
-                SellPrice = lp.SellPrice,
-                Margin = 0,
-                MarginPercent = 0
+                Margin = lp.Margin,
+                CostPrice = costPrice,
+                ComputedSellPrice = costPrice > 0 ? costPrice + lp.Margin : 0,
+                MarginPercent = costPrice > 0 ? lp.Margin / costPrice * 100 : 0
             }).ToList()
         };
 
-        // Fill in missing levels
         foreach (var level in levels)
         {
             if (!model.LevelPrices.Any(lp => lp.LevelId == level.Id))
@@ -64,9 +74,10 @@ public class ProductController : Controller
                 {
                     LevelId = level.Id,
                     LevelName = level.Name,
-                    SellPrice = 0,
-                    Margin = 0,
-                    MarginPercent = 0
+                    Margin = 200,
+                    CostPrice = costPrice,
+                    ComputedSellPrice = costPrice > 0 ? costPrice + 200 : 0,
+                    MarginPercent = costPrice > 0 ? 200 / costPrice * 100 : 0
                 });
             }
         }
@@ -143,7 +154,7 @@ public class ProductController : Controller
                 levelPrices.Add(new ProductLevelPrice
                 {
                     LevelId = lp.LevelId,
-                    SellPrice = lp.SellPrice,
+                    Margin = lp.Margin,
                     UpdatedAt = DateTime.UtcNow
                 });
             }
@@ -196,7 +207,7 @@ public class ProductController : Controller
             LevelPrices = levels.Select(l => new ProductViewModel.LevelPriceItem
             {
                 LevelId = l.Id,
-                SellPrice = product.ProductLevelPrices.FirstOrDefault(lp => lp.LevelId == l.Id)?.SellPrice ?? 0
+                Margin = product.ProductLevelPrices.FirstOrDefault(lp => lp.LevelId == l.Id)?.Margin ?? 200
             }).ToList()
         };
 
@@ -246,7 +257,7 @@ public class ProductController : Controller
                 levelPrices.Add(new ProductLevelPrice
                 {
                     LevelId = lp.LevelId,
-                    SellPrice = lp.SellPrice
+                    Margin = lp.Margin
                 });
             }
         }
@@ -387,7 +398,7 @@ public class ProductController : Controller
         var result = await _productService.UpdateProductPriceAsync(
             model.ProductId,
             model.LevelId,
-            model.SellPrice,
+            model.Margin,
             User.Identity?.Name);
 
         if (result)

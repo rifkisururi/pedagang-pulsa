@@ -212,7 +212,7 @@ public class AuthServiceTests : IAsyncLifetime
     public async Task LoginAsync_WithSuspendedAccount_ReturnsError()
     {
         // Arrange
-        var user = _context.Users.First(u => u.Username == "user1");
+        var user = _context.Users.First(u => u.UserName == "user1");
         user.Status = UserStatus.Suspended;
         await _context.SaveChangesAsync();
 
@@ -232,7 +232,7 @@ public class AuthServiceTests : IAsyncLifetime
     public async Task LoginAsync_WithInactiveAccount_ReturnsError()
     {
         // Arrange
-        var user = _context.Users.First(u => u.Username == "user1");
+        var user = _context.Users.First(u => u.UserName == "user1");
         user.Status = UserStatus.Inactive;
         await _context.SaveChangesAsync();
 
@@ -255,19 +255,20 @@ public class AuthServiceTests : IAsyncLifetime
     public async Task VerifyPinAsync_WithCorrectPin_ResetsFailedAttempts(int failedAttempts)
     {
         // Arrange
-        var user = _context.Users.First(u => u.Username == "user1");
+        var user = _context.Users.First(u => u.UserName == "user1");
         user.PinFailedAttempts = (short)failedAttempts;
         // Don't set PinLockedAt - we want to test that correct PIN resets failed attempts
         // even when there are failed attempts (but not locked yet)
         await _context.SaveChangesAsync();
 
         // Act
-        var result = await _authService.VerifyPinAsync(user.Id, "123456");
+        var (success, pinSessionToken, errorMessage, shouldSetLockout) = await _authService.VerifyPinAsync(user.Id, "123456");
 
         // Assert
-        result.Success.Should().BeTrue();
-        result.ErrorMessage.Should().BeEmpty();
-        result.PinSessionToken.Should().NotBeNullOrEmpty();
+        success.Should().BeTrue();
+        errorMessage.Should().BeEmpty();
+        pinSessionToken.Should().NotBeNullOrEmpty();
+        shouldSetLockout.Should().BeTrue();
 
         // Refresh user from database
         _context.Entry(user).ReloadAsync().Wait();
@@ -279,14 +280,16 @@ public class AuthServiceTests : IAsyncLifetime
     public async Task VerifyPinAsync_WithWrongPin_FirstAttempt_ReturnsTwoAttemptsLeft()
     {
         // Arrange
-        var user = _context.Users.First(u => u.Username == "user1");
+        var user = _context.Users.First(u => u.UserName == "user1");
 
         // Act
-        var result = await _authService.VerifyPinAsync(user.Id, "wrongpin");
+        var (success, pinSessionToken, errorMessage, shouldSetLockout) = await _authService.VerifyPinAsync(user.Id, "wrongpin");
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.ErrorMessage.Should().Be("Invalid PIN. 2 attempts remaining");
+        success.Should().BeFalse();
+        errorMessage.Should().Be("Invalid PIN. 2 attempts remaining");
+        pinSessionToken.Should().BeEmpty();
+        shouldSetLockout.Should().BeFalse();
 
         _context.Entry(user).ReloadAsync().Wait();
         user.PinFailedAttempts.Should().Be(1);
@@ -296,16 +299,18 @@ public class AuthServiceTests : IAsyncLifetime
     public async Task VerifyPinAsync_WithWrongPin_SecondAttempt_ReturnsOneAttemptLeft()
     {
         // Arrange
-        var user = _context.Users.First(u => u.Username == "user1");
+        var user = _context.Users.First(u => u.UserName == "user1");
         user.PinFailedAttempts = 1;
         await _context.SaveChangesAsync();
 
         // Act
-        var result = await _authService.VerifyPinAsync(user.Id, "wrongpin");
+        var (success, pinSessionToken, errorMessage, shouldSetLockout) = await _authService.VerifyPinAsync(user.Id, "wrongpin");
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.ErrorMessage.Should().Be("Invalid PIN. 1 attempts remaining");
+        success.Should().BeFalse();
+        errorMessage.Should().Be("Invalid PIN. 1 attempts remaining");
+        pinSessionToken.Should().BeEmpty();
+        shouldSetLockout.Should().BeFalse();
 
         _context.Entry(user).ReloadAsync().Wait();
         user.PinFailedAttempts.Should().Be(2);
@@ -315,16 +320,18 @@ public class AuthServiceTests : IAsyncLifetime
     public async Task VerifyPinAsync_WithWrongPin_ThirdAttempt_LocksAccount()
     {
         // Arrange
-        var user = _context.Users.First(u => u.Username == "user1");
+        var user = _context.Users.First(u => u.UserName == "user1");
         user.PinFailedAttempts = 2;
         await _context.SaveChangesAsync();
 
         // Act
-        var result = await _authService.VerifyPinAsync(user.Id, "wrongpin");
+        var (success, pinSessionToken, errorMessage, shouldSetLockout) = await _authService.VerifyPinAsync(user.Id, "wrongpin");
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.ErrorMessage.Should().Be("Account locked for 15 minutes due to too many failed attempts");
+        success.Should().BeFalse();
+        errorMessage.Should().Be("Account locked for 15 minutes due to too many failed attempts");
+        pinSessionToken.Should().BeEmpty();
+        shouldSetLockout.Should().BeFalse();
 
         _context.Entry(user).ReloadAsync().Wait();
         user.PinFailedAttempts.Should().Be(3);
@@ -336,18 +343,20 @@ public class AuthServiceTests : IAsyncLifetime
     public async Task VerifyPinAsync_WithLockedAccount_ReturnsLockoutMessage()
     {
         // Arrange
-        var user = _context.Users.First(u => u.Username == "user1");
+        var user = _context.Users.First(u => u.UserName == "user1");
         user.PinFailedAttempts = 3;
         user.PinLockedAt = DateTime.UtcNow.AddMinutes(-5); // Locked 5 minutes ago
         await _context.SaveChangesAsync();
 
         // Act
-        var result = await _authService.VerifyPinAsync(user.Id, "123456");
+        var (success, pinSessionToken, errorMessage, shouldSetLockout) = await _authService.VerifyPinAsync(user.Id, "123456");
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.ErrorMessage.Should().Contain("Account is locked");
-        result.ErrorMessage.Should().Contain("minutes");
+        success.Should().BeFalse();
+        errorMessage.Should().Contain("Account is locked");
+        errorMessage.Should().Contain("minutes");
+        pinSessionToken.Should().BeEmpty();
+        shouldSetLockout.Should().BeFalse();
 
         // Cleanup
         user.PinFailedAttempts = 0;
@@ -405,6 +414,39 @@ public class AuthServiceTests : IAsyncLifetime
         result.AccessToken.Should().BeEmpty();
         result.RefreshToken.Should().BeEmpty();
         result.ErrorMessage.Should().Be("Refresh token has been revoked");
+    }
+
+    [Fact]
+    public async Task IsPinLockedOutAsync_WithoutRedis_ReturnsFalse()
+    {
+        // Arrange & Act - AuthService without Redis
+        var authServiceNoRedis = new AuthService(_context, _loggerMock.Object, null);
+
+        // Assert
+        var result = await authServiceNoRedis.IsPinLockedOutAsync(Guid.NewGuid());
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetLockoutRemainingSecondsAsync_WithoutRedis_ReturnsZero()
+    {
+        // Arrange & Act - AuthService without Redis
+        var authServiceNoRedis = new AuthService(_context, _loggerMock.Object, null);
+
+        // Assert
+        var result = await authServiceNoRedis.GetLockoutRemainingSecondsAsync(Guid.NewGuid());
+        result.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task SetPinSessionAsync_WithoutRedis_DoesNotThrow()
+    {
+        // Arrange & Act - AuthService without Redis
+        var authServiceNoRedis = new AuthService(_context, _loggerMock.Object, null);
+
+        // Assert - Should not throw
+        var func = async () => await authServiceNoRedis.SetPinSessionAsync(Guid.NewGuid(), "test-token");
+        await func.Should().NotThrowAsync();
     }
 
     public void Dispose()

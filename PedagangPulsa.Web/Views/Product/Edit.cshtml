@@ -71,13 +71,13 @@
                         </div>
                     </div>
 
-                    <h5 class="mb-3">Price per Level</h5>
+                    <h5 class="mb-3">Margin per Level</h5>
                     <div class="table-responsive mb-4">
                         <table class="table table-sm table-striped" id="levelPricesTable">
                             <thead>
                                 <tr>
                                     <th>Level</th>
-                                    <th>Sell Price</th>
+                                    <th>Margin (Rp)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -94,8 +94,8 @@
                                             <td>
                                                 <div class="input-group input-group-sm">
                                                     <span class="input-group-text">Rp</span>
-                                                    <input type="number" name="LevelPrices[@i].SellPrice" class="form-control form-control-sm"
-                                                           step="0.01" min="0" value="@Model.LevelPrices[i].SellPrice" />
+                                                    <input type="number" name="LevelPrices[@i].Margin" class="form-control form-control-sm"
+                                                           step="0.01" min="0" value="@Model.LevelPrices[i].Margin" />
                                                 </div>
                                             </td>
                                         </tr>
@@ -105,7 +105,7 @@
                         </table>
                         <small class="text-muted">
                             <i class="bi bi-info-circle"></i>
-                            Set sell price for each user level.
+                            Set margin for each user level. Sell Price = Cost Price + Margin.
                         </small>
                     </div>
 

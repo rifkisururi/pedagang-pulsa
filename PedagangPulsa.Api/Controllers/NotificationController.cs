@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PedagangPulsa.Api.DTOs;
+using PedagangPulsa.Application.Services;
 using PedagangPulsa.Infrastructure.Data;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -15,10 +16,12 @@ namespace PedagangPulsa.Api.Controllers;
 public class NotificationController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly FcmService _fcmService;
 
-    public NotificationController(AppDbContext context)
+    public NotificationController(AppDbContext context, FcmService fcmService)
     {
         _context = context;
+        _fcmService = fcmService;
     }
 
     [HttpGet]
@@ -180,6 +183,152 @@ public class NotificationController : ControllerBase
         {
             success = true,
             message = "All notifications marked as read"
+        });
+    }
+
+    [HttpPost("fcm-token")]
+    public async Task<IActionResult> RegisterFcmToken([FromBody] RegisterFcmTokenRequest request)
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token",
+                ErrorCode = "INVALID_TOKEN"
+            });
+        }
+
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new ErrorResponse
+            {
+                Message = "Validation failed",
+                Errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList()
+            });
+        }
+
+        try
+        {
+            await _fcmService.RegisterOrUpdateTokenAsync(
+                userId, request.FcmToken, request.DeviceName, request.Platform, request.AppVersion);
+
+            return Ok(new FcmTokenResponse
+            {
+                Success = true,
+                Message = "FCM token registered successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new ErrorResponse
+            {
+                Message = "Failed to register FCM token",
+                ErrorCode = "FCM_REGISTRATION_FAILED",
+                Errors = new List<string> { ex.Message }
+            });
+        }
+    }
+
+    [HttpDelete("fcm-token")]
+    public async Task<IActionResult> UnregisterFcmToken([FromBody] UnregisterFcmTokenRequest request)
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token",
+                ErrorCode = "INVALID_TOKEN"
+            });
+        }
+
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new ErrorResponse
+            {
+                Message = "Validation failed",
+                Errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList()
+            });
+        }
+
+        var removed = await _fcmService.UnregisterTokenAsync(userId, request.FcmToken);
+
+        if (!removed)
+        {
+            return NotFound(new ErrorResponse
+            {
+                Message = "FCM token not found or already unregistered",
+                ErrorCode = "FCM_TOKEN_NOT_FOUND"
+            });
+        }
+
+        return Ok(new FcmTokenResponse
+        {
+            Success = true,
+            Message = "FCM token unregistered successfully"
+        });
+    }
+
+    [HttpPost("test")]
+    public async Task<IActionResult> TestNotification([FromBody] TestNotificationRequest request)
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token",
+                ErrorCode = "INVALID_TOKEN"
+            });
+        }
+
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
+
+        var title = !string.IsNullOrWhiteSpace(request.Title) ? request.Title : "Test Notification";
+        var body = !string.IsNullOrWhiteSpace(request.Body) ? request.Body : "Ini adalah notifikasi test dari PedagangPulsa.";
+
+        var result = await _fcmService.SendToUserAsync(userId, title, body, request.Data);
+
+        if (!result.Success)
+        {
+            return StatusCode(500, new ErrorResponse
+            {
+                Message = result.Message,
+                ErrorCode = "FCM_SEND_FAILED"
+            });
+        }
+
+        return Ok(new
+        {
+            success = true,
+            message = result.Message,
+            fcmMessageId = result.FcmMessageId
         });
     }
 

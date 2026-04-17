@@ -19,6 +19,15 @@
         <a asp-action="Index" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Back to List
         </a>
+        @if (Model.Status == "Pending")
+        {
+            <button type="button" class="btn btn-success ms-2" onclick="openApproveModal()">
+                <i class="bi bi-check-circle"></i> Approve
+            </button>
+            <button type="button" class="btn btn-danger ms-2" onclick="openRejectModal()">
+                <i class="bi bi-x-circle"></i> Reject
+            </button>
+        }
     </div>
 </div>
 
@@ -158,7 +167,98 @@
     </div>
 </div>
 
+<!-- Approve Modal -->
+<div class="modal fade" id="approveModal" tabindex="-1" aria-labelledby="approveModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" id="approveModalContent">
+        </div>
+    </div>
+</div>
+
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" id="rejectModalContent">
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
+        const topupId = '@Model.Id';
+
+        function openApproveModal() {
+            $.get('/Topup/Approve/' + topupId, function(data) {
+                $('#approveModalContent').html(data);
+                $('#approveModal').modal('show');
+            });
+        }
+
+        function openRejectModal() {
+            $.get('/Topup/Reject/' + topupId, function(data) {
+                $('#rejectModalContent').html(data);
+                $('#rejectModal').modal('show');
+            });
+        }
+
+        // Override submitApproveForm to redirect to Details page
+        function submitApproveForm() {
+            const form = $('#approveForm');
+            $.ajax({
+                url: form.attr('action'),
+                type: 'POST',
+                data: form.serialize(),
+                success: function(response) {
+                    if (response.success) {
+                        $('#approveModal').modal('hide');
+                        toastr.success(response.message);
+                        setTimeout(function() { window.location.reload(); }, 1000);
+                    } else {
+                        toastr.error(response.message);
+                    }
+                },
+                error: function() {
+                    toastr.error('An error occurred while processing your request.');
+                }
+            });
+        }
+
+        // Override submitRejectForm to redirect to Details page
+        function submitRejectForm() {
+            const form = $('#rejectForm');
+            const rejectReason = $('#RejectReason').val().trim();
+
+            if (!rejectReason) {
+                toastr.error('Reject reason is required');
+                $('#RejectReason').addClass('is-invalid');
+                return;
+            }
+
+            $.ajax({
+                url: form.attr('action'),
+                type: 'POST',
+                data: form.serialize(),
+                success: function(response) {
+                    if (response.success) {
+                        $('#rejectModal').modal('hide');
+                        toastr.success(response.message);
+                        setTimeout(function() { window.location.reload(); }, 1000);
+                    } else {
+                        toastr.error(response.message);
+                    }
+                },
+                error: function() {
+                    toastr.error('An error occurred while processing your request.');
+                }
+            });
+        }
+
+        // Clean up modal content when hidden
+        $('#approveModal').on('hidden.bs.modal', function() {
+            $('#approveModalContent').html('');
+        });
+        $('#rejectModal').on('hidden.bs.modal', function() {
+            $('#rejectModalContent').html('');
+        });
     </script>
 }

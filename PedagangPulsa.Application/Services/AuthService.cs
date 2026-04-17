@@ -1,41 +1,46 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using PedagangPulsa.Application.Abstractions.Caching;
+using PedagangPulsa.Application.Abstractions.Persistence;
+using PedagangPulsa.Domain.Entities;
+using PedagangPulsa.Domain.Enums;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using PedagangPulsa.Domain.Entities;
-using PedagangPulsa.Domain.Enums;
-using PedagangPulsa.Infrastructure.Data;
 
 namespace PedagangPulsa.Application.Services;
 
 public class AuthService
 {
-    private readonly AppDbContext _context;
+    private const string DefaultJwtSecret = "YourSuperSecretKeyThatIsAtLeast32CharactersLong!";
+    private const string DefaultJwtIssuer = "PedagangPulsa";
+    private const string DefaultJwtAudience = "PedagangPulsaMobile";
+
+    private readonly IAppDbContext _context;
     private readonly ILogger<AuthService> _logger;
+    private readonly IRedisService? _redisService;
     private readonly string _jwtSecret;
     private readonly string _jwtIssuer;
     private readonly string _jwtAudience;
 
     public AuthService(
-        AppDbContext context,
+        IAppDbContext context,
         ILogger<AuthService> logger,
-        string jwtSecret = "YourSuperSecretKeyThatIsAtLeast32CharactersLong!",
-        string jwtIssuer = "PedagangPulsa",
-        string jwtAudience = "PedagangPulsaMobile")
+        IRedisService? redisService = null,
+        string? jwtSecret = null,
+        string? jwtIssuer = null,
+        string? jwtAudience = null)
     {
         _context = context;
         _logger = logger;
-        _jwtSecret = jwtSecret;
-        _jwtIssuer = jwtIssuer;
-        _jwtAudience = jwtAudience;
+        _redisService = redisService;
+        _jwtSecret = jwtSecret ?? DefaultJwtSecret;
+        _jwtIssuer = jwtIssuer ?? DefaultJwtIssuer;
+        _jwtAudience = jwtAudience ?? DefaultJwtAudience;
     }
 
-    /// <summary>
-    /// Register a new user
-    /// </summary>
     public async Task<(User? User, string ErrorMessage)> RegisterAsync(
         string username,
         string? fullName,
@@ -44,7 +49,18 @@ public class AuthService
         string pin,
         string? referralCode = null)
     {
-        // Check if username already exists
+        return await RegisterAsync(username, fullName, email, phone, null, pin, referralCode);
+    }
+
+    public async Task<(User? User, string ErrorMessage)> RegisterAsync(
+        string username,
+        string? fullName,
+        string? email,
+        string? phone,
+        string? password,
+        string pin,
+        string? referralCode = null)
+    {
         var existingUser = await _context.Users
             .FirstOrDefaultAsync(u => u.UserName == username);
 
@@ -53,7 +69,6 @@ public class AuthService
             return (null, "Username already exists");
         }
 
-        // Check if email already exists
         if (!string.IsNullOrWhiteSpace(email))
         {
             var existingEmail = await _context.Users
@@ -65,7 +80,6 @@ public class AuthService
             }
         }
 
-        // Check if phone already exists
         if (!string.IsNullOrWhiteSpace(phone))
         {
             var existingPhone = await _context.Users
@@ -77,7 +91,6 @@ public class AuthService
             }
         }
 
-        // Validate referral code and get referrer with level
         User? referrer = null;
         Guid? referredBy = null;
         if (!string.IsNullOrWhiteSpace(referralCode))
@@ -94,22 +107,23 @@ public class AuthService
             referredBy = referrer.Id;
         }
 
-        // Get default level
         var defaultLevel = await _context.UserLevels
-            .FirstOrDefaultAsync(l => l.Name == "Member1");
+            .FirstOrDefaultAsync(l => l.Name == "Bronze");
 
         if (defaultLevel == null)
         {
             return (null, "Default user level not configured");
         }
 
-        // Create user
         var user = new User
         {
             UserName = username,
             FullName = fullName,
             Email = email,
             Phone = phone,
+            PasswordHash = string.IsNullOrWhiteSpace(password)
+                ? null
+                : BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12),
             PinHash = BCrypt.Net.BCrypt.HashPassword(pin, workFactor: 12),
             PinFailedAttempts = 0,
             PinLockedAt = null,
@@ -124,9 +138,6 @@ public class AuthService
             UpdatedAt = DateTime.UtcNow
         };
 
-        _context.Users.Add(user);
-
-        // Create user balance
         var balance = new UserBalance
         {
             UserId = user.Id,
@@ -135,21 +146,22 @@ public class AuthService
             UpdatedAt = DateTime.UtcNow
         };
 
+        user.Level = defaultLevel;
+        user.Balance = balance;
+
+        _context.Users.Add(user);
         _context.UserBalances.Add(balance);
 
-        // Create referral log if applicable
         if (referredBy.HasValue && referrer != null)
         {
-            var referralLog = new ReferralLog
+            _context.ReferralLogs.Add(new ReferralLog
             {
                 ReferrerId = referredBy.Value,
                 RefereeId = user.Id,
-                BonusAmount = null, // Will be set when referral bonus is configured
+                BonusAmount = null,
                 BonusStatus = ReferralBonusStatus.Pending,
                 CreatedAt = DateTime.UtcNow
-            };
-
-            _context.ReferralLogs.Add(referralLog);
+            });
         }
 
         await _context.SaveChangesAsync();
@@ -159,9 +171,6 @@ public class AuthService
         return (user, string.Empty);
     }
 
-    /// <summary>
-    /// Login user and generate JWT token
-    /// </summary>
     public async Task<(User? User, string AccessToken, string RefreshToken, string ErrorMessage)> LoginAsync(
         string username,
         string pin)
@@ -176,33 +185,27 @@ public class AuthService
             return (null, string.Empty, string.Empty, "Invalid username or PIN");
         }
 
-        // Check if user is suspended
         if (user.Status == UserStatus.Suspended)
         {
             return (null, string.Empty, string.Empty, "Account is suspended");
         }
 
-        // Check if user is inactive
         if (user.Status == UserStatus.Inactive)
         {
             return (null, string.Empty, string.Empty, "Account is inactive");
         }
 
-        // Check if PIN is locked
         if (user.PinLockedAt.HasValue && user.PinLockedAt.Value > DateTime.UtcNow.AddMinutes(-15))
         {
             var lockoutRemaining = (user.PinLockedAt.Value - DateTime.UtcNow.AddMinutes(-15)).TotalMinutes;
             return (null, string.Empty, string.Empty, $"Account is locked. Try again in {Math.Ceiling(lockoutRemaining)} minutes");
         }
 
-        // Verify PIN
         if (!BCrypt.Net.BCrypt.Verify(pin, user.PinHash))
         {
-            // Increment failed attempts
             user.PinFailedAttempts++;
             user.UpdatedAt = DateTime.UtcNow;
 
-            // Check if should lock
             if (user.PinFailedAttempts >= 3)
             {
                 user.PinLockedAt = DateTime.UtcNow;
@@ -217,7 +220,6 @@ public class AuthService
                 : "Account locked for 15 minutes due to too many failed attempts");
         }
 
-        // Reset failed attempts on successful login
         if (user.PinFailedAttempts > 0 || user.PinLockedAt.HasValue)
         {
             user.PinFailedAttempts = 0;
@@ -226,21 +228,18 @@ public class AuthService
             await _context.SaveChangesAsync();
         }
 
-        // Generate tokens
         var accessToken = GenerateAccessToken(user);
         var refreshToken = GenerateRefreshToken();
 
-        // Save refresh token
-        var refreshTokenEntity = new RefreshToken
+        _context.RefreshTokens.Add(new RefreshToken
         {
             UserId = user.Id,
             Token = refreshToken,
             ExpiresAt = DateTime.UtcNow.AddDays(7),
             IsRevoked = false,
             CreatedAt = DateTime.UtcNow
-        };
+        });
 
-        _context.RefreshTokens.Add(refreshTokenEntity);
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("User {Username} logged in successfully", username);
@@ -248,10 +247,56 @@ public class AuthService
         return (user, accessToken, refreshToken, string.Empty);
     }
 
-    /// <summary>
-    /// Verify PIN and generate session token
-    /// </summary>
-    public async Task<(bool Success, string PinSessionToken, string ErrorMessage)> VerifyPinAsync(
+    public async Task<(User? User, string AccessToken, string RefreshToken, string ErrorMessage)> LoginWithPasswordAsync(
+        string username,
+        string password)
+    {
+        var user = await _context.Users
+            .Include(u => u.Balance)
+            .Include(u => u.Level)
+            .FirstOrDefaultAsync(u => u.UserName == username);
+
+        if (user == null)
+        {
+            return (null, string.Empty, string.Empty, "Invalid username or password");
+        }
+
+        if (user.Status == UserStatus.Suspended)
+        {
+            return (null, string.Empty, string.Empty, "Account is suspended");
+        }
+
+        if (user.Status == UserStatus.Inactive)
+        {
+            return (null, string.Empty, string.Empty, "Account is inactive");
+        }
+
+        if (string.IsNullOrWhiteSpace(user.PasswordHash) || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+        {
+            _logger.LogWarning("Failed password login attempt for user {Username}", username);
+            return (null, string.Empty, string.Empty, "Invalid username or password");
+        }
+
+        var accessToken = GenerateAccessToken(user);
+        var refreshToken = GenerateRefreshToken();
+
+        _context.RefreshTokens.Add(new RefreshToken
+        {
+            UserId = user.Id,
+            Token = refreshToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(30),
+            IsRevoked = false,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("User {Username} logged in successfully with password", username);
+
+        return (user, accessToken, refreshToken, string.Empty);
+    }
+
+    public async Task<(bool Success, string PinSessionToken, string ErrorMessage, bool ShouldSetLockout)> VerifyPinAsync(
         Guid userId,
         string pin)
     {
@@ -260,27 +305,35 @@ public class AuthService
 
         if (user == null)
         {
-            return (false, string.Empty, "User not found");
+            return (false, string.Empty, "User not found", false);
         }
 
-        // Check if PIN is locked first (before checking PIN)
+        var lockoutKey = $"pin_lockout:{userId}";
+        if (_redisService != null && await _redisService.ExistsAsync(lockoutKey))
+        {
+            var ttl = await _redisService.TtlAsync(lockoutKey);
+            return (false, string.Empty, $"Account is locked. Try again in {Math.Ceiling(Math.Max(ttl, 1) / 60d)} minutes", false);
+        }
+
         if (user.PinLockedAt.HasValue && user.PinLockedAt.Value > DateTime.UtcNow.AddMinutes(-15))
         {
             var lockoutRemaining = (user.PinLockedAt.Value - DateTime.UtcNow.AddMinutes(-15)).TotalMinutes;
-            return (false, string.Empty, $"Account is locked. Try again in {Math.Ceiling(lockoutRemaining)} minutes");
+            return (false, string.Empty, $"Account is locked. Try again in {Math.Ceiling(lockoutRemaining)} minutes", false);
         }
 
-        // Verify PIN
         if (!BCrypt.Net.BCrypt.Verify(pin, user.PinHash))
         {
-            // Increment failed attempts
             user.PinFailedAttempts++;
             user.UpdatedAt = DateTime.UtcNow;
 
-            // Check if should lock
             if (user.PinFailedAttempts >= 3)
             {
                 user.PinLockedAt = DateTime.UtcNow;
+                if (_redisService != null)
+                {
+                    await _redisService.SetAsync(lockoutKey, "locked", TimeSpan.FromMinutes(15));
+                }
+
                 _logger.LogWarning("User {UserId} account locked due to 3 failed PIN attempts", userId);
             }
 
@@ -289,10 +342,9 @@ public class AuthService
             var attemptsLeft = 3 - user.PinFailedAttempts;
             return (false, string.Empty, attemptsLeft > 0
                 ? $"Invalid PIN. {attemptsLeft} attempts remaining"
-                : "Account locked for 15 minutes due to too many failed attempts");
+                : "Account locked for 15 minutes due to too many failed attempts", false);
         }
 
-        // Reset failed attempts on successful verification
         if (user.PinFailedAttempts > 0 || user.PinLockedAt.HasValue)
         {
             user.PinFailedAttempts = 0;
@@ -301,17 +353,77 @@ public class AuthService
             await _context.SaveChangesAsync();
         }
 
-        // Generate PIN session token (valid for 5 minutes)
         var pinSessionToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
         _logger.LogInformation("PIN verified for user {UserId}", userId);
 
-        return (true, pinSessionToken, string.Empty);
+        return (true, pinSessionToken, string.Empty, true);
     }
 
-    /// <summary>
-    /// Refresh access token
-    /// </summary>
+    public async Task<bool> IsPinLockedOutAsync(Guid userId)
+    {
+        var lockoutKey = $"pin_lockout:{userId}";
+        return _redisService != null && await _redisService.ExistsAsync(lockoutKey);
+    }
+
+    public async Task<long> GetLockoutRemainingSecondsAsync(Guid userId)
+    {
+        var lockoutKey = $"pin_lockout:{userId}";
+        if (_redisService == null)
+        {
+            return 0;
+        }
+        return await _redisService.TtlAsync(lockoutKey);
+    }
+
+    public async Task SetPinSessionAsync(Guid userId, string pinSessionToken)
+    {
+        if (_redisService == null)
+        {
+            return;
+        }
+
+        var sessionKey = $"pin_session:{userId}:{pinSessionToken}";
+        await _redisService.SetAsync(sessionKey, userId.ToString(), TimeSpan.FromMinutes(5));
+    }
+
+    public async Task InvalidatePreviousPinSessionsAsync(Guid userId, string currentToken)
+    {
+        if (_redisService == null)
+        {
+            return;
+        }
+
+        var versionKey = $"pin_session_version:{userId}";
+        await _redisService.SetAsync(versionKey, currentToken, TimeSpan.FromMinutes(5));
+    }
+
+    public async Task<(bool IsValid, string ErrorMessage)> ValidateAndConsumePinSessionAsync(Guid userId, string pinSessionToken)
+    {
+        if (_redisService == null)
+        {
+            return (true, string.Empty);
+        }
+
+        var versionKey = $"pin_session_version:{userId}";
+        var latestToken = await _redisService.GetAndRemoveAsync(versionKey);
+
+        if (latestToken == null)
+        {
+            return (false, "No valid PIN session found. Please verify your PIN again.");
+        }
+
+        if (latestToken != pinSessionToken)
+        {
+            return (false, "PIN session has been superseded. Please verify your PIN again.");
+        }
+
+        var sessionKey = $"pin_session:{userId}:{pinSessionToken}";
+        await _redisService.RemoveAsync(sessionKey);
+
+        return (true, string.Empty);
+    }
+
     public async Task<(string AccessToken, string RefreshToken, string ErrorMessage)> RefreshTokenAsync(
         string refreshToken)
     {
@@ -339,31 +451,26 @@ public class AuthService
             return (string.Empty, string.Empty, "User not found");
         }
 
-        // Check if user is still active
         if (token.User.Status != UserStatus.Active)
         {
             return (string.Empty, string.Empty, "User account is not active");
         }
 
-        // Revoke old refresh token
         token.IsRevoked = true;
         token.RevokedAt = DateTime.UtcNow;
 
-        // Generate new tokens
         var accessToken = GenerateAccessToken(token.User);
         var newRefreshToken = GenerateRefreshToken();
 
-        // Save new refresh token
-        var refreshTokenEntity = new RefreshToken
+        _context.RefreshTokens.Add(new RefreshToken
         {
             UserId = token.User.Id,
             Token = newRefreshToken,
             ExpiresAt = DateTime.UtcNow.AddDays(7),
             IsRevoked = false,
             CreatedAt = DateTime.UtcNow
-        };
+        });
 
-        _context.RefreshTokens.Add(refreshTokenEntity);
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Token refreshed for user {UserId}", token.User.Id);
@@ -371,9 +478,6 @@ public class AuthService
         return (accessToken, newRefreshToken, string.Empty);
     }
 
-    /// <summary>
-    /// Generate JWT access token
-    /// </summary>
     private string GenerateAccessToken(User user)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSecret));
@@ -381,6 +485,9 @@ public class AuthService
 
         var claims = new[]
         {
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Name, user.UserName),
+            new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.UniqueName, user.UserName),
             new Claim("level_id", user.LevelId.ToString()),
@@ -393,28 +500,26 @@ public class AuthService
             audience: _jwtAudience,
             claims: claims,
             expires: DateTime.UtcNow.AddMinutes(15),
-            signingCredentials: credentials
-        );
+            signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    /// <summary>
-    /// Generate refresh token
-    /// </summary>
-    private string GenerateRefreshToken()
+    private static string GenerateRefreshToken()
     {
         var randomBytes = RandomNumberGenerator.GetBytes(64);
         return Convert.ToBase64String(randomBytes);
     }
 
-    /// <summary>
-    /// Generate referral code
-    /// </summary>
-    private string GenerateReferralCode(string username)
+    private static string GenerateReferralCode(string username)
     {
-        // Take first 6 chars of username and add 2 random chars
-        var baseCode = username.ToUpper().Replace("[^A-Z0-9]", "")[..Math.Min(6, username.Length)];
+        var sanitized = new string(username
+            .ToUpperInvariant()
+            .Where(char.IsLetterOrDigit)
+            .ToArray());
+        var baseCode = string.IsNullOrWhiteSpace(sanitized)
+            ? "USER"
+            : sanitized[..Math.Min(6, sanitized.Length)];
         var random = new Random();
         var suffix = new string(Enumerable.Repeat("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 2)
             .Select(s => s[random.Next(s.Length)]).ToArray());

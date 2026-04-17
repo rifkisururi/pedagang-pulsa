@@ -1,17 +1,17 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
+using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Domain.Entities;
-using PedagangPulsa.Infrastructure.Data;
 
 namespace PedagangPulsa.Application.Services;
 
 public class TopupService
 {
-    private readonly AppDbContext _context;
+    private readonly IAppDbContext _context;
     private readonly Random _random = new();
 
-    public TopupService(AppDbContext context)
+    public TopupService(IAppDbContext context)
     {
         _context = context;
     }
@@ -117,14 +117,16 @@ public class TopupService
     {
         var query = _context.TopupRequests
             .Include(t => t.User)
+            .Include(t => t.BankAccount)
             .AsQueryable();
 
         // Apply search filter
         if (!string.IsNullOrWhiteSpace(search))
         {
+            var searchLower = search.Trim().ToLower();
             query = query.Where(t =>
-                EF.Functions.ILike(t.User.UserName, $"%{search}%") ||
-                (t.BankAccount != null && EF.Functions.ILike(t.BankAccount.BankName, $"%{search}%")));
+                t.User.UserName.ToLower().Contains(searchLower) ||
+                (t.BankAccount != null && t.BankAccount.BankName.ToLower().Contains(searchLower)));
         }
 
         // Apply status filter
@@ -207,6 +209,29 @@ public class TopupService
                 .ThenInclude(u => u.Balance)
             .Include(t => t.BankAccount)
             .FirstOrDefaultAsync(t => t.Id == id);
+    }
+
+    public async Task<TopupRequest?> GetUserTopupRequestAsync(Guid id, Guid userId)
+    {
+        return await _context.TopupRequests
+            .Include(t => t.BankAccount)
+            .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId);
+    }
+
+    public async Task<(List<TopupRequest> Topups, int TotalRecords)> GetUserTopupHistoryAsync(Guid userId, int page, int pageSize)
+    {
+        var query = _context.TopupRequests
+            .Include(t => t.BankAccount)
+            .Where(t => t.UserId == userId)
+            .OrderByDescending(t => t.CreatedAt);
+
+        var totalRecords = await query.CountAsync();
+        var topups = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (topups, totalRecords);
     }
 
     public async Task<bool> ApproveTopupAsync(Guid id, decimal finalAmount, string? notes, string? approvedBy)
@@ -292,7 +317,10 @@ public class TopupService
         // Update topup request
         topup.Status = TopupStatus.Approved;
         topup.Notes = notes;
-        // ApprovedBy/RejectedBy store username in Notes, not as Guid since we don't have user ID
+        if (Guid.TryParse(approvedBy, out var approvedById))
+        {
+            topup.ApprovedBy = approvedById;
+        }
         topup.ApprovedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -310,7 +338,10 @@ public class TopupService
 
         topup.Status = TopupStatus.Rejected;
         topup.RejectReason = reason;
-        // RejectedBy store username in Notes, not as Guid since we don't have user ID
+        if (Guid.TryParse(rejectedBy, out var rejectedById))
+        {
+            topup.RejectedBy = rejectedById;
+        }
         topup.RejectedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();

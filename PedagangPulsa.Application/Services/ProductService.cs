@@ -1,16 +1,16 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
+using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Domain.Entities;
-using PedagangPulsa.Infrastructure.Data;
 
 namespace PedagangPulsa.Application.Services;
 
 public class ProductService
 {
-    private readonly AppDbContext _context;
+    private readonly IAppDbContext _context;
 
-    public ProductService(AppDbContext context)
+    public ProductService(IAppDbContext context)
     {
         _context = context;
     }
@@ -31,26 +31,11 @@ public class ProductService
         // Apply search filter
         if (!string.IsNullOrWhiteSpace(search))
         {
-            // Check if using InMemory database (for testing)
-            var isInMemory = _context.Database.ProviderName?.Contains("InMemory") ?? false;
-
-            if (isInMemory)
-            {
-                // Use case-insensitive Contains for InMemory
-                var searchLower = search.ToLower();
-                query = query.Where(p =>
-                    p.Name.ToLower().Contains(searchLower) ||
-                    p.Code.ToLower().Contains(searchLower) ||
-                    (p.Description != null && p.Description.ToLower().Contains(searchLower)));
-            }
-            else
-            {
-                // Use ILike for PostgreSQL
-                query = query.Where(p =>
-                    EF.Functions.ILike(p.Name, $"%{search}%") ||
-                    EF.Functions.ILike(p.Code, $"%{search}%") ||
-                    EF.Functions.ILike(p.Description ?? "", $"%{search}%"));
-            }
+            var searchLower = search.Trim().ToLower();
+            query = query.Where(p =>
+                p.Name.ToLower().Contains(searchLower) ||
+                p.Code.ToLower().Contains(searchLower) ||
+                (p.Description != null && p.Description.ToLower().Contains(searchLower)));
         }
 
         // Apply category filter
@@ -141,6 +126,14 @@ public class ProductService
 
      public async Task<Product?> CreateProductAsync(Product product, List<ProductLevelPrice>? levelPrices)
      {
+         var existingProduct = await _context.Products
+             .FirstOrDefaultAsync(p => p.Code == product.Code);
+
+         if (existingProduct != null)
+         {
+             return null;
+         }
+
          _context.Products.Add(product);
 
          if (levelPrices != null && levelPrices.Any())
@@ -164,6 +157,14 @@ public class ProductService
 
         if (existing == null) return null;
 
+        var duplicateCode = await _context.Products
+            .AnyAsync(p => p.Code == product.Code && p.Id != product.Id);
+
+        if (duplicateCode)
+        {
+            return null;
+        }
+
         existing.Name = product.Name;
         existing.Code = product.Code;
         existing.CategoryId = product.CategoryId;
@@ -182,7 +183,7 @@ public class ProductService
                 var existingPrice = existingPrices.FirstOrDefault(lp => lp.LevelId == newPrice.LevelId);
                 if (existingPrice != null)
                 {
-                    existingPrice.SellPrice = newPrice.SellPrice;
+                    existingPrice.Margin = newPrice.Margin;
                     existingPrice.UpdatedAt = DateTime.UtcNow;
                 }
                 else
@@ -216,26 +217,25 @@ public class ProductService
             .ToListAsync();
     }
 
-    public async Task<bool> UpdateProductPriceAsync(Guid productId, int levelId, decimal sellPrice, string? updatedBy = null)
+    public async Task<bool> UpdateProductPriceAsync(Guid productId, int levelId, decimal margin, string? updatedBy = null)
     {
         var price = await _context.ProductLevelPrices
             .FirstOrDefaultAsync(p => p.ProductId == productId && p.LevelId == levelId);
 
         if (price == null)
         {
-            // Create new price entry
             price = new ProductLevelPrice
             {
                 ProductId = productId,
                 LevelId = levelId,
-                SellPrice = sellPrice,
+                Margin = margin,
                 UpdatedAt = DateTime.UtcNow
             };
             _context.ProductLevelPrices.Add(price);
         }
         else
         {
-            price.SellPrice = sellPrice;
+            price.Margin = margin;
             price.UpdatedAt = DateTime.UtcNow;
         }
 

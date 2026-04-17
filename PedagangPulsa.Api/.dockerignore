@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/wwwroot/lib/
+**/*.user
+**/*.suo
+**/*.md
+**/.git/
+**/.kilo/
+**/node_modules/
+PedagangPulsa.Tests/
+PedagangPulsa.Web/
+database/
+docs/
+.nuget/

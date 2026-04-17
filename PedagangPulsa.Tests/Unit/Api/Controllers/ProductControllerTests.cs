@@ -62,7 +62,7 @@ public class ProductControllerTests : IAsyncDisposable
     public async Task GetProducts_WithAuthentication_ReturnsUserLevelPricing()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         // Act
@@ -82,7 +82,7 @@ public class ProductControllerTests : IAsyncDisposable
     public async Task GetProducts_WithCategoryIdFilter_ReturnsFilteredProducts()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         var category = await _context.ProductCategories.FirstAsync();
@@ -102,7 +102,7 @@ public class ProductControllerTests : IAsyncDisposable
     public async Task GetProducts_WithOperatorFilter_ReturnsFilteredProducts()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         // Act
@@ -120,7 +120,7 @@ public class ProductControllerTests : IAsyncDisposable
     public async Task GetProducts_WithPagination_ReturnsCorrectPage()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         // Act
@@ -155,7 +155,7 @@ public class ProductControllerTests : IAsyncDisposable
     public async Task GetPrice_WithValidProduct_ReturnsUserLevelPrice()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         var product = await _context.Products.FirstAsync();
@@ -175,7 +175,7 @@ public class ProductControllerTests : IAsyncDisposable
     public async Task GetPrice_WithInvalidProduct_ReturnsNotFound()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         var nonExistentProductId = Guid.NewGuid();
@@ -194,7 +194,7 @@ public class ProductControllerTests : IAsyncDisposable
     public async Task GetProductSuppliers_WithValidProduct_ReturnsSuppliers()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         var product = await _context.Products.FirstAsync();
@@ -214,7 +214,7 @@ public class ProductControllerTests : IAsyncDisposable
     public async Task GetProductSuppliers_WithInvalidProduct_ReturnsEmptyList()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         var nonExistentProductId = Guid.NewGuid();

@@ -2,16 +2,16 @@ using Microsoft.Extensions.Logging;
 using MediatR;
 using PedagangPulsa.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Domain.Entities;
-using PedagangPulsa.Infrastructure.Data;
 
 namespace PedagangPulsa.Application.Services;
 
 public class UserService
 {
-    private readonly AppDbContext _context;
+    private readonly IAppDbContext _context;
 
-    public UserService(AppDbContext context)
+    public UserService(IAppDbContext context)
     {
         _context = context;
     }
@@ -35,28 +35,12 @@ public class UserService
         // Apply search filter
         if (!string.IsNullOrWhiteSpace(search))
         {
-            // Check if using InMemory database (for testing)
-            var isInMemory = _context.Database.ProviderName?.Contains("InMemory") ?? false;
-
-            if (isInMemory)
-            {
-                // Use case-insensitive Contains for InMemory
-                var searchLower = search.ToLower();
-                query = query.Where(u =>
-                    u.UserName.ToLower().Contains(searchLower) ||
-                    (u.FullName != null && u.FullName.ToLower().Contains(searchLower)) ||
-                    (u.Email != null && u.Email.ToLower().Contains(searchLower)) ||
-                    (u.Phone != null && u.Phone.ToLower().Contains(searchLower)));
-            }
-            else
-            {
-                // Use ILike for PostgreSQL
-                query = query.Where(u =>
-                    EF.Functions.ILike(u.UserName, $"%{search}%") ||
-                    EF.Functions.ILike(u.FullName ?? "", $"%{search}%") ||
-                    EF.Functions.ILike(u.Email ?? "", $"%{search}%") ||
-                    EF.Functions.ILike(u.Phone ?? "", $"%{search}%"));
-            }
+            var searchLower = search.Trim().ToLower();
+            query = query.Where(u =>
+                u.UserName.ToLower().Contains(searchLower) ||
+                (u.FullName != null && u.FullName.ToLower().Contains(searchLower)) ||
+                (u.Email != null && u.Email.ToLower().Contains(searchLower)) ||
+                (u.Phone != null && u.Phone.ToLower().Contains(searchLower)));
         }
 
         // Apply level filter

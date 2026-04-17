@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PedagangPulsa.Api.DTOs;
+using PedagangPulsa.Application.Services;
 using PedagangPulsa.Domain.Entities;
 using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Infrastructure.Data;
@@ -16,16 +17,25 @@ public class TransactionController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly ILogger<TransactionController> _logger;
-    private readonly IRedisService _redisService;
+    private readonly AuthService _authService;
 
     public TransactionController(
         AppDbContext context,
         ILogger<TransactionController> logger,
-        IRedisService redisService)
+        AuthService authService)
     {
         _context = context;
         _logger = logger;
-        _redisService = redisService;
+        _authService = authService;
+    }
+
+    private async Task<decimal> GetBestCostPriceAsync(Guid productId)
+    {
+        return await _context.SupplierProducts
+            .Where(sp => sp.ProductId == productId && sp.IsActive)
+            .OrderBy(sp => sp.Seq)
+            .Select(sp => sp.CostPrice)
+            .FirstOrDefaultAsync();
     }
 
     [HttpPost]
@@ -59,36 +69,40 @@ public class TransactionController : ControllerBase
             });
         }
 
-        // Validate PIN session token
-        var sessionKey = $"pin_session:{userId}:{request.PinSessionToken}";
-        var sessionValue = await _redisService.GetAsync(sessionKey);
+        // X-Reference-Id is required for idempotency
+        var referenceId = Request.Headers["X-Reference-Id"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(referenceId))
+        {
+            return BadRequest(new ErrorResponse
+            {
+                Message = "X-Reference-Id header is required",
+                ErrorCode = "REFERENCE_ID_REQUIRED"
+            });
+        }
 
-        if (sessionValue == null || sessionValue != userId.ToString())
+        // Check idempotency key first (before consuming PIN session)
+        var existingKey = await _context.IdempotencyKeys.FindAsync(userId, referenceId);
+        if (existingKey != null)
+        {
+            if (existingKey.ExpiresAt > DateTime.UtcNow && !string.IsNullOrEmpty(existingKey.ResponseCache))
+            {
+                return Ok(System.Text.Json.JsonSerializer.Deserialize<object>(existingKey.ResponseCache));
+            }
+        }
+
+        // Validate and atomically consume PIN session (prevents race condition)
+        var pinValidation = await _authService.ValidateAndConsumePinSessionAsync(userId, request.PinSessionToken);
+        if (!pinValidation.IsValid)
         {
             return Unauthorized(new ErrorResponse
             {
-                Message = "Invalid or expired PIN session. Please verify your PIN again.",
+                Message = pinValidation.ErrorMessage,
                 ErrorCode = "INVALID_PIN_SESSION"
             });
         }
 
-        // Check idempotency
-        var referenceId = Request.Headers["X-Reference-Id"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(referenceId))
-        {
-            var existingKey = await _context.IdempotencyKeys.FindAsync(referenceId, userId);
-            if (existingKey != null)
-            {
-                if (existingKey.ExpiresAt > DateTime.UtcNow && !string.IsNullOrEmpty(existingKey.ResponseCache))
-                {
-                    return Ok(System.Text.Json.JsonSerializer.Deserialize<object>(existingKey.ResponseCache));
-                }
-            }
-        }
-
         try
         {
-            // Get user with balance
             var user = await _context.Users
                 .Include(u => u.Balance)
                 .FirstOrDefaultAsync(u => u.Id == userId);
@@ -102,7 +116,6 @@ public class TransactionController : ControllerBase
                 });
             }
 
-            // Get product with pricing for user's level
             var product = await _context.Products
                 .Include(p => p.Category)
                 .Include(p => p.ProductLevelPrices)
@@ -117,11 +130,10 @@ public class TransactionController : ControllerBase
                 });
             }
 
-            // Get price for user's level
             var levelPrice = product.ProductLevelPrices
                 .FirstOrDefault(plp => plp.LevelId == user.LevelId && plp.IsActive);
 
-            if (levelPrice == null || levelPrice.SellPrice <= 0)
+            if (levelPrice == null || levelPrice.Margin < 0)
             {
                 return BadRequest(new ErrorResponse
                 {
@@ -130,8 +142,20 @@ public class TransactionController : ControllerBase
                 });
             }
 
-            // Check balance
-            if (user.Balance.ActiveBalance < levelPrice.SellPrice)
+            var costPrice = await GetBestCostPriceAsync(request.ProductId);
+
+            if (costPrice <= 0)
+            {
+                return BadRequest(new ErrorResponse
+                {
+                    Message = "Product not available (no supplier mapped)",
+                    ErrorCode = "PRODUCT_NOT_AVAILABLE"
+                });
+            }
+
+            var sellPrice = costPrice + levelPrice.Margin;
+
+            if (user.Balance.ActiveBalance < sellPrice)
             {
                 return BadRequest(new ErrorResponse
                 {
@@ -140,20 +164,18 @@ public class TransactionController : ControllerBase
                 });
             }
 
-            // Hold balance
             var heldBalanceBefore = user.Balance.HeldBalance;
             var activeBalanceBefore = user.Balance.ActiveBalance;
 
-            user.Balance.ActiveBalance -= levelPrice.SellPrice;
-            user.Balance.HeldBalance += levelPrice.SellPrice;
+            user.Balance.ActiveBalance -= sellPrice;
+            user.Balance.HeldBalance += sellPrice;
 
-            // Create ledger entry for hold
             var holdLedger = new BalanceLedger
             {
                 Id = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 UserId = userId,
                 Type = BalanceTransactionType.PurchaseHold,
-                Amount = -levelPrice.SellPrice,
+                Amount = -sellPrice,
                 ActiveBefore = activeBalanceBefore,
                 ActiveAfter = user.Balance.ActiveBalance,
                 HeldBefore = heldBalanceBefore,
@@ -166,15 +188,15 @@ public class TransactionController : ControllerBase
 
             await _context.SaveChangesAsync();
 
-            // Create transaction
             var referenceIdGen = $"{userId}{DateTime.UtcNow:yyyyMMddHHmmss}{Random.Shared.Next(1000, 9999)}";
             var transaction = new Transaction
             {
+                Id = Guid.NewGuid(),
                 ReferenceId = referenceIdGen,
                 UserId = userId,
                 ProductId = request.ProductId,
                 Destination = request.DestinationNumber,
-                SellPrice = levelPrice.SellPrice,
+                SellPrice = sellPrice,
                 CostPrice = null,
                 Status = TransactionStatus.Pending,
                 PinVerifiedAt = DateTime.UtcNow,
@@ -199,35 +221,30 @@ public class TransactionController : ControllerBase
                     Denomination = product.Denomination
                 },
                 Destination = transaction.Destination,
-                SellPrice = levelPrice.SellPrice,
+                SellPrice = sellPrice,
                 CreatedAt = transaction.CreatedAt
             };
 
-            // Cache response for idempotency
-            if (!string.IsNullOrWhiteSpace(referenceId))
+            // Store idempotency key with transaction reference
+            if (existingKey != null)
             {
-                var key = await _context.IdempotencyKeys.FindAsync(referenceId, userId);
-                if (key != null)
-                {
-                    key.ResponseCache = System.Text.Json.JsonSerializer.Serialize(response);
-                    await _context.SaveChangesAsync();
-                }
-                else
-                {
-                    var newKey = new IdempotencyKey
-                    {
-                        UserId = userId,
-                        Key = referenceId,
-                        ExpiresAt = DateTime.UtcNow.AddHours(24),
-                        ResponseCache = System.Text.Json.JsonSerializer.Serialize(response)
-                    };
-                    _context.IdempotencyKeys.Add(newKey);
-                    await _context.SaveChangesAsync();
-                }
+                existingKey.ResponseCache = System.Text.Json.JsonSerializer.Serialize(response);
+                existingKey.TransactionId = transaction.Id;
+                await _context.SaveChangesAsync();
             }
-
-            // Consume PIN session token (one-time use)
-            await _redisService.RemoveAsync(sessionKey);
+            else
+            {
+                var newKey = new IdempotencyKey
+                {
+                    UserId = userId,
+                    Key = referenceId,
+                    TransactionId = transaction.Id,
+                    ExpiresAt = DateTime.UtcNow.AddHours(24),
+                    ResponseCache = System.Text.Json.JsonSerializer.Serialize(response)
+                };
+                _context.IdempotencyKeys.Add(newKey);
+                await _context.SaveChangesAsync();
+            }
 
             return StatusCode(201, response);
         }

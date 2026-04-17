@@ -38,7 +38,7 @@ public class TopupServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var initialBalance = user.Balance!.ActiveBalance;
 
         var topup = TestDataBuilder.CreateTopupRequest(
@@ -78,7 +78,7 @@ public class TopupServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var initialBalance = user.Balance!.ActiveBalance;
 
         var topup = TestDataBuilder.CreateTopupRequest(
@@ -113,7 +113,7 @@ public class TopupServiceTests : IAsyncLifetime
     public async Task ApproveTopupAsync_CreatesBalanceLedgerEntry()
     {
         // Arrange
-        var user = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
         var amount = 100000m;
 
         var topup = TestDataBuilder.CreateTopupRequest(
@@ -148,7 +148,7 @@ public class TopupServiceTests : IAsyncLifetime
     public async Task ApproveTopupAsync_WithAlreadyApprovedTopup_ReturnsFalse()
     {
         // Arrange
-        var user = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
 
         var topup = TestDataBuilder.CreateTopupRequest(
             user.Id,
@@ -195,7 +195,7 @@ public class TopupServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var initialBalance = user.Balance!.ActiveBalance;
 
         var topup = TestDataBuilder.CreateTopupRequest(
@@ -233,7 +233,7 @@ public class TopupServiceTests : IAsyncLifetime
     public async Task RejectTopupAsync_DoesNotCreateBalanceLedgerEntry()
     {
         // Arrange
-        var user = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
 
         var topup = TestDataBuilder.CreateTopupRequest(
             user.Id,
@@ -263,7 +263,7 @@ public class TopupServiceTests : IAsyncLifetime
     public async Task RejectTopupAsync_WithAlreadyRejectedTopup_ReturnsFalse()
     {
         // Arrange
-        var user = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
 
         var topup = TestDataBuilder.CreateTopupRequest(
             user.Id,
@@ -306,7 +306,7 @@ public class TopupServiceTests : IAsyncLifetime
     public async Task GetTopupRequestsPagedAsync_ReturnsPagedResults()
     {
         // Arrange
-        var user = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
 
         // Add multiple topup requests
         for (int i = 0; i < 15; i++)
@@ -336,7 +336,7 @@ public class TopupServiceTests : IAsyncLifetime
     public async Task GetTopupRequestsPagedAsync_WithStatusFilter_FiltersCorrectly()
     {
         // Arrange
-        var user = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
 
         // Add topup requests with different statuses
         var pendingTopup = TestDataBuilder.CreateTopupRequest(user.Id, 10000m, TopupStatus.Pending);
@@ -362,7 +362,7 @@ public class TopupServiceTests : IAsyncLifetime
     public async Task GetTopupRequestByIdAsync_ReturnsTopupWithUserAndBalance()
     {
         // Arrange
-        var user = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
 
         var topup = TestDataBuilder.CreateTopupRequest(user.Id, 100000m);
         _context.TopupRequests.Add(topup);
@@ -382,7 +382,7 @@ public class TopupServiceTests : IAsyncLifetime
     public async Task CreateTopupRequest_WithValidData_SetsPendingStatus()
     {
         // Arrange
-        var user = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
         var amount = 100000m;
 
         var topup = TestDataBuilder.CreateTopupRequest(user.Id, amount);
@@ -404,7 +404,7 @@ public class TopupServiceTests : IAsyncLifetime
     public async Task CreateTopupRequest_WithInvalidAmount_ShouldValidate(decimal invalidAmount)
     {
         // Arrange
-        var user = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
 
         // Act
         var topup = TestDataBuilder.CreateTopupRequest(user.Id, invalidAmount);

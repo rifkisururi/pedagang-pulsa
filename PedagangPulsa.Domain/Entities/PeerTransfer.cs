@@ -7,7 +7,7 @@ public class PeerTransfer
     public Guid ToUserId { get; set; }
     public decimal Amount { get; set; }
     public string? Notes { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
 
     // Navigation properties
     public User FromUser { get; set; } = null!;

@@ -1,34 +1,12 @@
-using Microsoft.EntityFrameworkCore;
-using PedagangPulsa.Infrastructure.Data;
-using PedagangPulsa.Application.Services;
-using PedagangPulsa.Infrastructure.Suppliers;
+using PedagangPulsa.Application.DependencyInjection;
+using PedagangPulsa.Infrastructure.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add DbContext
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-// Register Infrastructure Services
-builder.Services.AddScoped<ISupplierAdapterFactory, SupplierAdapterFactory>();
-
-// Register Application Services
-builder.Services.AddScoped<UserService>();
-builder.Services.AddScoped<ProductService>();
-builder.Services.AddScoped<SupplierService>();
-builder.Services.AddScoped<SupplierProductService>();
-builder.Services.AddScoped<SupplierBalanceService>();
-builder.Services.AddScoped<TransactionService>();
-builder.Services.AddScoped<TopupService>();
-builder.Services.AddScoped<BalanceService>();
-builder.Services.AddScoped<ReportService>();
-builder.Services.AddScoped<ReferralService>();
-builder.Services.AddScoped<UserLevelService>();
-builder.Services.AddScoped<ExportService>();
-builder.Services.AddScoped<AuthService>();
-
-// Add HttpClient for supplier adapters
-builder.Services.AddHttpClient();
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("DefaultConnection not configured");
+builder.Services.AddInfrastructure(connectionString);
+builder.Services.AddApplicationServices();
 
 // Add Authentication
 builder.Services.AddAuthentication(options =>
@@ -58,26 +36,7 @@ builder.Services.AddSession(options =>
 
 var app = builder.Build();
 
-// Run database migrations and seed data
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-    try
-    {
-        var context = services.GetRequiredService<AppDbContext>();
-
-        // Apply pending migrations
-        await context.Database.MigrateAsync();
-
-        // Seed data
-        await DataSeeder.SeedAsync(context);
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred migrating or seeding the database.");
-    }
-}
+await app.ApplyDatabaseMigrationsAsync();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

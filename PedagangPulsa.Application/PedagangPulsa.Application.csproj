@@ -2,7 +2,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PedagangPulsa.Domain\PedagangPulsa.Domain.csproj" />
-    <ProjectReference Include="..\PedagangPulsa.Infrastructure\PedagangPulsa.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -125,7 +125,7 @@ public class ProductServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task CreateProductAsync_WithDuplicateCode_ThrowsException()
+    public async Task CreateProductAsync_WithDuplicateCode_ReturnsNull()
     {
         // Arrange
         var existingProduct = new Product
@@ -152,13 +152,11 @@ public class ProductServiceTests : IAsyncLifetime
             IsActive = true
         };
 
-        // Act & Assert
-        // PostgreSQL enforces unique constraint on Product.Code
-        // This should throw an exception (DbUpdateException wrapped in AggregateException)
-        var exception = await Assert.ThrowsAsync<Microsoft.EntityFrameworkCore.DbUpdateException>(
-            async () => await _service.CreateProductAsync(newProduct, null));
+        // Act
+        var result = await _service.CreateProductAsync(newProduct, null);
 
-        exception.InnerException.Should().BeOfType<Npgsql.PostgresException>();
+        // Assert
+        result.Should().BeNull();
 
         // Verify only one product with this code exists
         var productsWithSameCode = await _context.Products
@@ -185,9 +183,9 @@ public class ProductServiceTests : IAsyncLifetime
 
         var levelPrices = new List<ProductLevelPrice>
         {
-            new() { ProductId = product.Id, LevelId = 1, SellPrice = 5600 },
-            new() { ProductId = product.Id, LevelId = 2, SellPrice = 5550 },
-            new() { ProductId = product.Id, LevelId = 3, SellPrice = 5500 }
+            new() { ProductId = product.Id, LevelId = 1, Margin = 5600 },
+            new() { ProductId = product.Id, LevelId = 2, Margin = 5550 },
+            new() { ProductId = product.Id, LevelId = 3, Margin = 5500 }
         };
 
         // Act
@@ -199,9 +197,9 @@ public class ProductServiceTests : IAsyncLifetime
             .ToListAsync();
 
         prices.Should().HaveCount(3);
-        prices.Should().Contain(p => p.LevelId == 1 && p.SellPrice == 5600);
-        prices.Should().Contain(p => p.LevelId == 2 && p.SellPrice == 5550);
-        prices.Should().Contain(p => p.LevelId == 3 && p.SellPrice == 5500);
+        prices.Should().Contain(p => p.LevelId == 1 && p.Margin == 5600);
+        prices.Should().Contain(p => p.LevelId == 2 && p.Margin == 5550);
+        prices.Should().Contain(p => p.LevelId == 3 && p.Margin == 5500);
     }
 
     [Fact]
@@ -282,17 +280,17 @@ public class ProductServiceTests : IAsyncLifetime
 
         var originalPrices = new List<ProductLevelPrice>
         {
-            new() { ProductId = product.Id, LevelId = 1, SellPrice = 5600 },
-            new() { ProductId = product.Id, LevelId = 2, SellPrice = 5550 }
+            new() { ProductId = product.Id, LevelId = 1, Margin = 5600 },
+            new() { ProductId = product.Id, LevelId = 2, Margin = 5550 }
         };
 
         await _service.CreateProductAsync(product, originalPrices);
 
         var updatedPrices = new List<ProductLevelPrice>
         {
-            new() { ProductId = product.Id, LevelId = 1, SellPrice = 5700 }, // Updated
-            new() { ProductId = product.Id, LevelId = 2, SellPrice = 5550 }, // Same
-            new() { ProductId = product.Id, LevelId = 3, SellPrice = 5500 }  // New
+            new() { ProductId = product.Id, LevelId = 1, Margin = 5700 }, // Updated
+            new() { ProductId = product.Id, LevelId = 2, Margin = 5550 }, // Same
+            new() { ProductId = product.Id, LevelId = 3, Margin = 5500 }  // New
         };
 
         // Act
@@ -301,9 +299,9 @@ public class ProductServiceTests : IAsyncLifetime
         // Assert
         var prices = await _service.GetProductPricesAsync(product.Id);
         prices.Should().HaveCount(3);
-        prices.Should().Contain(p => p.LevelId == 1 && p.SellPrice == 5700);
-        prices.Should().Contain(p => p.LevelId == 2 && p.SellPrice == 5550);
-        prices.Should().Contain(p => p.LevelId == 3 && p.SellPrice == 5500);
+        prices.Should().Contain(p => p.LevelId == 1 && p.Margin == 5700);
+        prices.Should().Contain(p => p.LevelId == 2 && p.Margin == 5550);
+        prices.Should().Contain(p => p.LevelId == 3 && p.Margin == 5500);
     }
 
     [Fact]
@@ -400,7 +398,7 @@ public class ProductServiceTests : IAsyncLifetime
         var price = await _context.ProductLevelPrices
             .FirstOrDefaultAsync(p => p.ProductId == product.Id && p.LevelId == 1);
         price.Should().NotBeNull();
-        price!.SellPrice.Should().Be(5600);
+        price!.Margin.Should().Be(5600);
     }
 
     [Fact]
@@ -417,7 +415,7 @@ public class ProductServiceTests : IAsyncLifetime
 
         var levelPrices = new List<ProductLevelPrice>
         {
-            new() { ProductId = product.Id, LevelId = 1, SellPrice = 5600 }
+            new() { ProductId = product.Id, LevelId = 1, Margin = 5600 }
         };
 
         await _service.CreateProductAsync(product, levelPrices);
@@ -430,7 +428,7 @@ public class ProductServiceTests : IAsyncLifetime
         var price = await _context.ProductLevelPrices
             .FirstOrDefaultAsync(p => p.ProductId == product.Id && p.LevelId == 1);
         price.Should().NotBeNull();
-        price!.SellPrice.Should().Be(5700);
+        price!.Margin.Should().Be(5700);
     }
 
     [Fact]
@@ -447,9 +445,9 @@ public class ProductServiceTests : IAsyncLifetime
 
         var levelPrices = new List<ProductLevelPrice>
         {
-            new() { ProductId = product.Id, LevelId = 1, SellPrice = 5600 },
-            new() { ProductId = product.Id, LevelId = 2, SellPrice = 5550 },
-            new() { ProductId = product.Id, LevelId = 3, SellPrice = 5500 }
+            new() { ProductId = product.Id, LevelId = 1, Margin = 5600 },
+            new() { ProductId = product.Id, LevelId = 2, Margin = 5550 },
+            new() { ProductId = product.Id, LevelId = 3, Margin = 5500 }
         };
 
         await _service.CreateProductAsync(product, levelPrices);

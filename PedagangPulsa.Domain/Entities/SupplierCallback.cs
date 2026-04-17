@@ -9,10 +9,10 @@ public class SupplierCallback
     public string? IpAddress { get; set; }
     public bool HmacValid { get; set; }
     public long? AttemptId { get; set; }
-    public bool IsProcessed { get; set; } = false;
+    public bool IsProcessed { get; set; }
     public DateTime? ProcessedAt { get; set; }
     public string? ErrorMessage { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
 
     // Navigation properties
     public Supplier Supplier { get; set; } = null!;

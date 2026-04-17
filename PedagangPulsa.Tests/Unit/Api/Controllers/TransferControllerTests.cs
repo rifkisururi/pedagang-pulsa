@@ -46,8 +46,8 @@ public class TransferControllerTests : IAsyncDisposable
     public async Task Transfer_WithValidData_ReturnsOk()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
-        var user2 = await _context.Users.FirstAsync(u => u.Username == "user2");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
+        var user2 = await _context.Users.FirstAsync(u => u.UserName == "user2");
 
         // Setup user2 with transfer capability
         var level2 = await _context.UserLevels.FirstAsync(l => l.Name == "Member2");
@@ -94,7 +94,7 @@ public class TransferControllerTests : IAsyncDisposable
     public async Task Transfer_WithInvalidRecipient_ReturnsNotFound()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         var request = new TransferRequestDto
@@ -117,7 +117,7 @@ public class TransferControllerTests : IAsyncDisposable
     public async Task Transfer_ToSelf_ReturnsBadRequest()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         var request = new TransferRequestDto
@@ -140,7 +140,7 @@ public class TransferControllerTests : IAsyncDisposable
     public async Task Transfer_WithInsufficientBalance_ReturnsBadRequest()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         var request = new TransferRequestDto
@@ -163,7 +163,7 @@ public class TransferControllerTests : IAsyncDisposable
     public async Task Transfer_WithInvalidAmount_ReturnsBadRequest()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         var request = new TransferRequestDto
@@ -186,7 +186,7 @@ public class TransferControllerTests : IAsyncDisposable
     public async Task GetTransferHistory_WithAuthenticatedUser_ReturnsHistory()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         var level2 = await _context.UserLevels.FirstAsync(l => l.Name == "Member2");
@@ -217,7 +217,7 @@ public class TransferControllerTests : IAsyncDisposable
     public async Task GetTransferHistory_WithPagination_ReturnsCorrectPage()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         // Act

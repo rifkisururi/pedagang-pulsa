@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using PedagangPulsa.Infrastructure.Suppliers.DTOs;
+using PedagangPulsa.Application.Abstractions.Suppliers;
 
 namespace PedagangPulsa.Infrastructure.Suppliers.Digiflazz;
 

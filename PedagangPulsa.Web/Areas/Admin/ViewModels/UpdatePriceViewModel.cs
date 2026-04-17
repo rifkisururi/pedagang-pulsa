@@ -11,6 +11,6 @@ public class UpdatePriceViewModel
     public int LevelId { get; set; }
 
     [Required]
-    [Range(0, double.MaxValue, ErrorMessage = "Price must be greater than or equal to 0")]
-    public decimal SellPrice { get; set; }
+    [Range(0, double.MaxValue, ErrorMessage = "Margin must be greater than or equal to 0")]
+    public decimal Margin { get; set; } = 200;
 }

@@ -4,5 +4,6 @@ public enum NotificationChannel
 {
     Email,
     Sms,
-    Whatsapp
+    Whatsapp,
+    Push
 }

@@ -23,6 +23,7 @@ public class CategoryDto
     public string Name { get; set; } = string.Empty;
     public string Code { get; set; } = string.Empty;
     public string? Icon { get; set; }
+    public List<string> SubCategories { get; set; } = new();
 }
 
 public class CategoryListResponse

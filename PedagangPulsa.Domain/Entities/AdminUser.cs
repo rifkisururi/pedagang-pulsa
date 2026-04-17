@@ -8,9 +8,9 @@ public class AdminUser
     public string Username { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
-    public AdminRole Role { get; set; } = AdminRole.Staff;
-    public bool IsActive { get; set; } = true;
+    public AdminRole Role { get; set; }
+    public bool IsActive { get; set; }
     public DateTime? LastLoginAt { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }

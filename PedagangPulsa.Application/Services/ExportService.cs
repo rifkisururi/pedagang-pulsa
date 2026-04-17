@@ -2,17 +2,17 @@ using Microsoft.Extensions.Logging;
 using ClosedXML.Excel;
 using PedagangPulsa.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Domain.Entities;
-using PedagangPulsa.Infrastructure.Data;
 
 namespace PedagangPulsa.Application.Services;
 
 public class ExportService
 {
-    private readonly AppDbContext _context;
+    private readonly IAppDbContext _context;
     private readonly ILogger<ExportService> _logger;
 
-    public ExportService(AppDbContext context, ILogger<ExportService> logger)
+    public ExportService(IAppDbContext context, ILogger<ExportService> logger)
     {
         _context = context;
         _logger = logger;

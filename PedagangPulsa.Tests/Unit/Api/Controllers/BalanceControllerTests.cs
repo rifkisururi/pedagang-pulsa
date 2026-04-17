@@ -46,7 +46,7 @@ public class BalanceControllerTests : IAsyncDisposable
     public async Task GetBalance_WithAuthenticatedUser_ReturnsBalance()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         // Act
@@ -80,7 +80,7 @@ public class BalanceControllerTests : IAsyncDisposable
     public async Task GetHistory_WithAuthenticatedUser_ReturnsHistory()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         // Add some ledger entries
@@ -117,7 +117,7 @@ public class BalanceControllerTests : IAsyncDisposable
     public async Task GetHistory_WithPagination_ReturnsCorrectPage()
     {
         // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
         SetupAuthenticatedUser(user1.Id);
 
         // Act

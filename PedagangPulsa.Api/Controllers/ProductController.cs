@@ -25,20 +25,32 @@ public class ProductController : Controller
     public async Task<IActionResult> GetCategories()
     {
         var categories = await _context.ProductCategories
-            .OrderBy(c => c.Name)
-            .Select(c => new CategoryDto
-            {
-                Id = c.Id,
-                Name = c.Name,
-                Code = c.Code,
-                Icon = c.IconUrl
-            })
+            .OrderBy(c => c.SortOrder)
             .ToListAsync();
+
+        var operators = await _context.Products
+            .Where(p => p.IsActive && p.Operator != null)
+            .Select(p => new { p.CategoryId, Operator = p.Operator!.ToLower() })
+            .Distinct()
+            .ToListAsync();
+
+        var subCategories = operators
+            .GroupBy(o => o.CategoryId)
+            .ToDictionary(g => g.Key, g => g.Select(o => o.Operator).OrderBy(x => x).ToList());
+
+        var result = categories.Select(c => new CategoryDto
+        {
+            Id = c.Id,
+            Name = c.Name,
+            Code = c.Code,
+            Icon = c.IconUrl,
+            SubCategories = subCategories.GetValueOrDefault(c.Id, new())
+        }).ToList();
 
         return Ok(new CategoryListResponse
         {
             Success = true,
-            Data = categories
+            Data = result
         });
     }
 
@@ -69,7 +81,6 @@ public class ProductController : Controller
             });
         }
 
-        // Get user's level
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Id == userId);
 
@@ -98,6 +109,16 @@ public class ProductController : Controller
 
         var totalRecords = await query.CountAsync();
 
+        var productIds = await query
+            .Select(p => p.Id)
+            .ToListAsync();
+
+        var costPrices = await _context.SupplierProducts
+            .Where(sp => productIds.Contains(sp.ProductId) && sp.IsActive)
+            .GroupBy(sp => sp.ProductId)
+            .Select(g => new { ProductId = g.Key, CostPrice = g.OrderBy(sp => sp.Seq).First().CostPrice })
+            .ToDictionaryAsync(x => x.ProductId, x => x.CostPrice);
+
         var products = await query
             .OrderBy(p => p.Category!.Name)
             .ThenBy(p => p.Name)
@@ -114,10 +135,11 @@ public class ProductController : Controller
                 Description = p.Description,
                 Price = p.ProductLevelPrices
                     .Where(plp => plp.LevelId == user.LevelId && plp.IsActive)
-                    .Select(plp => plp.SellPrice)
+                    .Select(plp => plp.Margin > 0 && costPrices.ContainsKey(p.Id) ? costPrices[p.Id] + plp.Margin : 0m)
                     .FirstOrDefault(),
                 Available = p.ProductLevelPrices
-                    .Any(plp => plp.LevelId == user.LevelId && plp.IsActive && plp.SellPrice > 0)
+                    .Any(plp => plp.LevelId == user.LevelId && plp.IsActive && plp.Margin > 0)
+                    && costPrices.ContainsKey(p.Id) && costPrices[p.Id] > 0
             })
             .ToListAsync();
 
@@ -190,11 +212,22 @@ public class ProductController : Controller
             });
         }
 
-        // Get price for user's level
         var levelPrice = await _context.ProductLevelPrices
             .Where(plp => plp.ProductId == id && plp.LevelId == user.LevelId && plp.IsActive)
-            .Select(plp => plp.SellPrice)
+            .Select(plp => plp.Margin)
             .FirstOrDefaultAsync();
+
+        var costPrice = await _context.SupplierProducts
+            .Where(sp => sp.ProductId == id && sp.IsActive)
+            .OrderBy(sp => sp.Seq)
+            .Select(sp => sp.CostPrice)
+            .FirstOrDefaultAsync();
+
+        decimal computedSellPrice = 0;
+        if (levelPrice > 0 && costPrice > 0)
+        {
+            computedSellPrice = costPrice + levelPrice;
+        }
 
         return Ok(new
         {
@@ -208,9 +241,9 @@ public class ProductController : Controller
                 @operator = product.Operator,
                 denomination = product.Denomination,
                 description = product.Description,
-                price = levelPrice > 0 ? levelPrice : (decimal?)null,
+                price = computedSellPrice > 0 ? computedSellPrice : (decimal?)null,
                 levelId = user.LevelId,
-                message = levelPrice > 0 ? "Price available for your level" : "Price not available for your level"
+                message = computedSellPrice > 0 ? "Price available for your level" : "Price not available for your level"
             }
         });
     }

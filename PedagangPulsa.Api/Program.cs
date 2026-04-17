@@ -1,13 +1,9 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
+using PedagangPulsa.Application.DependencyInjection;
 using PedagangPulsa.Api.Middleware;
-using PedagangPulsa.Api.Controllers;
-using PedagangPulsa.Domain.Entities;
-using PedagangPulsa.Infrastructure.Data;
-using PedagangPulsa.Infrastructure.Suppliers;
+using PedagangPulsa.Infrastructure.DependencyInjection;
 using Scalar.AspNetCore;
 using System.Runtime.CompilerServices;
 
@@ -19,10 +15,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
 // Configure Database
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString)
-        .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning)));
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("DefaultConnection not configured");
+builder.Services.AddInfrastructure(connectionString, ignorePendingModelChangesWarning: true);
 
 // Configure JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
@@ -51,13 +46,10 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
-// Application Services
-builder.Services.AddScoped<PedagangPulsa.Application.Services.TransactionService>();
-builder.Services.AddScoped<PedagangPulsa.Application.Services.TopupService>();
-builder.Services.AddScoped<PedagangPulsa.Application.Services.BalanceService>();
-builder.Services.AddScoped<IRedisService, RedisService>();
-builder.Services.AddScoped<ISupplierAdapterFactory, SupplierAdapterFactory>();
-builder.Services.AddHttpClient();
+builder.Services.AddApplicationServices(
+    jwtSecret: jwtKey,
+    jwtIssuer: jwtIssuer,
+    jwtAudience: jwtAudience);
 
 // Add FormOptions for file upload
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
@@ -82,26 +74,7 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Run database migrations
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-    try
-    {
-        var context = services.GetRequiredService<AppDbContext>();
-
-        // Apply pending migrations
-        await context.Database.MigrateAsync();
-
-        // Seed minimum reference data required by the API.
-        await DataSeeder.SeedAsync(context);
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred migrating or seeding the database.");
-    }
-}
+await app.ApplyDatabaseMigrationsAsync();
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())

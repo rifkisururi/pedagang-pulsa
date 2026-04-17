@@ -1,13 +1,9 @@
 using Microsoft.Extensions.Logging;
+using PedagangPulsa.Application.Abstractions.Suppliers;
 using PedagangPulsa.Infrastructure.Suppliers.Digiflazz;
 using PedagangPulsa.Infrastructure.Suppliers.VIPReseller;
 
 namespace PedagangPulsa.Infrastructure.Suppliers;
-
-public interface ISupplierAdapterFactory
-{
-    ISupplierAdapter? CreateAdapter(string supplierCode, ILoggerFactory loggerFactory);
-}
 
 public class SupplierAdapterFactory : ISupplierAdapterFactory
 {

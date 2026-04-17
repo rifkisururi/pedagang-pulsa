@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Hosting;
+using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -8,16 +8,10 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using PedagangPulsa.Api.Controllers;
 using PedagangPulsa.Api.DTOs;
-using PedagangPulsa.Domain.Entities;
+using PedagangPulsa.Application.Services;
 using PedagangPulsa.Domain.Enums;
-using PedagangPulsa.Infrastructure.Data;
 using PedagangPulsa.Tests.Helpers;
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Security.Claims;
-using System.Threading.Tasks;
-using FluentAssertions;
 using Xunit;
 
 namespace PedagangPulsa.Tests.Unit.Api.Controllers;
@@ -25,253 +19,223 @@ namespace PedagangPulsa.Tests.Unit.Api.Controllers;
 public class TopupControllerTests : IAsyncDisposable
 {
     private readonly TestDbContext _context;
+    private readonly TopupService _topupService;
     private readonly Mock<ILogger<TopupController>> _loggerMock;
     private readonly Mock<IConfiguration> _configurationMock;
     private readonly Mock<IWebHostEnvironment> _environmentMock;
     private readonly TopupController _controller;
+    private readonly string _webRootPath;
 
     public TopupControllerTests()
     {
         _context = new TestDbContext();
         _context.SeedAsync().Wait();
 
+        _topupService = new TopupService(_context);
         _loggerMock = MockServices.CreateLogger<TopupController>();
         _configurationMock = new Mock<IConfiguration>();
         _environmentMock = new Mock<IWebHostEnvironment>();
+        _webRootPath = Path.Combine(Path.GetTempPath(), $"pedagangpulsa-topup-tests-{Guid.NewGuid():N}");
 
-        _environmentMock.Setup(e => e.WebRootPath).Returns(Path.GetTempPath());
+        _environmentMock.Setup(e => e.WebRootPath).Returns(_webRootPath);
+        _environmentMock.Setup(e => e.ContentRootPath).Returns(_webRootPath);
 
         _controller = new TopupController(
             _context,
+            _topupService,
             _loggerMock.Object,
             _configurationMock.Object,
-            _environmentMock.Object
-        );
-    }
-
-    private void SetupAuthenticatedUser(Guid userId)
-    {
-        var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) };
-        var identity = new ClaimsIdentity(claims);
-        var principal = new ClaimsPrincipal(identity);
-        _controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext { User = principal }
-        };
-    }
-
-    private Mock<IFormFile> CreateMockFile(string fileName, string contentType, byte[] content)
-    {
-        var mockFile = new Mock<IFormFile>();
-        mockFile.Setup(f => f.FileName).Returns(fileName);
-        mockFile.Setup(f => f.ContentType).Returns(contentType);
-        mockFile.Setup(f => f.Length).Returns(content.Length);
-        mockFile.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), System.Threading.CancellationToken.None))
-            .Callback<Stream, System.Threading.CancellationToken>((s, ct) =>
-            {
-                s.Write(content, 0, content.Length);
-            })
-            .Returns(Task.CompletedTask);
-
-        return mockFile;
+            _environmentMock.Object);
     }
 
     [Fact]
-    public async Task CreateTopupRequest_WithValidData_ReturnsCreated()
+    public async Task RequestTopup_WithValidData_ReturnsCreated()
     {
-        // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
-        SetupAuthenticatedUser(user1.Id);
-
-        // Add a bank account
-        var bankAccount = new BankAccount
-        {
-            BankName = "BCA",
-            AccountNumber = "1234567890",
-            AccountName = "Test Account"
-        };
-        _context.BankAccounts.Add(bankAccount);
-        await _context.SaveChangesAsync();
-
-        var fileContent = new byte[] { 0x01, 0x02, 0x03, 0x04 };
-        var mockFile = CreateMockFile("test.jpg", "image/jpeg", fileContent);
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
+        SetupAuthenticatedUser(user.Id);
 
         var request = new CreateTopupRequestDto
         {
-            BankAccountId = bankAccount.Id,
-            Amount = 100000,
-            Notes = "Test topup",
-            TransferProof = mockFile.Object
+            BankAccountId = 1,
+            Amount = 100000
         };
 
-        // Act
-        var result = await _controller.CreateTopupRequest(request);
+        var result = await _controller.RequestTopup(request);
 
-        // Assert
         var createdResult = result.Should().BeOfType<ObjectResult>().Subject;
         createdResult.StatusCode.Should().Be(201);
-        var response = createdResult.Value.Should().BeOfType<TopupResponse>().Subject;
 
+        var response = createdResult.Value.Should().BeOfType<TopupRequestResponse>().Subject;
         response.Success.Should().BeTrue();
         response.Status.Should().Be("pending");
-        response.Amount.Should().Be(100000);
+        response.Payment.BankName.Should().Be("BCA");
+        response.Payment.OriginalAmount.Should().Be(100000);
+        response.Payment.TotalAmount.Should().Be(response.Payment.OriginalAmount + response.Payment.UniqueCode);
+
+        var persistedTopup = await _context.TopupRequests.FirstOrDefaultAsync(t => t.Id == response.TopupId);
+        persistedTopup.Should().NotBeNull();
+        persistedTopup!.UserId.Should().Be(user.Id);
     }
 
     [Fact]
-    public async Task CreateTopupRequest_WithInvalidFileType_ReturnsBadRequest()
+    public async Task RequestTopup_WithInvalidBankAccount_ReturnsNotFound()
     {
-        // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
-        SetupAuthenticatedUser(user1.Id);
-
-        var bankAccount = new BankAccount
-        {
-            BankName = "BCA",
-            AccountNumber = "1234567890",
-            AccountName = "Test Account"
-        };
-        _context.BankAccounts.Add(bankAccount);
-        await _context.SaveChangesAsync();
-
-        var fileContent = new byte[] { 0x01, 0x02, 0x03, 0x04 };
-        var mockFile = CreateMockFile("test.exe", "application/exe", fileContent);
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
+        SetupAuthenticatedUser(user.Id);
 
         var request = new CreateTopupRequestDto
         {
-            BankAccountId = bankAccount.Id,
-            Amount = 100000,
-            TransferProof = mockFile.Object
+            BankAccountId = 99999,
+            Amount = 100000
         };
 
-        // Act
-        var result = await _controller.CreateTopupRequest(request);
+        var result = await _controller.RequestTopup(request);
 
-        // Assert
+        var notFoundResult = result.Should().BeOfType<NotFoundObjectResult>().Subject;
+        var error = notFoundResult.Value.Should().BeOfType<ErrorResponse>().Subject;
+        error.ErrorCode.Should().Be("BANK_ACCOUNT_NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task UploadTransferProof_WithInvalidFileType_ReturnsBadRequest()
+    {
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
+        SetupAuthenticatedUser(user.Id);
+
+        var topupRequest = await _topupService.CreateTopupRequestAsync(user.Id, 1, 100000);
+        topupRequest.Should().NotBeNull();
+
+        var mockFile = CreateMockFile("proof.exe", "application/octet-stream", [0x01, 0x02, 0x03]);
+
+        var result = await _controller.UploadTransferProof(topupRequest!.Id, mockFile.Object);
+
         var badRequestResult = result.Should().BeOfType<BadRequestObjectResult>().Subject;
         var error = badRequestResult.Value.Should().BeOfType<ErrorResponse>().Subject;
-
         error.ErrorCode.Should().Be("INVALID_FILE_TYPE");
     }
 
     [Fact]
-    public async Task CreateTopupRequest_WithInvalidBankAccount_ReturnsNotFound()
+    public async Task UploadTransferProof_WithValidFile_UpdatesTopupRequest()
     {
-        // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
-        SetupAuthenticatedUser(user1.Id);
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
+        SetupAuthenticatedUser(user.Id);
 
-        var fileContent = new byte[] { 0x01, 0x02, 0x03, 0x04 };
-        var mockFile = CreateMockFile("test.jpg", "image/jpeg", fileContent);
+        var topupRequest = await _topupService.CreateTopupRequestAsync(user.Id, 1, 100000);
+        topupRequest.Should().NotBeNull();
 
-        var request = new CreateTopupRequestDto
-        {
-            BankAccountId = 99999, // Invalid ID
-            Amount = 100000,
-            TransferProof = mockFile.Object
-        };
+        var mockFile = CreateMockFile("proof.jpg", "image/jpeg", [0x01, 0x02, 0x03, 0x04]);
 
-        // Act
-        var result = await _controller.CreateTopupRequest(request);
+        var result = await _controller.UploadTransferProof(topupRequest!.Id, mockFile.Object);
 
-        // Assert
-        var notFoundResult = result.Should().BeOfType<NotFoundObjectResult>().Subject;
-        var error = notFoundResult.Value.Should().BeOfType<ErrorResponse>().Subject;
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = okResult.Value.Should().BeOfType<TransferProofResponse>().Subject;
+        response.Success.Should().BeTrue();
+        response.TopupId.Should().Be(topupRequest.Id);
 
-        error.ErrorCode.Should().Be("BANK_ACCOUNT_NOT_FOUND");
+        var persistedTopup = await _context.TopupRequests.FirstAsync(t => t.Id == topupRequest.Id);
+        persistedTopup.TransferProofUrl.Should().StartWith("/uploads/topup/");
     }
 
     [Fact]
     public async Task GetTopupHistory_WithAuthenticatedUser_ReturnsHistory()
     {
-        // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
-        SetupAuthenticatedUser(user1.Id);
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
+        SetupAuthenticatedUser(user.Id);
 
-        var bankAccount = new BankAccount
-        {
-            BankName = "BCA",
-            AccountNumber = "1234567890",
-            AccountName = "Test Account"
-        };
-        _context.BankAccounts.Add(bankAccount);
-        await _context.SaveChangesAsync();
+        await _topupService.CreateTopupRequestAsync(user.Id, 1, 100000);
 
-        var topupRequest = new TopupRequest
-        {
-            Id = Guid.NewGuid(),
-            UserId = user1.Id,
-            BankAccountId = bankAccount.Id,
-            Amount = 100000,
-            TransferProofUrl = "/uploads/test.jpg",
-            Status = TopupStatus.Pending,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-        _context.TopupRequests.Add(topupRequest);
-        await _context.SaveChangesAsync();
-
-        // Act
         var result = await _controller.GetTopupHistory();
 
-        // Assert
         var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
         var response = okResult.Value.Should().BeOfType<TopupHistoryResponse>().Subject;
-
         response.Success.Should().BeTrue();
         response.Data.Should().NotBeEmpty();
         response.TotalRecords.Should().BeGreaterThan(0);
     }
 
     [Fact]
-    public async Task GetBankAccounts_ReturnsAllBankAccounts()
-    {
-        // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
-        SetupAuthenticatedUser(user1.Id);
-
-        var bankAccount = new BankAccount
-        {
-            BankName = "BCA",
-            AccountNumber = "1234567890",
-            AccountName = "Test Account"
-        };
-        _context.BankAccounts.Add(bankAccount);
-        await _context.SaveChangesAsync();
-
-        // Act
-        var result = await _controller.GetBankAccounts();
-
-        // Assert
-        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-        dynamic response = okResult.Value;
-
-        response.success.Should().Be(true);
-        response.data.Should().NotBeNull();
-    }
-
-    [Fact]
     public async Task GetTopupHistory_WithPagination_ReturnsCorrectPage()
     {
-        // Arrange
-        var user1 = await _context.Users.FirstAsync(u => u.Username == "user1");
-        SetupAuthenticatedUser(user1.Id);
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
+        SetupAuthenticatedUser(user.Id);
 
-        // Act
+        await _topupService.CreateTopupRequestAsync(user.Id, 1, 100000);
+
         var result = await _controller.GetTopupHistory(page: 1, pageSize: 10);
 
-        // Assert
         var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
         var response = okResult.Value.Should().BeOfType<TopupHistoryResponse>().Subject;
-
         response.Success.Should().BeTrue();
         response.Page.Should().Be(1);
         response.PageSize.Should().Be(10);
+    }
+
+    [Fact]
+    public async Task GetTopupDetail_WithExistingTopup_ReturnsDetail()
+    {
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
+        SetupAuthenticatedUser(user.Id);
+
+        var topupRequest = await _topupService.CreateTopupRequestAsync(user.Id, 1, 100000);
+        topupRequest.Should().NotBeNull();
+
+        var result = await _controller.GetTopupDetail(topupRequest!.Id);
+
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        dynamic response = okResult.Value!;
+
+        ((bool)response.success).Should().BeTrue();
+        ((Guid)response.data.id).Should().Be(topupRequest.Id);
+        ((decimal)response.data.amount).Should().Be(100000);
+        ((string)response.data.status).Should().Be(TopupStatus.Pending.ToString().ToLowerInvariant());
+    }
+
+    [Fact]
+    public async Task GetBankAccounts_ReturnsAllActiveBankAccounts()
+    {
+        var user = await _context.Users.FirstAsync(u => u.UserName == "user1");
+        SetupAuthenticatedUser(user.Id);
+
+        var result = await _controller.GetBankAccounts();
+
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        dynamic response = okResult.Value!;
+
+        ((bool)response.success).Should().BeTrue();
+        response.data.Should().NotBeNull();
     }
 
     public async ValueTask DisposeAsync()
     {
         await _context.CleanAsync();
         await _context.DisposeAsync();
+
+        if (Directory.Exists(_webRootPath))
+        {
+            Directory.Delete(_webRootPath, recursive: true);
+        }
+    }
+
+    private void SetupAuthenticatedUser(Guid userId)
+    {
+        var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, userId.ToString()) };
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims));
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = principal }
+        };
+    }
+
+    private static Mock<IFormFile> CreateMockFile(string fileName, string contentType, byte[] content)
+    {
+        var mockFile = new Mock<IFormFile>();
+        mockFile.Setup(f => f.FileName).Returns(fileName);
+        mockFile.Setup(f => f.ContentType).Returns(contentType);
+        mockFile.Setup(f => f.Length).Returns(content.Length);
+        mockFile.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
+            .Callback<Stream, CancellationToken>((stream, _) => stream.Write(content, 0, content.Length))
+            .Returns(Task.CompletedTask);
+
+        return mockFile;
     }
 }

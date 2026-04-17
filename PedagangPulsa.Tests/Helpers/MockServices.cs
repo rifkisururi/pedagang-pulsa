@@ -1,8 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
-using PedagangPulsa.Infrastructure.Data;
-using PedagangPulsa.Infrastructure.Suppliers;
+using PedagangPulsa.Application.Abstractions.Suppliers;
 
 namespace PedagangPulsa.Tests.Helpers;
 

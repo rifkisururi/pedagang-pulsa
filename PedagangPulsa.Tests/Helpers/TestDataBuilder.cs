@@ -26,10 +26,11 @@ public class TestDataBuilder
         return new User
         {
             Id = Guid.NewGuid(),
-            Username = username ?? $"testuser_{guid}",
+            UserName = username ?? $"testuser_{guid}",
             FullName = $"Test User {username}",
             Email = email ?? $"test_{guid}@test.com",
             Phone = phone ?? $"0812{guid.Substring(0, 8)}",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!"),
             PinHash = BCrypt.Net.BCrypt.HashPassword(pin),
             PinFailedAttempts = 0,
             PinLockedAt = null,

@@ -2,10 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using FluentAssertions;
+using PedagangPulsa.Application.Abstractions.Suppliers;
 using PedagangPulsa.Application.Services;
 using PedagangPulsa.Domain.Entities;
 using PedagangPulsa.Domain.Enums;
-using PedagangPulsa.Infrastructure.Suppliers;
 using PedagangPulsa.Tests.Helpers;
 using Xunit;
 
@@ -50,7 +50,7 @@ public class BalanceServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var initialActive = user.Balance!.ActiveBalance;
         var initialHeld = user.Balance.HeldBalance;
         var holdAmount = 50000m;
@@ -75,7 +75,7 @@ public class BalanceServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var initialActive = user.Balance!.ActiveBalance;
         var initialHeld = user.Balance.HeldBalance;
         var holdAmount = initialActive + 1000000m; // More than available
@@ -118,7 +118,7 @@ public class BalanceServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var holdAmount = 50000m;
         var refId = Guid.NewGuid();
 
@@ -144,7 +144,7 @@ public class BalanceServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var holdAmount = 50000m;
         await _transactionService.HoldBalanceAsync(user.Id, holdAmount, "TestHold", Guid.NewGuid());
 
@@ -170,7 +170,7 @@ public class BalanceServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var holdAmount = 50000m;
         await _transactionService.HoldBalanceAsync(user.Id, holdAmount, "TestHold", Guid.NewGuid());
 
@@ -195,7 +195,7 @@ public class BalanceServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var holdAmount = 50000m;
         await _transactionService.HoldBalanceAsync(user.Id, holdAmount, "TestHold", Guid.NewGuid());
 
@@ -220,7 +220,7 @@ public class BalanceServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var holdAmount = 50000m;
         await _transactionService.HoldBalanceAsync(user.Id, holdAmount, "TestHold", Guid.NewGuid());
 
@@ -247,7 +247,7 @@ public class BalanceServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var holdAmount = 50000m;
         await _transactionService.HoldBalanceAsync(user.Id, holdAmount, "TestHold", Guid.NewGuid());
 
@@ -274,7 +274,7 @@ public class BalanceServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var holdAmount = 50000m;
         await _transactionService.HoldBalanceAsync(user.Id, holdAmount, "TestHold", Guid.NewGuid());
 
@@ -299,7 +299,7 @@ public class BalanceServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var initialBalance = user.Balance!.ActiveBalance;
         var creditAmount = 100000m;
 
@@ -328,7 +328,7 @@ public class BalanceServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var initialBalance = user.Balance!.ActiveBalance;
         var debitAmount = -50000m;
 
@@ -357,7 +357,7 @@ public class BalanceServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var currentBalance = user.Balance!.ActiveBalance;
         var debitAmount = -(currentBalance + 1000000m); // More than available
 
@@ -386,7 +386,7 @@ public class BalanceServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var amount = 50000m;
 
         // Act
@@ -417,7 +417,7 @@ public class BalanceServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
 
         // Act - Perform multiple operations
         var refId1 = Guid.NewGuid();

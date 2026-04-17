@@ -2,11 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using FluentAssertions;
+using PedagangPulsa.Application.Abstractions.Suppliers;
 using PedagangPulsa.Application.Services;
 using PedagangPulsa.Domain.Entities;
 using PedagangPulsa.Domain.Enums;
-using PedagangPulsa.Infrastructure.Suppliers;
-using PedagangPulsa.Infrastructure.Suppliers.DTOs;
 using PedagangPulsa.Tests.Helpers;
 using Xunit;
 
@@ -53,7 +52,7 @@ public class TransactionServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var product = await _context.Products.FirstAsync(p => p.Code == "IS5");
         var destination = "08123456789";
         var amount = 5500m; // user1's price for IS5
@@ -87,7 +86,7 @@ public class TransactionServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var product = await _context.Products.FirstAsync(p => p.Code == "IS5");
         var destination = "08123456789";
         var amount = user.Balance!.ActiveBalance + 1000000m; // More than available
@@ -131,7 +130,7 @@ public class TransactionServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var product = await _context.Products.FirstAsync(p => p.Code == "IS5");
         var initialActive = user.Balance!.ActiveBalance;
         var initialHeld = user.Balance.HeldBalance;
@@ -161,7 +160,7 @@ public class TransactionServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var product = await _context.Products.FirstAsync(p => p.Code == "IS5");
         var amount = 5500m;
 
@@ -206,7 +205,7 @@ public class TransactionServiceTests : IAsyncLifetime
         // Create transaction
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var product = await _context.Products.FirstAsync(p => p.Code == "IS5");
         var createResult = await _transactionService.CreateTransactionAsync(
             user.Id,
@@ -259,7 +258,7 @@ public class TransactionServiceTests : IAsyncLifetime
         // Create transaction
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var product = await _context.Products.FirstAsync(p => p.Code == "IS5");
         var createResult = await _transactionService.CreateTransactionAsync(
             user.Id,
@@ -312,7 +311,7 @@ public class TransactionServiceTests : IAsyncLifetime
         // Create transaction
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var product = await _context.Products.FirstAsync(p => p.Code == "IS5");
         var createResult = await _transactionService.CreateTransactionAsync(
             user.Id,
@@ -353,7 +352,7 @@ public class TransactionServiceTests : IAsyncLifetime
 
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var product = await _context.Products.FirstAsync(p => p.Code == "IS5");
         var createResult = await _transactionService.CreateTransactionAsync(
             user.Id,
@@ -394,7 +393,7 @@ public class TransactionServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var holdAmount = 5500m;
         await _transactionService.HoldBalanceAsync(user.Id, holdAmount, "TestHold", Guid.NewGuid());
 
@@ -420,7 +419,7 @@ public class TransactionServiceTests : IAsyncLifetime
         // Arrange
         var user = await _context.Users
             .Include(u => u.Balance)
-            .FirstAsync(u => u.Username == "user1");
+            .FirstAsync(u => u.UserName == "user1");
         var holdAmount = 5500m;
         await _transactionService.HoldBalanceAsync(user.Id, holdAmount, "TestHold", Guid.NewGuid());
 

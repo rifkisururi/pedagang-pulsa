@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\PedagangPulsa.Application\PedagangPulsa.Application.csproj" />
     <ProjectReference Include="..\PedagangPulsa.Domain\PedagangPulsa.Domain.csproj" />
   </ItemGroup>
 

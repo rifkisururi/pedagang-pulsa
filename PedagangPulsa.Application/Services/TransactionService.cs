@@ -1,22 +1,21 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
+using PedagangPulsa.Application.Abstractions.Persistence;
+using PedagangPulsa.Application.Abstractions.Suppliers;
 using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Domain.Entities;
-using PedagangPulsa.Infrastructure.Data;
-using PedagangPulsa.Infrastructure.Suppliers;
-using PedagangPulsa.Infrastructure.Suppliers.DTOs;
 
 namespace PedagangPulsa.Application.Services;
 
 public class TransactionService
 {
-    private readonly AppDbContext _context;
+    private readonly IAppDbContext _context;
     private readonly ISupplierAdapterFactory _adapterFactory;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<TransactionService> _logger;
 
     public TransactionService(
-        AppDbContext context,
+        IAppDbContext context,
         ISupplierAdapterFactory adapterFactory,
         ILoggerFactory loggerFactory)
     {
@@ -66,6 +65,7 @@ public class TransactionService
         // Create transaction
         var transaction = new Transaction
         {
+            Id = Guid.NewGuid(),
             UserId = userId,
             ProductId = productId,
             Destination = destination,
@@ -451,10 +451,11 @@ public class TransactionService
         // Apply search filter
         if (!string.IsNullOrWhiteSpace(search))
         {
+            var searchLower = search.Trim().ToLower();
             query = query.Where(t =>
-                EF.Functions.ILike(t.Destination, $"%{search}%") ||
-                EF.Functions.ILike(t.Sn ?? "", $"%{search}%") ||
-                EF.Functions.ILike(t.SupplierTrxId ?? "", $"%{search}%"));
+                t.Destination.ToLower().Contains(searchLower) ||
+                ((t.Sn ?? "").ToLower().Contains(searchLower)) ||
+                ((t.SupplierTrxId ?? "").ToLower().Contains(searchLower)));
         }
 
         // Apply user filter

@@ -2,12 +2,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PedagangPulsa.Api.DTOs;
+using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Application.Services;
-using PedagangPulsa.Domain.Entities;
 using PedagangPulsa.Domain.Enums;
-using PedagangPulsa.Infrastructure.Data;
-using System.Data;
-using System.Data.Common;
 using System.Security.Claims;
 
 namespace PedagangPulsa.Api.Controllers;
@@ -17,14 +14,14 @@ namespace PedagangPulsa.Api.Controllers;
 [Authorize]
 public class TopupController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IAppDbContext _context;
     private readonly TopupService _topupService;
     private readonly ILogger<TopupController> _logger;
     private readonly IConfiguration _configuration;
     private readonly IWebHostEnvironment _environment;
 
     public TopupController(
-        AppDbContext context,
+        IAppDbContext context,
         TopupService topupService,
         ILogger<TopupController> logger,
         IConfiguration configuration,
@@ -134,7 +131,7 @@ public class TopupController : ControllerBase
     /// Step 2: Upload bukti transfer untuk topup request yang sudah dibuat
     /// </summary>
     [HttpPost("{id:guid}/proof")]
-    public async Task<IActionResult> UploadTransferProof(Guid id, [FromForm] IFormFile transferProof)
+    public async Task<IActionResult> UploadTransferProof(Guid id, IFormFile transferProof)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId == null || !Guid.TryParse(userId, out var userGuid))
@@ -275,29 +272,8 @@ public class TopupController : ControllerBase
             });
         }
 
-        var connection = await OpenConnectionAsync();
-        await using var command = CreateCommand(connection, """
-            SELECT
-                t."Id",
-                t."Amount",
-                t."UniqueCode",
-                t."Status",
-                t."TransferProofUrl",
-                b."BankName",
-                b."AccountNumber",
-                b."AccountName",
-                t."RejectReason",
-                t."CreatedAt",
-                t."UpdatedAt"
-            FROM "TopupRequests" AS t
-            LEFT JOIN "BankAccounts" AS b ON b."Id" = t."BankAccountId"
-            WHERE t."Id" = @id AND t."UserId" = @userId
-            """);
-        AddParameter(command, "@id", id);
-        AddParameter(command, "@userId", userGuid);
-
-        await using var reader = await command.ExecuteReaderAsync();
-        if (!await reader.ReadAsync())
+        var topupRequest = await _topupService.GetUserTopupRequestAsync(id, userGuid);
+        if (topupRequest == null)
         {
             return NotFound(new ErrorResponse
             {
@@ -306,26 +282,23 @@ public class TopupController : ControllerBase
             });
         }
 
-        var amount = reader.GetDecimal(reader.GetOrdinal("Amount"));
-        var uniqueCode = reader.GetInt32(reader.GetOrdinal("UniqueCode"));
-
         return Ok(new
         {
             success = true,
             data = new
             {
-                id = reader.GetGuid(reader.GetOrdinal("Id")),
-                amount = amount,
-                uniqueCode = uniqueCode,
-                totalAmount = amount + uniqueCode,
-                status = reader.GetString(reader.GetOrdinal("Status")).ToLowerInvariant(),
-                transferProofUrl = reader["TransferProofUrl"] as string,
-                bankName = reader["BankName"] as string,
-                accountNumber = reader["AccountNumber"] as string,
-                accountName = reader["AccountName"] as string,
-                rejectReason = reader["RejectReason"] as string,
-                createdAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                updatedAt = reader["UpdatedAt"] is DBNull ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("UpdatedAt"))
+                id = topupRequest.Id,
+                amount = topupRequest.Amount,
+                uniqueCode = topupRequest.UniqueCode,
+                totalAmount = topupRequest.Amount + topupRequest.UniqueCode,
+                status = topupRequest.Status.ToString().ToLowerInvariant(),
+                transferProofUrl = topupRequest.TransferProofUrl,
+                bankName = topupRequest.BankAccount?.BankName,
+                accountNumber = topupRequest.BankAccount?.AccountNumber,
+                accountName = topupRequest.BankAccount?.AccountName,
+                rejectReason = topupRequest.RejectReason,
+                createdAt = topupRequest.CreatedAt,
+                updatedAt = topupRequest.UpdatedAt
             }
         });
     }
@@ -348,70 +321,25 @@ public class TopupController : ControllerBase
             });
         }
 
-        var connection = await OpenConnectionAsync();
-        var topupItems = new List<TopupHistoryItem>();
-
-        await using (var historyCommand = CreateCommand(connection, """
-            SELECT
-                t."Id",
-                t."Amount",
-                t."UniqueCode",
-                t."Status",
-                t."TransferProofUrl",
-                b."BankName",
-                b."AccountNumber",
-                t."RejectReason",
-                t."CreatedAt",
-                t."UpdatedAt"
-            FROM "TopupRequests" AS t
-            LEFT JOIN "BankAccounts" AS b ON b."Id" = t."BankAccountId"
-            WHERE t."UserId" = @userId
-            ORDER BY t."CreatedAt" DESC
-            LIMIT @limit OFFSET @offset
-            """))
-        {
-            AddParameter(historyCommand, "@userId", userGuid);
-            AddParameter(historyCommand, "@limit", pageSize);
-            AddParameter(historyCommand, "@offset", (page - 1) * pageSize);
-
-            await using var historyReader = await historyCommand.ExecuteReaderAsync();
-            while (await historyReader.ReadAsync())
-            {
-                var amount = historyReader.GetDecimal(historyReader.GetOrdinal("Amount"));
-                var uniqueCode = historyReader.GetInt32(historyReader.GetOrdinal("UniqueCode"));
-
-                topupItems.Add(new TopupHistoryItem
-                {
-                    Id = historyReader.GetGuid(historyReader.GetOrdinal("Id")),
-                    Amount = amount,
-                    UniqueCode = uniqueCode,
-                    TotalAmount = amount + uniqueCode,
-                    Status = historyReader.GetString(historyReader.GetOrdinal("Status")).ToLowerInvariant(),
-                    TransferProofUrl = historyReader["TransferProofUrl"] as string,
-                    BankName = historyReader["BankName"] as string,
-                    BankAccountNumber = historyReader["AccountNumber"] as string,
-                    RejectReason = historyReader["RejectReason"] as string,
-                    CreatedAt = historyReader.GetDateTime(historyReader.GetOrdinal("CreatedAt")),
-                    UpdatedAt = historyReader["UpdatedAt"] is DBNull ? null : historyReader.GetDateTime(historyReader.GetOrdinal("UpdatedAt"))
-                });
-            }
-        }
-
-        int totalRecords;
-        await using (var countCommand = CreateCommand(connection, """
-            SELECT COUNT(*)
-            FROM "TopupRequests"
-            WHERE "UserId" = @userId
-            """))
-        {
-            AddParameter(countCommand, "@userId", userGuid);
-            totalRecords = Convert.ToInt32(await countCommand.ExecuteScalarAsync());
-        }
+        var (topups, totalRecords) = await _topupService.GetUserTopupHistoryAsync(userGuid, page, pageSize);
 
         return Ok(new TopupHistoryResponse
         {
             Success = true,
-            Data = topupItems,
+            Data = topups.Select(t => new TopupHistoryItem
+            {
+                Id = t.Id,
+                Amount = t.Amount,
+                UniqueCode = t.UniqueCode,
+                TotalAmount = t.Amount + t.UniqueCode,
+                Status = t.Status.ToString().ToLowerInvariant(),
+                TransferProofUrl = t.TransferProofUrl,
+                BankName = t.BankAccount?.BankName,
+                BankAccountNumber = t.BankAccount?.AccountNumber,
+                RejectReason = t.RejectReason,
+                CreatedAt = t.CreatedAt,
+                UpdatedAt = t.UpdatedAt
+            }).ToList(),
             TotalRecords = totalRecords,
             Page = page,
             PageSize = pageSize
@@ -442,31 +370,5 @@ public class TopupController : ControllerBase
             success = true,
             data = bankAccounts
         });
-    }
-
-    private async Task<DbConnection> OpenConnectionAsync()
-    {
-        var connection = _context.Database.GetDbConnection();
-        if (connection.State != ConnectionState.Open)
-        {
-            await connection.OpenAsync();
-        }
-
-        return connection;
-    }
-
-    private static DbCommand CreateCommand(DbConnection connection, string commandText)
-    {
-        var command = connection.CreateCommand();
-        command.CommandText = commandText;
-        return command;
-    }
-
-    private static void AddParameter(DbCommand command, string parameterName, object? value)
-    {
-        var parameter = command.CreateParameter();
-        parameter.ParameterName = parameterName;
-        parameter.Value = value ?? DBNull.Value;
-        command.Parameters.Add(parameter);
     }
 }

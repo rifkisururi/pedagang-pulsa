@@ -70,7 +70,7 @@
     <div class="col-lg-7">
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-white">
-                <h5 class="card-title mb-0">Price per Level</h5>
+                <h5 class="card-title mb-0">Margin per Level</h5>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
@@ -78,6 +78,8 @@
                         <thead class="table-light">
                             <tr>
                                 <th>Level</th>
+                                <th class="text-end">Cost Price</th>
+                                <th class="text-end">Margin</th>
                                 <th class="text-end">Sell Price</th>
                             </tr>
                         </thead>
@@ -88,7 +90,9 @@
                                     <td>
                                         <span class="badge bg-primary">@price.LevelName</span>
                                     </td>
-                                    <td class="text-end fw-bold">Rp @price.SellPrice.ToString("N2")</td>
+                                    <td class="text-end">Rp @price.CostPrice.ToString("N0")</td>
+                                    <td class="text-end text-primary">Rp @price.Margin.ToString("N0")</td>
+                                    <td class="text-end fw-bold">Rp @price.ComputedSellPrice.ToString("N0")</td>
                                 </tr>
                             }
                         </tbody>

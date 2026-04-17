@@ -1,17 +1,17 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
+using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Domain.Entities;
-using PedagangPulsa.Infrastructure.Data;
 
 namespace PedagangPulsa.Application.Services;
 
 public class ReferralService
 {
-    private readonly AppDbContext _context;
+    private readonly IAppDbContext _context;
     private readonly ILogger<ReferralService> _logger;
 
-    public ReferralService(AppDbContext context, ILogger<ReferralService> logger)
+    public ReferralService(IAppDbContext context, ILogger<ReferralService> logger)
     {
         _context = context;
         _logger = logger;

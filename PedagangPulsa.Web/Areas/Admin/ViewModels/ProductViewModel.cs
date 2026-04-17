@@ -30,7 +30,6 @@ public class ProductViewModel
 
     public List<LevelPriceItem>? LevelPrices { get; set; }
 
-    // Lists for dropdowns
     public List<CategoryItem> AvailableCategories { get; set; } = new();
     public List<LevelItem> AvailableLevels { get; set; } = new();
 
@@ -49,6 +48,6 @@ public class ProductViewModel
     public class LevelPriceItem
     {
         public int LevelId { get; set; }
-        public decimal SellPrice { get; set; }
+        public decimal Margin { get; set; } = 200;
     }
 }

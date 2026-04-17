@@ -1,17 +1,17 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
+using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Domain.Entities;
-using PedagangPulsa.Infrastructure.Data;
 
 namespace PedagangPulsa.Application.Services;
 
 public class BalanceService
 {
-    private readonly AppDbContext _context;
+    private readonly IAppDbContext _context;
     private readonly ILogger<BalanceService> _logger;
 
-    public BalanceService(AppDbContext context, ILogger<BalanceService> logger)
+    public BalanceService(IAppDbContext context, ILogger<BalanceService> logger)
     {
         _context = context;
         _logger = logger;

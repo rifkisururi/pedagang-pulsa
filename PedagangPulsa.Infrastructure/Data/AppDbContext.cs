@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Domain.Entities;
 using PedagangPulsa.Domain.Enums;
 
 namespace PedagangPulsa.Infrastructure.Data;
 
-public class AppDbContext : DbContext
+public class AppDbContext : DbContext, IAppDbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
@@ -50,6 +51,9 @@ public class AppDbContext : DbContext
     public DbSet<NotificationTemplate> NotificationTemplates { get; set; }
     public DbSet<NotificationLog> NotificationLogs { get; set; }
 
+    // Device
+    public DbSet<UserDevice> UserDevices { get; set; }
+
     // Admin & Audit
     public DbSet<AdminUser> AdminUsers { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
@@ -63,7 +67,7 @@ public class AppDbContext : DbContext
         modelBuilder.HasPostgresEnum("transaction_status", new[] { "pending", "processing", "success", "failed", "refunded", "cancelled" });
         modelBuilder.HasPostgresEnum("attempt_status", new[] { "pending", "processing", "success", "failed", "timeout" });
         modelBuilder.HasPostgresEnum("topup_status", new[] { "pending", "approved", "rejected" });
-        modelBuilder.HasPostgresEnum("notification_channel", new[] { "email", "sms", "whatsapp" });
+        modelBuilder.HasPostgresEnum("notification_channel", new[] { "email", "sms", "whatsapp", "push" });
         modelBuilder.HasPostgresEnum("markup_type", new[] { "percentage", "fixed" });
         modelBuilder.HasPostgresEnum("admin_role", new[] { "superadmin", "admin", "finance", "staff" });
         modelBuilder.HasPostgresEnum("referral_bonus_status", new[] { "pending", "paid", "cancelled" });
@@ -298,7 +302,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<ProductLevelPrice>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.SellPrice).HasPrecision(15, 2).IsRequired();
+            entity.Property(e => e.Margin).HasPrecision(15, 2).IsRequired();
             entity.HasIndex(e => new { e.ProductId, e.LevelId, e.IsActive });
             entity.HasOne(e => e.Product)
                 .WithMany(p => p.ProductLevelPrices)
@@ -468,6 +472,23 @@ public class AppDbContext : DbContext
                 .HasForeignKey(e => e.UserId);
         });
 
+        // UserDevice
+        modelBuilder.Entity<UserDevice>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.FcmToken).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.DeviceName).HasMaxLength(100);
+            entity.Property(e => e.Platform).HasMaxLength(20);
+            entity.Property(e => e.AppVersion).HasMaxLength(20);
+            entity.HasIndex(e => new { e.UserId, e.FcmToken }).IsUnique();
+            entity.HasIndex(e => e.FcmToken);
+            entity.HasIndex(e => e.IsActive);
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // AdminUser
         modelBuilder.Entity<AdminUser>(entity =>
         {
@@ -496,7 +517,7 @@ public class AppDbContext : DbContext
         modelBuilder.HasPostgresEnum("transaction_status", new[] { "pending", "processing", "success", "failed", "refunded", "cancelled" });
         modelBuilder.HasPostgresEnum("attempt_status", new[] { "pending", "processing", "success", "failed", "timeout" });
         modelBuilder.HasPostgresEnum("topup_status", new[] { "pending", "approved", "rejected" });
-        modelBuilder.HasPostgresEnum("notification_channel", new[] { "email", "sms", "whatsapp" });
+        modelBuilder.HasPostgresEnum("notification_channel", new[] { "email", "sms", "whatsapp", "push" });
         modelBuilder.HasPostgresEnum("markup_type", new[] { "percentage", "fixed" });
         modelBuilder.HasPostgresEnum("admin_role", new[] { "superadmin", "admin", "finance", "staff" });
         modelBuilder.HasPostgresEnum("referral_bonus_status", new[] { "pending", "paid", "cancelled" });

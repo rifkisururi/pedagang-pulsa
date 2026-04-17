@@ -5,10 +5,6 @@ using PedagangPulsa.Infrastructure.Data;
 
 namespace PedagangPulsa.Tests.Helpers;
 
-/// <summary>
-/// PostgreSQL database context for testing
-/// Uses the same database as the web application
-/// </summary>
 public class TestDbContext : AppDbContext
 {
     private static int _categoryIdCounter = 1;
@@ -16,109 +12,34 @@ public class TestDbContext : AppDbContext
     private static int _supplierBalanceIdCounter = 1;
     private static int _productLevelPriceIdCounter = 1;
 
-    public bool IsInMemory => false;
+    public bool IsInMemory => true;
 
-    public TestDbContext() : base(
-        CreateOptions())
+    public TestDbContext()
+        : base(CreateOptions())
     {
+        Database.EnsureCreated();
     }
 
     private static DbContextOptions<AppDbContext> CreateOptions()
     {
-        // Use the dev database connection string
-        var connectionString = "Host=ep-noisy-rain-a1pqpydc-pooler.ap-southeast-1.aws.neon.tech;Username=neondb_owner;Password=npg_a1pMW8UqCKVI;Database=neondb;SSL Mode=Require;Trust Server Certificate=true";
-
         return new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(connectionString)
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .EnableSensitiveDataLogging()
             .EnableDetailedErrors()
             .Options;
     }
 
-    /// <summary>
-    /// Clean up database before seeding to avoid primary key conflicts
-    /// Uses TRUNCATE with CASCADE for efficient cleanup
-    /// </summary>
     public async Task CleanupBeforeSeedAsync()
     {
-        // Use TRUNCATE with CASCADE for efficient cleanup and restart sequences
-        // This is safer than DELETE as it handles foreign keys automatically
-        var tables = new[]
-        {
-            "\"AdminUsers\"",
-            "\"Suppliers\"",
-            "\"SupplierBalances\"",
-            "\"SupplierBalanceLedgers\"",
-            "\"SupplierCallbacks\"",
-            "\"SupplierProducts\"",
-            "\"TopupRequests\"",
-            "\"ReferralLogs\"",
-            "\"UserLevels\"",
-            "\"UserLevelConfigs\"",
-            "\"Users\"",
-            "\"UserBalances\"",
-            "\"BalanceLedgers\"",
-            "\"RefreshTokens\"",
-            "\"Products\"",
-            "\"ProductLevelPrices\"",
-            "\"ProductCategories\"",
-            "\"Transactions\"",
-            "\"TransactionAttempts\"",
-            "\"IdempotencyKeys\""
-        };
-
-        foreach (var table in tables)
-        {
-            try
-            {
-                await Database.ExecuteSqlRawAsync($"TRUNCATE TABLE {table} CASCADE");
-            }
-            catch
-            {
-                // Table might not exist or already truncated, continue
-            }
-        }
-
-        // Restart sequences to ensure IDs start from 1
-        await RestartSequencesAsync();
+        await Database.EnsureDeletedAsync();
+        await Database.EnsureCreatedAsync();
+        ResetCounters();
     }
 
-    /// <summary>
-    /// Restart all sequences to 1
-    /// </summary>
-    private async Task RestartSequencesAsync()
-    {
-        var sequences = new[]
-        {
-            "\"ProductCategories_Id_seq\"",
-            "\"UserLevels_Id_seq\"",
-            "\"SupplierBalances_Id_seq\"",
-            "\"SupplierProducts_Id_seq\"",
-            "\"ProductLevelPrices_Id_seq\""
-        };
-
-        foreach (var sequence in sequences)
-        {
-            try
-            {
-                await Database.ExecuteSqlRawAsync($"ALTER SEQUENCE {sequence} RESTART WITH 1");
-            }
-            catch
-            {
-                // Sequence might not exist, ignore error
-            }
-        }
-    }
-
-    /// <summary>
-    /// Seed database with test data
-    /// </summary>
     public async Task SeedAsync()
     {
-        // Clean up first to avoid conflicts
         await CleanupBeforeSeedAsync();
 
-        // Add user levels - Let database auto-generate IDs
         var member1Level = new UserLevel
         {
             Name = "Member1",
@@ -142,80 +63,64 @@ public class TestDbContext : AppDbContext
         UserLevels.AddRange(member1Level, member2Level);
         await SaveChangesAsync();
 
-        // Get the generated IDs for use in creating users
-        var member1LevelId = member1Level.Id;
-        var member2LevelId = member2Level.Id;
-
-        // Add admin user
-        var adminUser = new AdminUser
+        AdminUsers.Add(new AdminUser
         {
             Id = Guid.NewGuid(),
             Username = "admin",
             Email = "admin@test.com",
-            PasswordHash = "hashed_password",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!", workFactor: 12),
             Role = AdminRole.SuperAdmin,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
-        };
+        });
 
-        AdminUsers.Add(adminUser);
-        await SaveChangesAsync();
-
-        // Add test users
         var user1 = CreateUser(
             username: "user1",
             email: "user1@test.com",
             phone: "08123456789",
-            levelId: member1LevelId,
-            referralCode: "USER1ABC"
-        );
+            levelId: member1Level.Id,
+            referralCode: "USER1ABC");
 
         var user2 = CreateUser(
             username: "user2",
             email: "user2@test.com",
             phone: "08123456790",
-            levelId: member2LevelId,
+            levelId: member2Level.Id,
             referralCode: "USER2XYZ",
-            referredBy: user1.Id
-        );
+            referredBy: user1.Id);
 
         Users.AddRange(user1, user2);
+
+        UserBalances.AddRange(
+            new UserBalance
+            {
+                UserId = user1.Id,
+                ActiveBalance = 1000000,
+                HeldBalance = 0,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new UserBalance
+            {
+                UserId = user2.Id,
+                ActiveBalance = 500000,
+                HeldBalance = 0,
+                UpdatedAt = DateTime.UtcNow
+            });
+
         await SaveChangesAsync();
 
-        // Add user balances
-        var balance1 = new UserBalance
-        {
-            UserId = user1.Id,
-            ActiveBalance = 1000000,
-            HeldBalance = 0,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-        var balance2 = new UserBalance
-        {
-            UserId = user2.Id,
-            ActiveBalance = 500000,
-            HeldBalance = 0,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-        UserBalances.AddRange(balance1, balance2);
-        await SaveChangesAsync();
-
-        // Add product category
         var category = new ProductCategory
         {
             Id = _categoryIdCounter++,
             Name = "Pulsa",
             Code = "PULSA",
+            SortOrder = 1,
             IsActive = true
         };
 
         ProductCategories.Add(category);
-        await SaveChangesAsync();
 
-        // Add products
         var product1 = new Product
         {
             Id = Guid.NewGuid(),
@@ -241,101 +146,90 @@ public class TestDbContext : AppDbContext
         Products.AddRange(product1, product2);
         await SaveChangesAsync();
 
-        // Add product level prices
         ProductLevelPrices.AddRange(
             new ProductLevelPrice
             {
                 Id = _productLevelPriceIdCounter++,
                 ProductId = product1.Id,
-                LevelId = member1LevelId,
-                SellPrice = 5500,
+                LevelId = member1Level.Id,
+                Margin = 300,
                 IsActive = true
             },
             new ProductLevelPrice
             {
-                Id = _productLevelPriceIdCounter++,
+                Id = _productLevelPriceCounter(),
                 ProductId = product1.Id,
-                LevelId = member2LevelId,
-                SellPrice = 5300,
+                LevelId = member2Level.Id,
+                Margin = 100,
                 IsActive = true
             },
             new ProductLevelPrice
             {
-                Id = _productLevelPriceIdCounter++,
+                Id = _productLevelPriceCounter(),
                 ProductId = product2.Id,
-                LevelId = member1LevelId,
-                SellPrice = 10500,
+                LevelId = member1Level.Id,
+                Margin = 400,
                 IsActive = true
             },
             new ProductLevelPrice
             {
-                Id = _productLevelPriceIdCounter++,
+                Id = _productLevelPriceCounter(),
                 ProductId = product2.Id,
-                LevelId = member2LevelId,
-                SellPrice = 10300,
+                LevelId = member2Level.Id,
+                Margin = 200,
                 IsActive = true
-            }
-        );
+            });
+
+        Suppliers.AddRange(
+            new Supplier
+            {
+                Id = 1,
+                Name = "Digiflazz",
+                Code = "DIGIFLAZZ",
+                ApiBaseUrl = "https://api.digiflazz.com",
+                MemberId = "test_member_id",
+                Pin = "test_pin",
+                Password = "test_password",
+                IsActive = true,
+                TimeoutSeconds = 30
+            },
+            new Supplier
+            {
+                Id = 2,
+                Name = "VIPReseller",
+                Code = "VIPRESELLER",
+                ApiBaseUrl = "https://api.vipreseller.com",
+                MemberId = "test_member_id",
+                Pin = "test_pin",
+                Password = "test_password",
+                IsActive = true,
+                TimeoutSeconds = 30
+            });
+
         await SaveChangesAsync();
 
-        // Add suppliers
-        var supplier1 = new Supplier
-        {
-            Name = "Digiflazz",
-            Code = "DIGIFLAZZ",
-            ApiBaseUrl = "https://api.digiflazz.com",
-            MemberId = "test_member_id",
-            Pin = "test_pin",
-            Password = "test_password",
-            IsActive = true,
-            TimeoutSeconds = 30
-        };
-
-        var supplier2 = new Supplier
-        {
-            Name = "VIPReseller",
-            Code = "VIPRESELLER",
-            ApiBaseUrl = "https://api.vipreseller.com",
-            MemberId = "test_member_id",
-            Pin = "test_pin",
-            Password = "test_password",
-            IsActive = true,
-            TimeoutSeconds = 30
-        };
-
-        Suppliers.AddRange(supplier1, supplier2);
-        await SaveChangesAsync();
-
-        // Reload suppliers to get their auto-generated IDs
-        var supplier1Id = Suppliers.Where(s => s.Code == "DIGIFLAZZ").Select(s => s.Id).First();
-        var supplier2Id = Suppliers.Where(s => s.Code == "VIPRESELLER").Select(s => s.Id).First();
-
-        // Add supplier balances using actual supplier IDs
         SupplierBalances.AddRange(
             new SupplierBalance
             {
                 Id = _supplierBalanceIdCounter++,
-                SupplierId = supplier1Id,
+                SupplierId = 1,
                 ActiveBalance = 5000000,
                 UpdatedAt = DateTime.UtcNow
             },
             new SupplierBalance
             {
                 Id = _supplierBalanceIdCounter++,
-                SupplierId = supplier2Id,
+                SupplierId = 2,
                 ActiveBalance = 3000000,
                 UpdatedAt = DateTime.UtcNow
-            }
-        );
-        await SaveChangesAsync();
+            });
 
-        // Add supplier products using actual supplier IDs
         SupplierProducts.AddRange(
             new SupplierProduct
             {
                 Id = _supplierProductIdCounter++,
                 ProductId = product1.Id,
-                SupplierId = supplier1Id,
+                SupplierId = 1,
                 SupplierProductCode = "IS5",
                 SupplierProductName = "Indosat 5.000",
                 CostPrice = 5200,
@@ -346,19 +240,54 @@ public class TestDbContext : AppDbContext
             {
                 Id = _supplierProductIdCounter++,
                 ProductId = product1.Id,
-                SupplierId = supplier2Id,
+                SupplierId = 2,
                 SupplierProductCode = "IS5",
                 SupplierProductName = "Indosat 5.000",
                 CostPrice = 5250,
                 Seq = 2,
                 IsActive = true
-            }
-        );
+            },
+            new SupplierProduct
+            {
+                Id = _supplierProductIdCounter++,
+                ProductId = product2.Id,
+                SupplierId = 1,
+                SupplierProductCode = "TS10",
+                SupplierProductName = "Telkomsel 10.000",
+                CostPrice = 10100,
+                Seq = 1,
+                IsActive = true
+            });
+
+        BankAccounts.Add(new BankAccount
+        {
+            Id = 1,
+            BankName = "BCA",
+            AccountName = "Pedagang Pulsa",
+            AccountNumber = "1234567890",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        });
 
         await SaveChangesAsync();
     }
 
-    private User CreateUser(
+    public async Task CleanAsync()
+    {
+        await CleanupBeforeSeedAsync();
+    }
+
+    private static void ResetCounters()
+    {
+        _categoryIdCounter = 1;
+        _supplierProductIdCounter = 1;
+        _supplierBalanceIdCounter = 1;
+        _productLevelPriceIdCounter = 1;
+    }
+
+    private static int _productLevelPriceCounter() => _productLevelPriceIdCounter++;
+
+    private static User CreateUser(
         string username,
         string email,
         string phone,
@@ -369,11 +298,12 @@ public class TestDbContext : AppDbContext
         return new User
         {
             Id = Guid.NewGuid(),
-            Username = username,
+            UserName = username,
             FullName = $"Test {username}",
             Email = email,
             Phone = phone,
-            PinHash = BCrypt.Net.BCrypt.HashPassword("123456"),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!", workFactor: 12),
+            PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
             PinFailedAttempts = 0,
             PinLockedAt = null,
             LevelId = levelId,
@@ -386,18 +316,5 @@ public class TestDbContext : AppDbContext
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
-    }
-
-    /// <summary>
-    /// Clean up database
-    /// </summary>
-    public async Task CleanAsync()
-    {
-        await CleanupBeforeSeedAsync();
-    }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        // Don't configure again, already configured in constructor
     }
 }

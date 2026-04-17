@@ -1,16 +1,16 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
+using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Domain.Entities;
-using PedagangPulsa.Infrastructure.Data;
 
 namespace PedagangPulsa.Application.Services;
 
 public class SupplierProductService
 {
-    private readonly AppDbContext _context;
+    private readonly IAppDbContext _context;
 
-    public SupplierProductService(AppDbContext context)
+    public SupplierProductService(IAppDbContext context)
     {
         _context = context;
     }

@@ -1,7 +1,7 @@
 # PedagangPulsa API Documentation
 
-## Version: 1.0.0
-## Last Updated: 2026-04-03
+## Version: 1.2.0
+## Last Updated: 2026-04-11
 
 ---
 
@@ -43,7 +43,7 @@ Scalar is only enabled when `ASPNETCORE_ENVIRONMENT=Development`. The underlying
 
 ## Authentication
 
-The API uses JWT (JSON Web Token) based authentication. All endpoints except `/api/auth/register` and `/api/auth/login` require authentication.
+The API uses JWT (JSON Web Token) based authentication. All endpoints except `/api/auth/register`, `/api/auth/login`, and `/api/auth/refresh` require authentication.
 
 ### Authentication Flow
 
@@ -77,9 +77,26 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
 
 ```json
 {
+  "success": false,
   "message": "Error message",
   "errorCode": "ERROR_CODE",
-  "errors": ["Detailed error messages"]
+  "errors": ["Detailed error messages"],
+  "timestamp": "2026-04-11T04:22:16.5869482Z"
+}
+```
+
+### Paged Response
+
+All list endpoints return a paginated response format:
+
+```json
+{
+  "success": true,
+  "data": [ ... ],
+  "totalRecords": 100,
+  "page": 1,
+  "pageSize": 20,
+  "totalPages": 5
 }
 ```
 
@@ -90,12 +107,14 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
 | Error Code | HTTP Status | Description |
 |------------|-------------|-------------|
 | `INVALID_TOKEN` | 401 | Access token is invalid or expired |
+| `INVALID_TOKEN_FORMAT` | 401 | Token format is invalid (missing or malformed) |
 | `INVALID_CREDENTIALS` | 401 | Username or password is incorrect |
 | `ACCOUNT_INACTIVE` | 401 | User account is not active |
 | `ACCOUNT_LOCKED` | 429 | Account locked due to multiple failed attempts |
 | `INVALID_PIN` | 401 | PIN verification failed |
 | `INVALID_PIN_SESSION` | 401 | PIN session token is invalid or expired |
 | `DUPLICATE_FIELD` | 400 | Username, email, or phone already exists |
+| `CONFIG_ERROR` | 500 | System configuration error |
 | `VALIDATION_ERROR` | 400 | Request validation failed |
 | `USER_NOT_FOUND` | 404 | User not found |
 | `PRODUCT_NOT_FOUND` | 404 | Product not found |
@@ -103,6 +122,7 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
 | `INSUFFICIENT_BALANCE` | 400 | Insufficient balance for transaction |
 | `BANK_ACCOUNT_NOT_FOUND` | 404 | Bank account not found |
 | `INVALID_FILE_TYPE` | 400 | Invalid file type for upload |
+| `MISSING_FILE` | 400 | No file uploaded in request |
 | `FILE_TOO_LARGE` | 400 | File size exceeds limit |
 | `RECIPIENT_NOT_FOUND` | 404 | Transfer recipient not found |
 | `INVALID_TRANSFER` | 400 | Invalid transfer operation |
@@ -113,7 +133,9 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
 | `INVALID_TOPUP_STATUS` | 400 | Cannot upload proof for current status |
 | `PROOF_ALREADY_UPLOADED` | 400 | Transfer proof already uploaded |
 | `CREATE_TOPUP_FAILED` | 400 | Failed to create topup request |
+| `TOPUP_ERROR` | 500 | Error processing topup request |
 | `UPLOAD_ERROR` | 500 | Error uploading transfer proof |
+| `TRANSFER_ERROR` | 500 | Error processing transfer |
 
 ---
 
@@ -301,7 +323,7 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
 
 **Endpoint**: `GET /api/product/categories`
 
-**Description**: Get all product categories
+**Description**: Get all product categories with their sub-categories (operators). Categories are ordered by sort order. Sub-categories are derived from distinct operators of active products in each category.
 
 **Headers**:
 - `Authorization: Bearer {access_token}`
@@ -312,10 +334,11 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
   "success": true,
   "data": [
     {
-      "id": "integer",
-      "name": "string",
-      "code": "string",
-      "icon": "string (url)"
+      "id": 1,
+      "name": "Pulsa Reguler",
+      "code": "PULSA",
+      "icon": null,
+      "subCategories": ["telkomsel", "indosat", "xl", "smartfren", "tri", "axis"]
     }
   ]
 }
@@ -348,16 +371,17 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
       "name": "string",
       "code": "string",
       "categoryName": "string",
-      "operator": "string",
-      "denomination": "integer",
-      "description": "string",
-      "price": "decimal",
+      "operator": "string (nullable)",
+      "denomination": "decimal (nullable)",
+      "description": "string (nullable)",
+      "price": "decimal (nullable)",
       "available": "boolean"
     }
   ],
   "totalRecords": "integer",
   "page": "integer",
-  "pageSize": "integer"
+  "pageSize": "integer",
+  "totalPages": "integer"
 }
 ```
 
@@ -385,9 +409,9 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
     "code": "string",
     "categoryName": "string",
     "operator": "string",
-    "denomination": "integer",
+    "denomination": "decimal (nullable)",
     "description": "string",
-    "price": "decimal",
+    "price": "decimal (nullable)",
     "levelId": "integer",
     "message": "string"
   }
@@ -460,10 +484,10 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
     "name": "string",
     "code": "string",
     "operator": "string",
-    "denomination": "integer"
+    "denomination": "decimal"
   },
-  "destination": "string",
-  "sellPrice": "decimal",
+  "destination": "string (nullable)",
+  "sellPrice": "decimal (nullable)",
   "createdAt": "datetime"
 }
 ```
@@ -543,7 +567,8 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
   ],
   "totalRecords": "integer",
   "page": "integer",
-  "pageSize": "integer"
+  "pageSize": "integer",
+  "totalPages": "integer"
 }
 ```
 
@@ -604,12 +629,13 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
       "activeAfter": "decimal",
       "heldBefore": "decimal",
       "heldAfter": "decimal",
-      "description": "string"
+      "description": "string (nullable)"
     }
   ],
   "totalRecords": "integer",
   "page": "integer",
-  "pageSize": "integer"
+  "pageSize": "integer",
+  "totalPages": "integer"
 }
 ```
 
@@ -679,6 +705,8 @@ The API uses JWT (JSON Web Token) based authentication. All endpoints except `/a
   "amount": 100000
 }
 ```
+
+> `amount` must be at least 10,000.
 
 **Success Response** (201):
 ```json
@@ -811,7 +839,8 @@ transferProof: file (required, JPG/PNG/PDF, max 5MB)
   ],
   "totalRecords": "integer",
   "page": "integer",
-  "pageSize": "integer"
+  "pageSize": "integer",
+  "totalPages": "integer"
 }
 ```
 
@@ -901,7 +930,8 @@ transferProof: file (required, JPG/PNG/PDF, max 5MB)
   ],
   "totalRecords": "integer",
   "page": "integer",
-  "pageSize": "integer"
+  "pageSize": "integer",
+  "totalPages": "integer"
 }
 ```
 
@@ -1059,6 +1089,15 @@ For API integration support:
 ---
 
 ## Changelog
+
+### v1.2.0 (2026-04-11)
+- **Product Categories**: Added `subCategories` field containing distinct operator names from active products in each category
+- **Product Categories**: Categories now ordered by `sortOrder` instead of `name`
+- **Paged Responses**: Added `totalPages` field to all paginated endpoints (products, transactions, balance history, topup history, transfer history)
+- **Error Response**: Added `success` (false) and `timestamp` fields to error responses
+- **New Error Codes**: `INVALID_TOKEN_FORMAT`, `CONFIG_ERROR`, `MISSING_FILE`, `TOPUP_ERROR`, `TRANSFER_ERROR`
+- **Auth**: `/api/auth/refresh` is now documented as a public endpoint (no auth required)
+- **Topup**: `amount` minimum is now 10,000
 
 ### v1.1.0 (2026-04-03)
 - **BREAKING**: Topup flow changed to 2-step process
