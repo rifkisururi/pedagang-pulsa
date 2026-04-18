@@ -18,6 +18,9 @@ public class ExportService
         _logger = logger;
     }
 
+    // ⚡ Bolt Optimization: Added AsNoTracking() to ExportTransactionsAsync.
+    // Export queries retrieve potentially large datasets that are never modified or saved back.
+    // Bypassing the EF Core change tracker significantly reduces memory allocations and improves performance.
     public async Task<byte[]> ExportTransactionsAsync(
         DateTime? startDate = null,
         DateTime? endDate = null,
@@ -25,6 +28,7 @@ public class ExportService
         int? userId = null)
     {
         var query = _context.Transactions
+            .AsNoTracking()
             .Include(t => t.User)
             .Include(t => t.Product)
             .ThenInclude(p => p.Category)
@@ -139,12 +143,14 @@ public class ExportService
         return stream.ToArray();
     }
 
+    // ⚡ Bolt Optimization: Added AsNoTracking() to ExportTopupRequestsAsync.
     public async Task<byte[]> ExportTopupRequestsAsync(
         DateTime? startDate = null,
         DateTime? endDate = null,
         string? status = null)
     {
         var query = _context.TopupRequests
+            .AsNoTracking()
             .Include(t => t.User)
             .Include(t => t.BankAccount)
             .AsQueryable();
@@ -250,6 +256,8 @@ public class ExportService
         return stream.ToArray();
     }
 
+    // ⚡ Bolt Optimization: Added AsNoTracking() to ExportBalanceLedgerAsync.
+    // This is especially impactful here as it can fetch up to 50,000 records.
     public async Task<byte[]> ExportBalanceLedgerAsync(
         DateTime? startDate = null,
         DateTime? endDate = null,
@@ -257,6 +265,7 @@ public class ExportService
         Guid? userId = null)
     {
         var query = _context.BalanceLedgers
+            .AsNoTracking()
             .Include(bl => bl.User)
             .AsQueryable();
 
@@ -365,6 +374,7 @@ public class ExportService
         return stream.ToArray();
     }
 
+    // ⚡ Bolt Optimization: Added AsNoTracking() to ExportProfitReportAsync.
     public async Task<byte[]> ExportProfitReportAsync(
         DateTime startDate,
         DateTime endDate)
@@ -373,6 +383,7 @@ public class ExportService
         var end = endDate.Date.AddDays(1).AddTicks(-1);
 
         var transactions = await _context.Transactions
+            .AsNoTracking()
             .Include(t => t.Product)
             .Include(t => t.Attempts)
             .ThenInclude(a => a.Supplier)
