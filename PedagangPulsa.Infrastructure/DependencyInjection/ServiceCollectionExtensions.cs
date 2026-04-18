@@ -9,6 +9,7 @@ using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Application.Abstractions.Suppliers;
 using PedagangPulsa.Infrastructure.Caching;
 using PedagangPulsa.Infrastructure.Data;
+using PedagangPulsa.Infrastructure.Data.Interceptors;
 using PedagangPulsa.Infrastructure.Fcm;
 using PedagangPulsa.Infrastructure.Suppliers;
 
@@ -21,9 +22,14 @@ public static class ServiceCollectionExtensions
         string connectionString,
         bool ignorePendingModelChangesWarning = false)
     {
-        services.AddDbContext<AppDbContext>(options =>
+        services.AddSingleton<EfCoreErrorLogger>();
+
+        services.AddDbContext<AppDbContext>((sp, options) =>
         {
             options.UseNpgsql(connectionString);
+
+            var errorLogger = sp.GetRequiredService<EfCoreErrorLogger>();
+            options.AddInterceptors(errorLogger);
 
             if (ignorePendingModelChangesWarning)
             {
