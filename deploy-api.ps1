@@ -21,9 +21,7 @@ $DbConnection = if ($env:DEPLOY_DB_CONNECTION) { $env:DEPLOY_DB_CONNECTION } els
     Read-Host "PostgreSQL ConnectionString"
 }
 $RedisConnection = "redis://default:MTzdXJYhwwc7d5hc5jERcESAT8rZpuCE@redis-12099.crce289.asia-seast2-2.gcp.cloud.redislabs.com:12099"
-$JwtKey = if ($env:DEPLOY_JWT_KEY) { $env:DEPLOY_JWT_KEY } else {
-    Read-Host "JWT Key"
-}
+$JwtKey = "PedagangPulsaDevelopmentJwtKey_ChangeThisBeforeProduction_12345"
 $JwtIssuer = "PedagangPulsa.Api"
 $JwtAudience = "PedagangPulsa.Client"
 

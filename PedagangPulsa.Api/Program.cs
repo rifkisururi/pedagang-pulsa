@@ -91,6 +91,12 @@ if (enableSwagger)
     app.UseSwaggerUI();
 }
 
+// Skip HTTPS redirection on Cloud Run (TLS handled by load balancer)
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
 if (enableScalar)
 {
     app.MapScalarApiReference("/scalar", options =>
@@ -100,8 +106,6 @@ if (enableScalar)
             .DisableAgent();
     });
 }
-
-app.UseHttpsRedirection();
 
 // Enable static files for uploads
 app.UseStaticFiles();
