@@ -92,8 +92,14 @@ public class AuthController : ControllerBase
         }
 
         var result = await _authService.LoginWithPasswordAsync(request.Username, request.Password);
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var loggerFactory = (Microsoft.Extensions.Logging.ILoggerFactory?)HttpContext.RequestServices.GetService(typeof(Microsoft.Extensions.Logging.ILoggerFactory));
+        var logger = loggerFactory?.CreateLogger("PedagangPulsa.Api.Controllers.AuthController");
+
         if (!string.IsNullOrWhiteSpace(result.ErrorMessage))
         {
+            logger?.LogWarning("Failed login attempt. Username: {Username}, Reason: {Reason}, IP: {IPAddress}", request.Username, result.ErrorMessage, ipAddress);
+
             return Unauthorized(new ErrorResponse
             {
                 Message = result.ErrorMessage,
@@ -105,6 +111,10 @@ public class AuthController : ControllerBase
         }
 
         var user = result.User!;
+
+        // Log successful login
+        logger?.LogInformation("User logged in successfully. Username: {Username}, Email: {Email}, IP: {IPAddress}", user.UserName, user.Email, ipAddress);
+
         return Ok(new LoginResponse
         {
             Success = true,
@@ -231,5 +241,17 @@ public class AuthController : ControllerBase
             PinSessionToken = result.PinSessionToken,
             ExpiresIn = 300
         });
+    }
+
+    [HttpPost("logout")]
+    [Authorize]
+    public IActionResult Logout()
+    {
+        var username = User.Identity?.Name ?? User.FindFirstValue(ClaimTypes.Name) ?? "unknown";
+        var loggerFactory = (Microsoft.Extensions.Logging.ILoggerFactory?)HttpContext.RequestServices.GetService(typeof(Microsoft.Extensions.Logging.ILoggerFactory));
+        var logger = loggerFactory?.CreateLogger("PedagangPulsa.Api.Controllers.AuthController");
+        logger?.LogInformation("User logged out successfully. Username: {Username}", username);
+
+        return Ok(new { Success = true, Message = "Logout successful" });
     }
 }

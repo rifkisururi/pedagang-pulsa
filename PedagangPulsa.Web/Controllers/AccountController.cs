@@ -50,6 +50,8 @@ public class AccountController : Controller
 
         if (adminUser == null)
         {
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            _logger.LogWarning("Failed login attempt in Web Admin. Username: {Username}, Reason: {Reason}, IP: {IPAddress}", model.Username, "Invalid login attempt", ipAddress);
             ModelState.AddModelError(string.Empty, "Invalid login attempt.");
             return View(model);
         }
@@ -58,6 +60,8 @@ public class AccountController : Controller
         bool isPasswordValid = BCrypt.Net.BCrypt.Verify(model.Password, adminUser.PasswordHash);
         if (!isPasswordValid)
         {
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            _logger.LogWarning("Failed login attempt in Web Admin. Username: {Username}, Reason: {Reason}, IP: {IPAddress}", model.Username, "Invalid login attempt", ipAddress);
             ModelState.AddModelError(string.Empty, "Invalid login attempt.");
             return View(model);
         }
