@@ -72,22 +72,38 @@ public class ReportService
             BySupplier = bySupplier
         };
     }
-
+    // ⚡ Bolt Optimization: Replace O(N) database queries in loop with a single O(1) batched query.
+    // Uses AsNoTracking() and projection to eliminate entity tracking overhead and reduce memory allocations.
     public async Task<List<DailyProfitSummary>> GetDailyProfitSummaryAsync(DateTime startDate, DateTime endDate)
     {
+        var start = startDate.Date;
+        var end = endDate.Date.AddDays(1).AddTicks(-1);
+
+        // Fetch only required fields for the given date range
+        var transactionsData = await _context.Transactions
+            .AsNoTracking()
+            .Where(t => t.Status == TransactionStatus.Success && t.CreatedAt >= start && t.CreatedAt <= end)
+            .Select(t => new
+            {
+                t.CreatedAt,
+                t.SellPrice,
+                t.CostPrice
+            })
+            .ToListAsync();
+
         var summaries = new List<DailyProfitSummary>();
 
         for (var date = startDate.Date; date <= endDate.Date; date = date.AddDays(1))
         {
-            var startOfDay = date;
-            var endOfDay = date.AddDays(1).AddTicks(-1);
+            var currentDayStart = date;
+            var currentDayEnd = date.AddDays(1).AddTicks(-1);
 
-            var transactions = await _context.Transactions
-                .Where(t => t.Status == TransactionStatus.Success && t.CreatedAt >= startOfDay && t.CreatedAt <= endOfDay)
-                .ToListAsync();
+            var dailyTransactions = transactionsData
+                .Where(t => t.CreatedAt >= currentDayStart && t.CreatedAt <= currentDayEnd)
+                .ToList();
 
-            var totalRevenue = transactions.Sum(t => t.SellPrice);
-            var totalCost = transactions.Sum(t => t.CostPrice ?? 0);
+            var totalRevenue = dailyTransactions.Sum(t => t.SellPrice);
+            var totalCost = dailyTransactions.Sum(t => t.CostPrice ?? 0);
             var totalProfit = totalRevenue - totalCost;
 
             summaries.Add(new DailyProfitSummary
@@ -96,13 +112,14 @@ public class ReportService
                 TotalRevenue = totalRevenue,
                 TotalCost = totalCost,
                 TotalProfit = totalProfit,
-                TotalTransactions = transactions.Count,
+                TotalTransactions = dailyTransactions.Count,
                 ProfitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0
             });
         }
 
         return summaries;
     }
+
 
     public async Task<ProfitBySupplierReport> GetProfitBySupplierAsync(DateTime? startDate = null, DateTime? endDate = null)
     {
