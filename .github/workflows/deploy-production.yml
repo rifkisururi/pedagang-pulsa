@@ -1,4 +1,4 @@
-name: Deploy to Cloud Run
+name: Deploy to Production
 
 on:
   push:
@@ -6,9 +6,10 @@ on:
 
 env:
   PROJECT_ID: pedagangpulsa27
-  REGION: asia-southeast2
+  REGION: asia-southeast1
   SERVICE_NAME: pedagangpulsa-api
-  IMAGE: asia-southeast2-docker.pkg.dev/pedagangpulsa27/docker-repo/pedagangpulsa-api
+  IMAGE: asia-southeast1-docker.pkg.dev/pedagangpulsa27/docker-repo/pedagangpulsa-api
+  DOMAIN: api.pedagangpulsa.com
 
 jobs:
   deploy:
@@ -46,6 +47,15 @@ jobs:
             --set-env-vars "ASPNETCORE_ENVIRONMENT=Production,ConnectionStrings__DefaultConnection=${{ secrets.DB_CONNECTION }},ConnectionStrings__Redis=${{ secrets.REDIS_CONNECTION }},Jwt__Key=${{ secrets.JWT_KEY }},Jwt__Issuer=PedagangPulsa.Api,Jwt__Audience=PedagangPulsa.Client,EnableSwagger=true,EnableScalar=true" \
             --no-cpu-throttling \
             --project ${{ env.PROJECT_ID }}
+
+      - name: Map Custom Domain
+        run: |
+          gcloud beta run domain-mappings create \
+            --service=${{ env.SERVICE_NAME }} \
+            --domain=${{ env.DOMAIN }} \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --quiet 2>/dev/null || echo "Domain mapping already exists, skipping..."
 
       - name: Cleanup old images
         run: |
