@@ -20,9 +20,7 @@ $Image = "$Region-docker.pkg.dev/$ProjectId/$RepoName/$ServiceName"
 $DbConnection = if ($env:DEPLOY_DB_CONNECTION) { $env:DEPLOY_DB_CONNECTION } else {
     Read-Host "PostgreSQL ConnectionString"
 }
-$RedisConnection = if ($env:DEPLOY_REDIS_CONNECTION) { $env:DEPLOY_REDIS_CONNECTION } else {
-    Read-Host "Redis ConnectionString"
-}
+$RedisConnection = "redis://default:MTzdXJYhwwc7d5hc5jERcESAT8rZpuCE@redis-12099.crce289.asia-seast2-2.gcp.cloud.redislabs.com:12099"
 $JwtKey = if ($env:DEPLOY_JWT_KEY) { $env:DEPLOY_JWT_KEY } else {
     Read-Host "JWT Key"
 }
