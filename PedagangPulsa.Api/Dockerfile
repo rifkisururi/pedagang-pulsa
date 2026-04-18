@@ -19,6 +19,7 @@ RUN dotnet publish "PedagangPulsa.Api.csproj" -c $BUILD_CONFIGURATION \
 
 # Runtime stage - Alpine for smallest image (~85MB)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
+RUN apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=build /app/publish .
 

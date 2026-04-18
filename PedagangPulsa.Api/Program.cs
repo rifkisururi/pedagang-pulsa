@@ -82,11 +82,17 @@ var app = builder.Build();
 await app.ApplyDatabaseMigrationsAsync();
 
 // Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
+var enableSwagger = builder.Configuration.GetValue<bool?>("EnableSwagger") ?? app.Environment.IsDevelopment();
+var enableScalar = builder.Configuration.GetValue<bool?>("EnableScalar") ?? app.Environment.IsDevelopment();
+
+if (enableSwagger)
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+}
 
+if (enableScalar)
+{
     app.MapScalarApiReference("/scalar", options =>
     {
         options.WithTitle("PedagangPulsa API Reference")
