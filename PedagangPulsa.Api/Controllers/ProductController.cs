@@ -2,8 +2,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PedagangPulsa.Api.DTOs;
+using PedagangPulsa.Application.Abstractions.Caching;
 using PedagangPulsa.Infrastructure.Data;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace PedagangPulsa.Api.Controllers;
 
@@ -13,18 +15,33 @@ public class ProductController : Controller
 {
     private readonly AppDbContext _context;
     private readonly ILogger<ProductController> _logger;
+    private readonly IRedisService _redis;
 
-    public ProductController(AppDbContext context, ILogger<ProductController> logger)
+    private static readonly JsonSerializerOptions _jsonOpts = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    public ProductController(AppDbContext context, ILogger<ProductController> logger, IRedisService redis)
     {
         _context = context;
         _logger = logger;
+        _redis = redis;
     }
 
     [HttpGet("categories")]
     [Authorize]
     public async Task<IActionResult> GetCategories()
     {
-        var categories = await _context.ProductCategories
+        const string cacheKey = "product:categories";
+        var cached = await _redis.GetAsync(cacheKey);
+        if (cached != null)
+        {
+            var cachedResult = JsonSerializer.Deserialize<CategoryListResponse>(cached, _jsonOpts)!;
+            return Ok(cachedResult);
+        }
+
+        var categories = await _context.ProductCategories.AsNoTracking()
             .OrderBy(c => c.SortOrder)
             .ToListAsync();
 
@@ -47,11 +64,10 @@ public class ProductController : Controller
             SubCategories = subCategories.GetValueOrDefault(c.Id, new())
         }).ToList();
 
-        return Ok(new CategoryListResponse
-        {
-            Success = true,
-            Data = result
-        });
+        var response = new CategoryListResponse { Success = true, Data = result };
+        await _redis.SetAsync(cacheKey, JsonSerializer.Serialize(response, _jsonOpts), TimeSpan.FromMinutes(10));
+
+        return Ok(response);
     }
 
     [HttpGet]
@@ -81,7 +97,7 @@ public class ProductController : Controller
             });
         }
 
-        var user = await _context.Users
+        var user = await _context.Users.AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == userId);
 
         if (user == null)
@@ -93,7 +109,15 @@ public class ProductController : Controller
             });
         }
 
-        var query = _context.Products
+        // Check cache
+        var cacheKey = $"products:{categoryId ?? 0}:{operatorParam ?? "_"}:{user.LevelId}:{page}:{pageSize}";
+        var cached = await _redis.GetAsync(cacheKey);
+        if (cached != null)
+        {
+            return Ok(JsonSerializer.Deserialize<ProductListResponse>(cached, _jsonOpts)!);
+        }
+
+        var query = _context.Products.AsNoTracking()
             .Include(p => p.Category)
             .Where(p => p.IsActive);
 
@@ -143,14 +167,17 @@ public class ProductController : Controller
             })
             .ToListAsync();
 
-        return Ok(new ProductListResponse
+        var productResponse = new ProductListResponse
         {
             Success = true,
             Data = products,
             TotalRecords = totalRecords,
             Page = page,
             PageSize = pageSize
-        });
+        };
+        await _redis.SetAsync(cacheKey, JsonSerializer.Serialize(productResponse, _jsonOpts), TimeSpan.FromMinutes(5));
+
+        return Ok(productResponse);
     }
 
     [HttpGet("{id}/price")]

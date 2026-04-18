@@ -101,6 +101,8 @@ public class TransactionController : ControllerBase
             });
         }
 
+        var isInMemory = _context.Database.ProviderName?.Contains("InMemory") == true;
+        await using var dbTransaction = !isInMemory ? await _context.Database.BeginTransactionAsync() : null;
         try
         {
             var user = await _context.Users
@@ -155,6 +157,15 @@ public class TransactionController : ControllerBase
 
             var sellPrice = costPrice + levelPrice.Margin;
 
+            // Lock user balance row to prevent concurrent balance modifications
+            if (!isInMemory)
+            {
+                await _context.Database.ExecuteSqlRawAsync(
+                    "SELECT * FROM \"UserBalances\" WHERE \"UserId\" = {0} FOR UPDATE",
+                    userId);
+            }
+
+            // Re-check balance after acquiring lock
             if (user.Balance.ActiveBalance < sellPrice)
             {
                 return BadRequest(new ErrorResponse
@@ -186,8 +197,6 @@ public class TransactionController : ControllerBase
             };
             _context.BalanceLedgers.Add(holdLedger);
 
-            await _context.SaveChangesAsync();
-
             var referenceIdGen = $"{userId}{DateTime.UtcNow:yyyyMMddHHmmss}{Random.Shared.Next(1000, 9999)}";
             var transaction = new Transaction
             {
@@ -205,7 +214,6 @@ public class TransactionController : ControllerBase
             };
 
             _context.Transactions.Add(transaction);
-            await _context.SaveChangesAsync();
 
             var response = new TransactionResponse
             {
@@ -230,7 +238,6 @@ public class TransactionController : ControllerBase
             {
                 existingKey.ResponseCache = System.Text.Json.JsonSerializer.Serialize(response);
                 existingKey.TransactionId = transaction.Id;
-                await _context.SaveChangesAsync();
             }
             else
             {
@@ -243,8 +250,10 @@ public class TransactionController : ControllerBase
                     ResponseCache = System.Text.Json.JsonSerializer.Serialize(response)
                 };
                 _context.IdempotencyKeys.Add(newKey);
-                await _context.SaveChangesAsync();
             }
+
+            await _context.SaveChangesAsync();
+            if (dbTransaction != null) await dbTransaction.CommitAsync();
 
             return StatusCode(201, response);
         }
@@ -258,6 +267,7 @@ public class TransactionController : ControllerBase
         }
         catch (Exception ex)
         {
+            if (dbTransaction != null) await dbTransaction.RollbackAsync();
             _logger.LogError(ex, "Error creating transaction for user {UserId}", userId);
             return StatusCode(500, new ErrorResponse
             {

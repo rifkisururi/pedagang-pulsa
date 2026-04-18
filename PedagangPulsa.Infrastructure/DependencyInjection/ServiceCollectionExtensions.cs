@@ -9,9 +9,9 @@ using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Application.Abstractions.Suppliers;
 using PedagangPulsa.Infrastructure.Caching;
 using PedagangPulsa.Infrastructure.Data;
-using PedagangPulsa.Infrastructure.Data.Interceptors;
 using PedagangPulsa.Infrastructure.Fcm;
 using PedagangPulsa.Infrastructure.Suppliers;
+using StackExchange.Redis;
 
 namespace PedagangPulsa.Infrastructure.DependencyInjection;
 
@@ -22,14 +22,9 @@ public static class ServiceCollectionExtensions
         string connectionString,
         bool ignorePendingModelChangesWarning = false)
     {
-        services.AddSingleton<EfCoreErrorLogger>();
-
-        services.AddDbContext<AppDbContext>((sp, options) =>
+        services.AddDbContext<AppDbContext>(options =>
         {
             options.UseNpgsql(connectionString);
-
-            var errorLogger = sp.GetRequiredService<EfCoreErrorLogger>();
-            options.AddInterceptors(errorLogger);
 
             if (ignorePendingModelChangesWarning)
             {
@@ -39,13 +34,72 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddScoped<ISupplierAdapterFactory, SupplierAdapterFactory>();
-        services.AddScoped<IRedisService, RedisService>();
         services.AddHttpClient();
         services.AddHttpClient("Fcm", client => client.Timeout = TimeSpan.FromSeconds(10));
         services.AddHttpClient("GoogleAuth", client => client.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<IFcmClient, FcmClient>();
 
         return services;
+    }
+
+    public static IServiceCollection AddRedisInfrastructure(
+        this IServiceCollection services,
+        string redisConnectionString)
+    {
+        services.AddSingleton<IConnectionMultiplexer>(sp =>
+        {
+            var logger = sp.GetRequiredService<ILogger<IConnectionMultiplexer>>();
+            logger.LogInformation("Connecting to Redis...");
+
+            // StackExchange.Redis does not support redis:// URL scheme.
+            // Convert "redis://user:pass@host:port" to "host:port,password=pass,user=user"
+            var config = ParseConnectionString(redisConnectionString);
+            config.AbortOnConnectFail = false;
+            config.ConnectTimeout = 10000;
+            config.AsyncTimeout = 5000;
+            config.SyncTimeout = 5000;
+            config.ReconnectRetryPolicy = new ExponentialRetry(5000);
+            var connection = ConnectionMultiplexer.Connect(config);
+            connection.ConnectionFailed += (_, e) =>
+                logger.LogWarning(e.Exception, "Redis connection failed. EndPoint: {EndPoint}", e.EndPoint);
+            connection.ConnectionRestored += (_, e) =>
+                logger.LogInformation("Redis connection restored. EndPoint: {EndPoint}", e.EndPoint);
+            connection.ErrorMessage += (_, e) =>
+                logger.LogError("Redis error: {Message}", e.Message);
+            return connection;
+        });
+
+        services.AddSingleton<IRedisService, RedisService>();
+
+        return services;
+    }
+
+    private static ConfigurationOptions ParseConnectionString(string connectionString)
+    {
+        // If it's already in StackExchange.Redis format (host:port,password=...), parse directly
+        if (!connectionString.StartsWith("redis://", StringComparison.OrdinalIgnoreCase))
+        {
+            return ConfigurationOptions.Parse(connectionString);
+        }
+
+        // Parse "redis://user:password@host:port" URL format
+        var uri = new Uri(connectionString);
+        var config = new ConfigurationOptions
+        {
+            EndPoints = { { uri.Host, uri.Port } }
+        };
+
+        if (!string.IsNullOrEmpty(uri.UserInfo))
+        {
+            var parts = uri.UserInfo.Split(':', 2);
+            config.User = parts[0];
+            if (parts.Length > 1)
+            {
+                config.Password = parts[1];
+            }
+        }
+
+        return config;
     }
 }
 

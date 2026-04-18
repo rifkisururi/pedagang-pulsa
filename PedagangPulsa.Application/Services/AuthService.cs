@@ -182,7 +182,6 @@ public class AuthService
 
         if (user == null)
         {
-            _logger.LogWarning("Failed login attempt for username {Username}. Reason: {Reason}", username, "Invalid username or PIN");
             return (null, string.Empty, string.Empty, "Invalid username or PIN");
         }
 
@@ -259,7 +258,6 @@ public class AuthService
 
         if (user == null)
         {
-            _logger.LogWarning("Failed password login attempt for username {Username}. Reason: {Reason}", username, "Invalid username or password");
             return (null, string.Empty, string.Empty, "Invalid username or password");
         }
 

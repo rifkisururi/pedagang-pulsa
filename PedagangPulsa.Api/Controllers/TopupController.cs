@@ -2,10 +2,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PedagangPulsa.Api.DTOs;
+using PedagangPulsa.Application.Abstractions.Caching;
 using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Application.Services;
 using PedagangPulsa.Domain.Enums;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace PedagangPulsa.Api.Controllers;
 
@@ -19,19 +21,27 @@ public class TopupController : ControllerBase
     private readonly ILogger<TopupController> _logger;
     private readonly IConfiguration _configuration;
     private readonly IWebHostEnvironment _environment;
+    private readonly IRedisService _redis;
+
+    private static readonly JsonSerializerOptions _jsonOpts = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
 
     public TopupController(
         IAppDbContext context,
         TopupService topupService,
         ILogger<TopupController> logger,
         IConfiguration configuration,
-        IWebHostEnvironment environment)
+        IWebHostEnvironment environment,
+        IRedisService redis)
     {
         _context = context;
         _topupService = topupService;
         _logger = logger;
         _configuration = configuration;
         _environment = environment;
+        _redis = redis;
     }
 
     /// <summary>
@@ -352,7 +362,14 @@ public class TopupController : ControllerBase
     [HttpGet("banks")]
     public async Task<IActionResult> GetBankAccounts()
     {
-        var bankAccounts = await _context.BankAccounts
+        const string cacheKey = "banks:active";
+        var cached = await _redis.GetAsync(cacheKey);
+        if (cached != null)
+        {
+            return Ok(JsonSerializer.Deserialize<object>(cached, _jsonOpts)!);
+        }
+
+        var bankAccounts = await _context.BankAccounts.AsNoTracking()
             .Where(b => b.IsActive)
             .OrderBy(b => b.BankName)
             .Select(b => new
@@ -365,10 +382,9 @@ public class TopupController : ControllerBase
             })
             .ToListAsync();
 
-        return Ok(new
-        {
-            success = true,
-            data = bankAccounts
-        });
+        var response = new { success = true, data = bankAccounts };
+        await _redis.SetAsync(cacheKey, JsonSerializer.Serialize(response, _jsonOpts), TimeSpan.FromMinutes(30));
+
+        return Ok(response);
     }
 }

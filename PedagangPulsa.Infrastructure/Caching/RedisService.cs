@@ -1,95 +1,82 @@
 using Microsoft.Extensions.Logging;
 using PedagangPulsa.Application.Abstractions.Caching;
-using System.Collections.Concurrent;
+using StackExchange.Redis;
 
 namespace PedagangPulsa.Infrastructure.Caching;
 
-public class RedisService : IRedisService
+public sealed class RedisService : IRedisService, IAsyncDisposable
 {
-    private sealed class CacheEntry
-    {
-        public required string Value { get; init; }
-        public DateTimeOffset? ExpiresAt { get; init; }
-    }
-
-    private static readonly ConcurrentDictionary<string, CacheEntry> Store = new();
+    private readonly IDatabase _db;
+    private readonly IConnectionMultiplexer _redis;
     private readonly ILogger<RedisService> _logger;
 
-    public RedisService(ILogger<RedisService> logger)
+    public RedisService(IConnectionMultiplexer redis, ILogger<RedisService> logger)
     {
+        _redis = redis;
+        _db = redis.GetDatabase();
         _logger = logger;
     }
 
-    public Task SetAsync(string key, string value, TimeSpan? expiry = null)
+    public async Task SetAsync(string key, string value, TimeSpan? expiry = null)
     {
-        Store[key] = new CacheEntry
-        {
-            Value = value,
-            ExpiresAt = expiry.HasValue ? DateTimeOffset.UtcNow.Add(expiry.Value) : null
-        };
+        _logger.LogDebug("Cache set for {Key} with expiry {Expiry}s", key, expiry?.TotalSeconds);
 
-        _logger.LogDebug("Cache set for {Key}", key);
-        return Task.CompletedTask;
+        if (expiry.HasValue)
+        {
+            var seconds = (int)expiry.Value.TotalSeconds;
+            await _db.StringSetAsync(
+                key, value,
+                expiry: TimeSpan.FromSeconds(seconds),
+                when: When.Always,
+                flags: CommandFlags.FireAndForget);
+        }
+        else
+        {
+            await _db.StringSetAsync(key, value);
+        }
     }
 
-    public Task<string?> GetAsync(string key)
+    public async Task<string?> GetAsync(string key)
     {
-        if (!TryGetValidEntry(key, out var entry))
-        {
-            return Task.FromResult<string?>(null);
-        }
-
-        return Task.FromResult<string?>(entry!.Value);
+        var value = await _db.StringGetAsync(key);
+        return value.HasValue ? value.ToString() : null;
     }
 
     public Task<bool> ExistsAsync(string key)
     {
-        return Task.FromResult(TryGetValidEntry(key, out _));
+        return _db.KeyExistsAsync(key);
     }
 
     public Task RemoveAsync(string key)
     {
-        Store.TryRemove(key, out _);
-        return Task.CompletedTask;
+        return _db.KeyDeleteAsync(key);
     }
 
-    public Task<string?> GetAndRemoveAsync(string key)
+    public async Task<string?> GetAndRemoveAsync(string key)
     {
-        if (!TryGetValidEntry(key, out var entry))
+        var value = await _db.StringGetAsync(key);
+        if (value.HasValue)
         {
-            return Task.FromResult<string?>(null);
+            await _db.KeyDeleteAsync(key);
         }
-
-        Store.TryRemove(key, out _);
-        return Task.FromResult<string?>(entry!.Value);
+        return value.HasValue ? value.ToString() : null;
     }
 
-    public Task<long> TtlAsync(string key)
+    public async Task<long> TtlAsync(string key)
     {
-        if (!TryGetValidEntry(key, out var entry) || entry?.ExpiresAt == null)
-        {
-            return Task.FromResult(0L);
-        }
-
-        var ttl = (long)Math.Ceiling((entry.ExpiresAt.Value - DateTimeOffset.UtcNow).TotalSeconds);
-        return Task.FromResult(Math.Max(0L, ttl));
+        var ttl = await _db.KeyTimeToLiveAsync(key);
+        return ttl.HasValue ? (long)ttl.Value.TotalSeconds : 0;
     }
 
-    private static bool TryGetValidEntry(string key, out CacheEntry? entry)
+    public async ValueTask DisposeAsync()
     {
-        entry = null;
-        if (!Store.TryGetValue(key, out var current))
+        if (_redis is IAsyncDisposable asyncDisposable)
         {
-            return false;
+            await asyncDisposable.DisposeAsync();
         }
-
-        if (current.ExpiresAt.HasValue && current.ExpiresAt.Value <= DateTimeOffset.UtcNow)
+        else
         {
-            Store.TryRemove(key, out _);
-            return false;
+            _redis.Dispose();
         }
-
-        entry = current;
-        return true;
     }
 }

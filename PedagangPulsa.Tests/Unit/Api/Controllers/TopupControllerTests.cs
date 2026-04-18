@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using PedagangPulsa.Api.Controllers;
 using PedagangPulsa.Api.DTOs;
+using PedagangPulsa.Application.Abstractions.Caching;
 using PedagangPulsa.Application.Services;
 using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Tests.Helpers;
@@ -23,6 +24,7 @@ public class TopupControllerTests : IAsyncDisposable
     private readonly Mock<ILogger<TopupController>> _loggerMock;
     private readonly Mock<IConfiguration> _configurationMock;
     private readonly Mock<IWebHostEnvironment> _environmentMock;
+    private readonly Mock<IRedisService> _redisServiceMock;
     private readonly TopupController _controller;
     private readonly string _webRootPath;
 
@@ -35,6 +37,7 @@ public class TopupControllerTests : IAsyncDisposable
         _loggerMock = MockServices.CreateLogger<TopupController>();
         _configurationMock = new Mock<IConfiguration>();
         _environmentMock = new Mock<IWebHostEnvironment>();
+        _redisServiceMock = new Mock<IRedisService>();
         _webRootPath = Path.Combine(Path.GetTempPath(), $"pedagangpulsa-topup-tests-{Guid.NewGuid():N}");
 
         _environmentMock.Setup(e => e.WebRootPath).Returns(_webRootPath);
@@ -45,7 +48,8 @@ public class TopupControllerTests : IAsyncDisposable
             _topupService,
             _loggerMock.Object,
             _configurationMock.Object,
-            _environmentMock.Object);
+            _environmentMock.Object,
+            _redisServiceMock.Object);
     }
 
     [Fact]

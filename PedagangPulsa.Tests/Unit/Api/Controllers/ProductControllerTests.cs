@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using PedagangPulsa.Api.Controllers;
 using PedagangPulsa.Api.DTOs;
+using PedagangPulsa.Application.Abstractions.Caching;
 using PedagangPulsa.Infrastructure.Data;
 using PedagangPulsa.Tests.Helpers;
 using System;
@@ -21,6 +22,7 @@ public class ProductControllerTests : IAsyncDisposable
 {
     private readonly TestDbContext _context;
     private readonly Mock<ILogger<ProductController>> _loggerMock;
+    private readonly Mock<IRedisService> _redisServiceMock;
     private readonly ProductController _controller;
 
     public ProductControllerTests()
@@ -29,7 +31,8 @@ public class ProductControllerTests : IAsyncDisposable
         _context.SeedAsync().Wait();
 
         _loggerMock = MockServices.CreateLogger<ProductController>();
-        _controller = new ProductController(_context, _loggerMock.Object);
+        _redisServiceMock = new Mock<IRedisService>();
+        _controller = new ProductController(_context, _loggerMock.Object, _redisServiceMock.Object);
     }
 
     private void SetupAuthenticatedUser(Guid userId)

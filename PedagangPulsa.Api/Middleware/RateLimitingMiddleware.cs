@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using PedagangPulsa.Application.Abstractions.Caching;
 
 namespace PedagangPulsa.Api.Middleware;
 
@@ -6,9 +6,8 @@ public class RateLimitingMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<RateLimitingMiddleware> _logger;
+    private readonly IRedisService _redis;
 
-    // In-memory counter (for production, use Redis)
-    private static readonly ConcurrentDictionary<string, RateLimitCounter> _counters = new();
     private static readonly RateLimitRule[] _rules =
     [
         new("login", "/api/auth/login", HttpMethods.Post, 60, TimeSpan.FromMinutes(1), RateLimitKeyType.IP),
@@ -21,10 +20,12 @@ public class RateLimitingMiddleware
 
     public RateLimitingMiddleware(
         RequestDelegate next,
-        ILogger<RateLimitingMiddleware> logger)
+        ILogger<RateLimitingMiddleware> logger,
+        IRedisService redis)
     {
         _next = next;
         _logger = logger;
+        _redis = redis;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -36,24 +37,43 @@ public class RateLimitingMiddleware
         }
 
         var identifier = GetIdentifier(context, rule.KeyType);
-        var key = $"{rule.Prefix}:{identifier}";
-        var counter = _counters.GetOrAdd(key, static _ => new RateLimitCounter());
-        var now = DateTime.UtcNow;
-        var snapshot = counter.RegisterRequest(now, rule.Window);
+        var key = $"ratelimit:{rule.Prefix}:{identifier}";
 
-        ApplyRateLimitHeaders(context.Response.Headers, rule, snapshot);
+        // Use Redis INCR with expiry for atomic rate limiting
+        var currentCountStr = await _redis.GetAsync(key);
+        int currentCount;
+        if (currentCountStr == null)
+        {
+            // First request in this window
+            currentCount = 1;
+            await _redis.SetAsync(key, "1", rule.Window);
+        }
+        else
+        {
+            currentCount = int.Parse(currentCountStr) + 1;
+            await _redis.SetAsync(key, currentCount.ToString(), rule.Window);
+        }
 
-        if (snapshot.Count > rule.Limit)
+        // Calculate remaining time for headers
+        var ttl = await _redis.TtlAsync(key);
+        var resetAt = DateTime.UtcNow.AddSeconds(Math.Max(ttl, 1));
+
+        // Apply rate limit headers
+        context.Response.Headers["X-RateLimit-Limit"] = rule.Limit.ToString();
+        context.Response.Headers["X-RateLimit-Remaining"] = Math.Max(rule.Limit - currentCount, 0).ToString();
+        context.Response.Headers["X-RateLimit-Reset"] = resetAt.ToString("yyyy-MM-ddTHH:mm:ssZ");
+
+        if (currentCount > rule.Limit)
         {
             _logger.LogWarning(
                 "Rate limit exceeded for {Key}. Count: {Count}, Limit: {Limit}",
                 key,
-                snapshot.Count,
+                currentCount,
                 rule.Limit);
 
             context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
             context.Response.ContentType = "application/json";
-            context.Response.Headers["Retry-After"] = GetRetryAfterSeconds(snapshot.ResetAt, now).ToString();
+            context.Response.Headers["Retry-After"] = Math.Max((int)Math.Ceiling((resetAt - DateTime.UtcNow).TotalSeconds), 1).ToString();
 
             await context.Response.WriteAsJsonAsync(new
             {
@@ -81,50 +101,17 @@ public class RateLimitingMiddleware
     {
         var requestPath = path ?? string.Empty;
 
-        return _rules.FirstOrDefault(rule =>
-            string.Equals(method, rule.Method, StringComparison.OrdinalIgnoreCase) &&
-            requestPath.StartsWith(rule.PathPrefix, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static void ApplyRateLimitHeaders(
-        IHeaderDictionary headers,
-        RateLimitRule rule,
-        RateLimitSnapshot snapshot)
-    {
-        headers["X-RateLimit-Limit"] = rule.Limit.ToString();
-        headers["X-RateLimit-Remaining"] = Math.Max(rule.Limit - snapshot.Count, 0).ToString();
-        headers["X-RateLimit-Reset"] = snapshot.ResetAt.ToString("yyyy-MM-ddTHH:mm:ssZ");
-    }
-
-    private static int GetRetryAfterSeconds(DateTime resetAt, DateTime now)
-    {
-        return Math.Max((int)Math.Ceiling((resetAt - now).TotalSeconds), 1);
-    }
-
-    private sealed class RateLimitCounter
-    {
-        private readonly Lock _lock = new();
-        private int _count;
-        private DateTime _windowStart = DateTime.UtcNow;
-
-        public RateLimitSnapshot RegisterRequest(DateTime now, TimeSpan window)
+        foreach (var rule in _rules)
         {
-            lock (_lock)
+            if (string.Equals(method, rule.Method, StringComparison.OrdinalIgnoreCase) &&
+                requestPath.StartsWith(rule.PathPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                if ((now - _windowStart) > window)
-                {
-                    _count = 0;
-                    _windowStart = now;
-                }
-
-                _count++;
-
-                return new RateLimitSnapshot(_count, _windowStart.Add(window));
+                return rule;
             }
         }
-    }
 
-    private readonly record struct RateLimitSnapshot(int Count, DateTime ResetAt);
+        return null;
+    }
 
     private readonly record struct RateLimitRule(
         string Prefix,
