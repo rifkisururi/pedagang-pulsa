@@ -12,8 +12,10 @@ public class RateLimitingMiddleware
     [
         new("login", "/api/auth/login", HttpMethods.Post, 60, TimeSpan.FromMinutes(1), RateLimitKeyType.IP),
         new("register", "/api/auth/register", HttpMethods.Post, 60, TimeSpan.FromMinutes(1), RateLimitKeyType.IP),
-        new("transaction", "/api/transaction", HttpMethods.Post, 10, TimeSpan.FromMinutes(1), RateLimitKeyType.User),
         new("pin_verify", "/api/auth/pin/verify", HttpMethods.Post, 10, TimeSpan.FromMinutes(1), RateLimitKeyType.User),
+        new("change_pin", "/api/auth/pin", HttpMethods.Put, 5, TimeSpan.FromMinutes(1), RateLimitKeyType.User),
+        new("change_password", "/api/auth/password", HttpMethods.Put, 5, TimeSpan.FromMinutes(1), RateLimitKeyType.User),
+        new("transaction", "/api/transaction", HttpMethods.Post, 10, TimeSpan.FromMinutes(1), RateLimitKeyType.User),
         new("transfer", "/api/transfer", HttpMethods.Post, 60, TimeSpan.FromMinutes(1), RateLimitKeyType.User),
         new("topup", "/api/topup", HttpMethods.Post, 60, TimeSpan.FromMinutes(1), RateLimitKeyType.User)
     ];

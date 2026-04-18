@@ -511,6 +511,105 @@ public class AuthService
         return Convert.ToBase64String(randomBytes);
     }
 
+    public async Task<User?> GetUserByIdAsync(Guid userId)
+    {
+        return await _context.Users
+            .Include(u => u.Balance)
+            .Include(u => u.Level)
+            .FirstOrDefaultAsync(u => u.Id == userId);
+    }
+
+    public async Task<(bool Success, string ErrorMessage)> ChangePinAsync(Guid userId, string currentPin, string newPin)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null)
+        {
+            return (false, "User not found");
+        }
+
+        // Check Redis lockout first
+        var lockoutKey = $"pin_lockout:{userId}";
+        if (_redisService != null && await _redisService.ExistsAsync(lockoutKey))
+        {
+            var ttl = await _redisService.TtlAsync(lockoutKey);
+            return (false, $"Account is locked. Try again in {Math.Ceiling(Math.Max(ttl, 1) / 60d)} minutes");
+        }
+
+        // Check DB lockout
+        if (user.PinLockedAt.HasValue && user.PinLockedAt.Value > DateTime.UtcNow.AddMinutes(-15))
+        {
+            var lockoutRemaining = (user.PinLockedAt.Value - DateTime.UtcNow.AddMinutes(-15)).TotalMinutes;
+            return (false, $"Account is locked. Try again in {Math.Ceiling(lockoutRemaining)} minutes");
+        }
+
+        if (!BCrypt.Net.BCrypt.Verify(currentPin, user.PinHash))
+        {
+            user.PinFailedAttempts++;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            if (user.PinFailedAttempts >= 3)
+            {
+                user.PinLockedAt = DateTime.UtcNow;
+                if (_redisService != null)
+                {
+                    await _redisService.SetAsync(lockoutKey, "locked", TimeSpan.FromMinutes(15));
+                }
+
+                await _context.SaveChangesAsync();
+                return (false, "Account locked for 15 minutes due to too many failed attempts");
+            }
+
+            await _context.SaveChangesAsync();
+
+            var attemptsLeft = 3 - user.PinFailedAttempts;
+            return (false, $"Invalid PIN. {attemptsLeft} attempts remaining");
+        }
+
+        // Reset failed attempts and update PIN
+        user.PinFailedAttempts = 0;
+        user.PinLockedAt = null;
+        user.PinHash = BCrypt.Net.BCrypt.HashPassword(newPin, workFactor: 12);
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("PIN changed successfully for user {UserId}", userId);
+
+        return (true, string.Empty);
+    }
+
+    public async Task<(bool Success, string ErrorMessage)> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null)
+        {
+            return (false, "User not found");
+        }
+
+        if (string.IsNullOrWhiteSpace(user.PasswordHash))
+        {
+            return (false, "Account has no password set");
+        }
+
+        if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
+        {
+            return (false, "Current password is incorrect");
+        }
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword, workFactor: 12);
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Password changed successfully for user {UserId}", userId);
+
+        return (true, string.Empty);
+    }
+
     private static string GenerateReferralCode(string username)
     {
         var sanitized = new string(username

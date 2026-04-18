@@ -232,4 +232,169 @@ public class AuthController : ControllerBase
             ExpiresIn = 300
         });
     }
+
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<IActionResult> Me()
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token",
+                ErrorCode = "INVALID_TOKEN"
+            });
+        }
+
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
+
+        var user = await _authService.GetUserByIdAsync(userId);
+        if (user == null)
+        {
+            return NotFound(new ErrorResponse
+            {
+                Message = "User not found",
+                ErrorCode = "USER_NOT_FOUND"
+            });
+        }
+
+        return Ok(new UserMeResponse
+        {
+            Success = true,
+            Message = "User profile retrieved successfully",
+            User = new UserDto
+            {
+                Id = user.Id,
+                Username = user.UserName,
+                Email = user.Email,
+                FullName = user.FullName,
+                Phone = user.Phone,
+                Level = user.Level?.Name ?? string.Empty,
+                LevelId = user.LevelId,
+                Balance = user.Balance?.ActiveBalance ?? 0,
+                ReferralCode = user.ReferralCode,
+                CreatedAt = user.CreatedAt
+            }
+        });
+    }
+
+    [HttpPut("pin")]
+    [Authorize]
+    public async Task<IActionResult> ChangePin([FromBody] ChangePinRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new ErrorResponse
+            {
+                Message = "Validation failed",
+                Errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList()
+            });
+        }
+
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token",
+                ErrorCode = "INVALID_TOKEN"
+            });
+        }
+
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
+
+        var result = await _authService.ChangePinAsync(userId, request.CurrentPin, request.NewPin);
+        if (!result.Success)
+        {
+            var errorCode = result.ErrorMessage.Contains("locked", StringComparison.OrdinalIgnoreCase)
+                ? "ACCOUNT_LOCKED"
+                : "INVALID_PIN";
+
+            var statusCode = result.ErrorMessage.Contains("locked", StringComparison.OrdinalIgnoreCase)
+                ? 429
+                : 400;
+
+            return StatusCode(statusCode, new ErrorResponse
+            {
+                Message = result.ErrorMessage,
+                ErrorCode = errorCode
+            });
+        }
+
+        return Ok(new ChangePinResponse
+        {
+            Success = true,
+            Message = "PIN changed successfully"
+        });
+    }
+
+    [HttpPut("password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new ErrorResponse
+            {
+                Message = "Validation failed",
+                Errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList()
+            });
+        }
+
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token",
+                ErrorCode = "INVALID_TOKEN"
+            });
+        }
+
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
+
+        var result = await _authService.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword);
+        if (!result.Success)
+        {
+            var errorCode = result.ErrorMessage.Contains("incorrect", StringComparison.OrdinalIgnoreCase)
+                ? "INVALID_PASSWORD"
+                : result.ErrorMessage.Contains("no password", StringComparison.OrdinalIgnoreCase)
+                    ? "NO_PASSWORD_SET"
+                    : "CHANGE_PASSWORD_ERROR";
+
+            return BadRequest(new ErrorResponse
+            {
+                Message = result.ErrorMessage,
+                ErrorCode = errorCode
+            });
+        }
+
+        return Ok(new ChangePasswordResponse
+        {
+            Success = true,
+            Message = "Password changed successfully"
+        });
+    }
 }

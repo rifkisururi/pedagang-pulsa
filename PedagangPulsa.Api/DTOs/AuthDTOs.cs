@@ -108,3 +108,48 @@ public class UserDto
     public string ReferralCode { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
 }
+
+public class UserMeResponse
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public UserDto User { get; set; } = null!;
+}
+
+public class ChangePinRequest
+{
+    [Required(ErrorMessage = "Current PIN is required")]
+    [StringLength(6, MinimumLength = 6, ErrorMessage = "PIN must be exactly 6 digits")]
+    [RegularExpression(@"^\d{6}$", ErrorMessage = "PIN must be 6 digits")]
+    public string CurrentPin { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "New PIN is required")]
+    [StringLength(6, MinimumLength = 6, ErrorMessage = "PIN must be exactly 6 digits")]
+    [RegularExpression(@"^\d{6}$", ErrorMessage = "PIN must be 6 digits")]
+    public string NewPin { get; set; } = string.Empty;
+}
+
+public class ChangePinResponse
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
+
+public class ChangePasswordRequest
+{
+    [Required(ErrorMessage = "Current password is required")]
+    [StringLength(100, MinimumLength = 8, ErrorMessage = "Password must be between 8 and 100 characters")]
+    [DataType(DataType.Password)]
+    public string CurrentPassword { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "New password is required")]
+    [StringLength(100, MinimumLength = 8, ErrorMessage = "Password must be between 8 and 100 characters")]
+    [DataType(DataType.Password)]
+    public string NewPassword { get; set; } = string.Empty;
+}
+
+public class ChangePasswordResponse
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
