@@ -122,11 +122,11 @@ jobs:
                     --repository=docker-repo \
                     --location=${{ env.REGION }} \
                     --package=pedagangpulsa-api \
-                    --quiet 2>/dev/null
+                    --quiet 2>/dev/null || true
                 done
               echo "Deleting image: $DIGEST"
               gcloud artifacts docker images delete "${{ env.IMAGE }}@$DIGEST" \
-                --quiet 2>/dev/null && echo "  Deleted." || echo "  WARNING: failed to delete $DIGEST"
+                --quiet --delete-tags 2>/dev/null && echo "  Deleted." || echo "  WARNING: failed to delete $DIGEST"
             done < /tmp/delete.txt
           else
             echo "No old images to delete"
