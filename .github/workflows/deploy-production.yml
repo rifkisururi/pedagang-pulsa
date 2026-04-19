@@ -58,20 +58,43 @@ jobs:
 
       - name: Cleanup old images
         run: |
-          echo "Fetching all tags for ${{ env.IMAGE }}..."
-          gcloud artifacts docker images list-tags \
-            "${{ env.IMAGE }}" \
-            --format='value(tags)' \
-            --quiet 2>/dev/null | tr ';' '\n' | sort -u | while read -r TAG; do
-              TAG=$(echo "$TAG" | xargs)
-              [[ -z "$TAG" || "$TAG" == "latest" || "$TAG" == "${{ github.sha }}" ]] && continue
-              echo "Untagging: $TAG"
-              gcloud artifacts docker images untag "${{ env.IMAGE }}:$TAG" --quiet 2>/dev/null || true
+          echo "=== Image cleanup ==="
+          # Step 1: Delete old tags using gcloud artifacts tags
+          CURRENT_TAGS=$(gcloud artifacts tags list \
+            --repository=docker-repo \
+            --location=${{ env.REGION }} \
+            --package=pedagangpulsa-api \
+            --format='value(name)' \
+            --quiet 2>/dev/null || echo "")
+
+          for TAG in $CURRENT_TAGS; do
+            if [[ "$TAG" != "latest" && "$TAG" != "${{ github.sha }}" ]]; then
+              echo "Deleting tag: $TAG"
+              gcloud artifacts tags delete "$TAG" \
+                --repository=docker-repo \
+                --location=${{ env.REGION }} \
+                --package=pedagangpulsa-api \
+                --quiet 2>/dev/null || echo "  WARNING: failed to delete tag $TAG"
+            fi
+          done
+
+          # Step 2: Delete untagged images by digest
+          gcloud artifacts docker images list "${{ env.IMAGE }}" \
+            --format='value(version)' \
+            --quiet 2>/dev/null | while read -r DIGEST; do
+              # Get tags for this digest
+              DIGEST_TAGS=$(gcloud artifacts tags list \
+                --repository=docker-repo \
+                --location=${{ env.REGION }} \
+                --package=pedagangpulsa-api \
+                --format='value(version)' \
+                --quiet 2>/dev/null | grep "$DIGEST" || echo "")
+              if [[ -z "$DIGEST_TAGS" ]]; then
+                echo "Deleting untagged image: $DIGEST"
+                gcloud artifacts docker images delete \
+                  "${{ env.IMAGE }}@$DIGEST" \
+                  --quiet --delete-tags 2>/dev/null || echo "  WARNING: failed to delete $DIGEST"
+              fi
             done
 
-          echo "Deleting untagged images..."
-          gcloud artifacts docker images delete \
-            "${{ env.IMAGE }}" \
-            --delete-untagged \
-            --quiet 2>/dev/null || true
-          echo "Cleanup complete. Kept: latest, ${{ github.sha }}"
+          echo "=== Cleanup complete. Kept: latest, ${{ github.sha }} ==="
