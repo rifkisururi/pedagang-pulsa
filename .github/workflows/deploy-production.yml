@@ -61,16 +61,25 @@ jobs:
         run: |
           echo "Fetching all tags for ${{ env.IMAGE }}..."
           TAGS=$(gcloud artifacts docker images list-tags \
-            ${{ env.IMAGE }} \
+            "${{ env.IMAGE }}" \
             --format='value(tags)' \
-            --quiet 2>/dev/null)
+            --quiet || echo "")
 
-          for TAG in $TAGS; do
+          if [[ -z "$TAGS" ]]; then
+            echo "No tags found, skipping cleanup."
+            exit 0
+          fi
+
+          # tags output is semicolon-separated, convert to newline-separated
+          IFS=';' read -ra TAG_ARRAY <<< "$TAGS"
+          for TAG in "${TAG_ARRAY[@]}"; do
+            TAG=$(echo "$TAG" | xargs)
+            if [[ -z "$TAG" ]]; then continue; fi
             if [[ "$TAG" != "latest" && "$TAG" != "${{ github.sha }}" ]]; then
               echo "Deleting old image: ${{ env.IMAGE }}:$TAG"
               gcloud artifacts docker images delete \
-                "${{ env.IMAGE }}@$TAG" \
-                --quiet --delete-tags
+                "${{ env.IMAGE }}:$TAG" \
+                --quiet --delete-tags || echo "Failed to delete $TAG, skipping..."
             fi
           done
           echo "Cleanup complete. Kept: latest, ${{ github.sha }}"
