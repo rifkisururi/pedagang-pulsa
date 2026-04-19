@@ -39,13 +39,12 @@ jobs:
             --image ${{ env.IMAGE }}:${{ github.sha }} \
             --region ${{ env.REGION }} \
             --port 8080 \
-            --memory 512Mi \
+            --memory 128Mi \
             --cpu 1 \
             --min-instances 0 \
             --max-instances 1 \
             --allow-unauthenticated \
             --set-env-vars "ASPNETCORE_ENVIRONMENT=Production,ConnectionStrings__DefaultConnection=${{ secrets.DB_CONNECTION }},ConnectionStrings__Redis=${{ secrets.REDIS_CONNECTION }},Jwt__Key=${{ secrets.JWT_KEY }},Jwt__Issuer=PedagangPulsa.Api,Jwt__Audience=PedagangPulsa.Client,EnableSwagger=true,EnableScalar=true" \
-            --no-cpu-throttling \
             --project ${{ env.PROJECT_ID }}
 
       - name: Map Custom Domain
@@ -60,26 +59,19 @@ jobs:
       - name: Cleanup old images
         run: |
           echo "Fetching all tags for ${{ env.IMAGE }}..."
-          TAGS=$(gcloud artifacts docker images list-tags \
+          gcloud artifacts docker images list-tags \
             "${{ env.IMAGE }}" \
             --format='value(tags)' \
-            --quiet || echo "")
+            --quiet 2>/dev/null | tr ';' '\n' | sort -u | while read -r TAG; do
+              TAG=$(echo "$TAG" | xargs)
+              [[ -z "$TAG" || "$TAG" == "latest" || "$TAG" == "${{ github.sha }}" ]] && continue
+              echo "Untagging: $TAG"
+              gcloud artifacts docker images untag "${{ env.IMAGE }}:$TAG" --quiet 2>/dev/null || true
+            done
 
-          if [[ -z "$TAGS" ]]; then
-            echo "No tags found, skipping cleanup."
-            exit 0
-          fi
-
-          # tags output is semicolon-separated, convert to newline-separated
-          IFS=';' read -ra TAG_ARRAY <<< "$TAGS"
-          for TAG in "${TAG_ARRAY[@]}"; do
-            TAG=$(echo "$TAG" | xargs)
-            if [[ -z "$TAG" ]]; then continue; fi
-            if [[ "$TAG" != "latest" && "$TAG" != "${{ github.sha }}" ]]; then
-              echo "Deleting old image: ${{ env.IMAGE }}:$TAG"
-              gcloud artifacts docker images delete \
-                "${{ env.IMAGE }}:$TAG" \
-                --quiet --delete-tags || echo "Failed to delete $TAG, skipping..."
-            fi
-          done
+          echo "Deleting untagged images..."
+          gcloud artifacts docker images delete \
+            "${{ env.IMAGE }}" \
+            --delete-untagged \
+            --quiet 2>/dev/null || true
           echo "Cleanup complete. Kept: latest, ${{ github.sha }}"
