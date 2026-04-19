@@ -1,30 +1,30 @@
-# See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
-
-# This stage is used when running from VS in fast mode (Default for Debug configuration)
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
-USER $APP_UID
-WORKDIR /app
-EXPOSE 8080
-EXPOSE 8081
-
-
-# This stage is used to build the service project
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
+
 COPY ["PedagangPulsa.Web/PedagangPulsa.Web.csproj", "PedagangPulsa.Web/"]
-RUN dotnet restore "./PedagangPulsa.Web/PedagangPulsa.Web.csproj"
+COPY ["PedagangPulsa.Application/PedagangPulsa.Application.csproj", "PedagangPulsa.Application/"]
+COPY ["PedagangPulsa.Infrastructure/PedagangPulsa.Infrastructure.csproj", "PedagangPulsa.Infrastructure/"]
+COPY ["PedagangPulsa.Domain/PedagangPulsa.Domain.csproj", "PedagangPulsa.Domain/"]
+RUN dotnet restore "PedagangPulsa.Web/PedagangPulsa.Web.csproj"
+
 COPY . .
 WORKDIR "/src/PedagangPulsa.Web"
-RUN dotnet build "./PedagangPulsa.Web.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN dotnet publish "PedagangPulsa.Web.csproj" -c $BUILD_CONFIGURATION \
+    -o /app/publish \
+    /p:UseAppHost=false \
+    /p:DebugType=none \
+    /p:DebugSymbols=false
 
-# This stage is used to publish the service project to be copied to the final stage
-FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./PedagangPulsa.Web.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
-
-# This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
-FROM base AS final
+# Runtime stage - Alpine for smallest image
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
+RUN apk add --no-cache ca-certificates tzdata icu-libs
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
+
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+
 ENTRYPOINT ["dotnet", "PedagangPulsa.Web.dll"]

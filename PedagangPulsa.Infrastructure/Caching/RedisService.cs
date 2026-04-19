@@ -24,15 +24,22 @@ public sealed class RedisService : IRedisService, IAsyncDisposable
         if (expiry.HasValue)
         {
             var seconds = (int)expiry.Value.TotalSeconds;
-            await _db.StringSetAsync(
+            var result = await _db.StringSetAsync(
                 key, value,
                 expiry: TimeSpan.FromSeconds(seconds),
-                when: When.Always,
-                flags: CommandFlags.FireAndForget);
+                when: When.Always);
+            if (!result)
+            {
+                _logger.LogWarning("Cache set failed for {Key}", key);
+            }
         }
         else
         {
-            await _db.StringSetAsync(key, value);
+            var result = await _db.StringSetAsync(key, value);
+            if (!result)
+            {
+                _logger.LogWarning("Cache set failed for {Key}", key);
+            }
         }
     }
 
@@ -66,6 +73,18 @@ public sealed class RedisService : IRedisService, IAsyncDisposable
     {
         var ttl = await _db.KeyTimeToLiveAsync(key);
         return ttl.HasValue ? (long)ttl.Value.TotalSeconds : 0;
+    }
+
+    public async Task RemoveByPatternAsync(string pattern)
+    {
+        var endpoints = _redis.GetEndPoints();
+        var server = _redis.GetServer(endpoints[0]);
+        var keys = server.Keys(pattern: pattern).ToArray();
+        if (keys.Length > 0)
+        {
+            await _db.KeyDeleteAsync(keys);
+            _logger.LogDebug("Cache removed for pattern {Pattern}, {Count} keys deleted", pattern, keys.Length);
+        }
     }
 
     public async ValueTask DisposeAsync()

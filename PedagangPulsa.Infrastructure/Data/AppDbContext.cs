@@ -365,7 +365,7 @@ public class AppDbContext : DbContext, IAppDbContext
             entity.HasOne(e => e.Product)
                 .WithMany(p => p.SupplierProducts)
                 .HasForeignKey(e => e.ProductId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(e => e.Supplier)
                 .WithMany(s => s.SupplierProducts)
                 .HasForeignKey(e => e.SupplierId);

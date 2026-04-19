@@ -16,17 +16,21 @@ public class ProductController : Controller
     private readonly AppDbContext _context;
     private readonly ILogger<ProductController> _logger;
     private readonly IRedisService _redis;
+    private readonly IProductCacheService _productCache;
+    private readonly IConfiguration _configuration;
 
     private static readonly JsonSerializerOptions _jsonOpts = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    public ProductController(AppDbContext context, ILogger<ProductController> logger, IRedisService redis)
+    public ProductController(AppDbContext context, ILogger<ProductController> logger, IRedisService redis, IProductCacheService productCache, IConfiguration configuration)
     {
         _context = context;
         _logger = logger;
         _redis = redis;
+        _productCache = productCache;
+        _configuration = configuration;
     }
 
     [HttpGet("categories")]
@@ -143,6 +147,14 @@ public class ProductController : Controller
             .Select(g => new { ProductId = g.Key, CostPrice = g.OrderBy(sp => sp.Seq).First().CostPrice })
             .ToDictionaryAsync(x => x.ProductId, x => x.CostPrice);
 
+        var pagedIds = await query
+            .OrderBy(p => p.Category!.Name)
+            .ThenBy(p => p.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(p => p.Id)
+            .ToListAsync();
+
         var products = await query
             .OrderBy(p => p.Category!.Name)
             .ThenBy(p => p.Name)
@@ -156,16 +168,24 @@ public class ProductController : Controller
                 CategoryName = p.Category!.Name,
                 Operator = p.Operator,
                 Denomination = p.Denomination,
-                Description = p.Description,
-                Price = p.ProductLevelPrices
-                    .Where(plp => plp.LevelId == user.LevelId && plp.IsActive)
-                    .Select(plp => plp.Margin > 0 && costPrices.ContainsKey(p.Id) ? costPrices[p.Id] + plp.Margin : 0m)
-                    .FirstOrDefault(),
-                Available = p.ProductLevelPrices
-                    .Any(plp => plp.LevelId == user.LevelId && plp.IsActive && plp.Margin > 0)
-                    && costPrices.ContainsKey(p.Id) && costPrices[p.Id] > 0
+                Description = p.Description
             })
             .ToListAsync();
+
+        var margins = await _context.ProductLevelPrices
+            .Where(plp => pagedIds.Contains(plp.ProductId) && plp.LevelId == user.LevelId && plp.IsActive)
+            .GroupBy(plp => plp.ProductId)
+            .Select(g => new { ProductId = g.Key, Margin = g.OrderByDescending(plp => plp.UpdatedAt).First().Margin })
+            .ToDictionaryAsync(x => x.ProductId, x => x.Margin);
+
+        foreach (var dto in products)
+        {
+            var hasCost = costPrices.TryGetValue(dto.Id, out var cost) && cost > 0;
+            var hasMargin = margins.TryGetValue(dto.Id, out var margin) && margin > 0;
+
+            dto.Price = (hasCost && hasMargin) ? cost + margin : (decimal?)null;
+            dto.Available = hasCost && hasMargin;
+        }
 
         var productResponse = new ProductListResponse
         {
@@ -300,5 +320,37 @@ public class ProductController : Controller
             success = true,
             data = suppliers
         });
+    }
+
+    /// <summary>
+    /// Invalidate product cache. Requires X-Api-Key header for authentication.
+    /// </summary>
+    [HttpPost("cache/invalidate")]
+    public async Task<IActionResult> InvalidateCache()
+    {
+        var apiKey = _configuration["InternalApiKey"];
+        if (string.IsNullOrEmpty(apiKey))
+        {
+            return StatusCode(500, new ErrorResponse
+            {
+                Message = "Internal API key not configured",
+                ErrorCode = "CONFIG_ERROR"
+            });
+        }
+
+        var requestKey = Request.Headers["X-Api-Key"].FirstOrDefault();
+        if (string.IsNullOrEmpty(requestKey) || requestKey != apiKey)
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid or missing API key",
+                ErrorCode = "INVALID_API_KEY"
+            });
+        }
+
+        await _productCache.InvalidateProductCacheAsync();
+        _logger.LogInformation("Product cache invalidated via API");
+
+        return Ok(new { success = true, message = "Product cache invalidated" });
     }
 }

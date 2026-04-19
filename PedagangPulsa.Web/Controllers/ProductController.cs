@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PedagangPulsa.Application.Abstractions.Caching;
 using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Application.Services;
 using PedagangPulsa.Domain.Entities;
@@ -14,12 +15,14 @@ public class ProductController : Controller
     private readonly ProductService _productService;
     private readonly IAppDbContext _context;
     private readonly ILogger<ProductController> _logger;
+    private readonly IProductCacheService _productCache;
 
-    public ProductController(ProductService productService, IAppDbContext context, ILogger<ProductController> logger)
+    public ProductController(ProductService productService, IAppDbContext context, ILogger<ProductController> logger, IProductCacheService productCache)
     {
         _productService = productService;
         _context = context;
         _logger = logger;
+        _productCache = productCache;
     }
 
     public IActionResult Index()
@@ -168,6 +171,7 @@ public class ProductController : Controller
         }
 
         TempData["Success"] = "Product created successfully.";
+        await _productCache.InvalidateProductCacheAsync();
         return RedirectToAction(nameof(Index));
     }
 
@@ -270,6 +274,7 @@ public class ProductController : Controller
         }
 
         TempData["Success"] = "Product updated successfully.";
+        await _productCache.InvalidateProductCacheAsync();
         return RedirectToAction(nameof(Details), new { id = model.Id });
     }
 
@@ -307,6 +312,7 @@ public class ProductController : Controller
         }
 
         TempData["Success"] = "Product deleted successfully.";
+        await _productCache.InvalidateProductCacheAsync();
         return RedirectToAction(nameof(Index));
     }
 
@@ -403,6 +409,7 @@ public class ProductController : Controller
 
         if (result)
         {
+            await _productCache.InvalidateProductCacheAsync();
             return Json(new { success = true, message = "Price updated successfully" });
         }
 

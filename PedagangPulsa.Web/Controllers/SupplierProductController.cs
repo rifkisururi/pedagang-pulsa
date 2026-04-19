@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PedagangPulsa.Application.Abstractions.Caching;
 using PedagangPulsa.Application.Services;
 using PedagangPulsa.Domain.Entities;
 using PedagangPulsa.Infrastructure.Data;
@@ -16,19 +17,22 @@ public class SupplierProductController : Controller
     private readonly SupplierService _supplierService;
     private readonly AppDbContext _context;
     private readonly ILogger<SupplierProductController> _logger;
+    private readonly IProductCacheService _productCache;
 
     public SupplierProductController(
         SupplierProductService supplierProductService,
         ProductService productService,
         SupplierService supplierService,
         AppDbContext context,
-        ILogger<SupplierProductController> logger)
+        ILogger<SupplierProductController> logger,
+        IProductCacheService productCache)
     {
         _supplierProductService = supplierProductService;
         _productService = productService;
         _supplierService = supplierService;
         _context = context;
         _logger = logger;
+        _productCache = productCache;
     }
 
     // Index page for all supplier products (menu navigation)
@@ -118,6 +122,7 @@ public class SupplierProductController : Controller
         }
 
         TempData["Success"] = "Supplier added successfully.";
+        await _productCache.InvalidateProductCacheAsync();
         return RedirectToAction(nameof(Index), new { productId = model.ProductId });
     }
 
@@ -177,6 +182,7 @@ public class SupplierProductController : Controller
         }
 
         TempData["Success"] = "Supplier mapping updated successfully.";
+        await _productCache.InvalidateProductCacheAsync();
         return RedirectToAction(nameof(Index), new { productId = model.ProductId });
     }
 
@@ -214,6 +220,7 @@ public class SupplierProductController : Controller
         }
 
         TempData["Success"] = "Supplier mapping deleted successfully.";
+        await _productCache.InvalidateProductCacheAsync();
         return RedirectToAction(nameof(Index), new { productId = model.ProductId });
     }
 
@@ -236,6 +243,7 @@ public class SupplierProductController : Controller
 
         if (result)
         {
+            await _productCache.InvalidateProductCacheAsync();
             return Json(new { success = true, message = "Order updated successfully" });
         }
 
@@ -301,6 +309,7 @@ public class SupplierProductController : Controller
             return Json(new { success = false, message = "Failed to save mapping. It might already exist or data is invalid." });
         }
 
+        await _productCache.InvalidateProductCacheAsync();
         return Json(new { success = true, message = "Mapping saved successfully." });
     }
 
@@ -312,6 +321,7 @@ public class SupplierProductController : Controller
         var result = await _supplierProductService.DeleteSupplierProductAsync(productId, supplierId);
         if (result)
         {
+            await _productCache.InvalidateProductCacheAsync();
             return Json(new { success = true, message = "Mapping deleted successfully." });
         }
         return Json(new { success = false, message = "Failed to delete mapping." });

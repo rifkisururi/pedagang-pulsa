@@ -70,6 +70,7 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddSingleton<IRedisService, RedisService>();
+        services.AddScoped<IProductCacheService, ProductCacheService>();
 
         return services;
     }

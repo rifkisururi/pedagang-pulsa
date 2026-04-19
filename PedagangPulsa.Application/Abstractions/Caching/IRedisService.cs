@@ -8,4 +8,5 @@ public interface IRedisService
     Task RemoveAsync(string key);
     Task<string?> GetAndRemoveAsync(string key);
     Task<long> TtlAsync(string key);
+    Task RemoveByPatternAsync(string pattern);
 }
