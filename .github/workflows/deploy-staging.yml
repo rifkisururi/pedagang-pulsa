@@ -59,8 +59,18 @@ jobs:
 
       - name: Cleanup old images
         run: |
-          gcloud artifacts docker images delete \
+          echo "Fetching all tags for ${{ env.IMAGE }}..."
+          TAGS=$(gcloud artifacts docker images list-tags \
             ${{ env.IMAGE }} \
-            --delete-tags \
-            --keep-tags=1 \
-            --quiet 2>/dev/null || true
+            --format='value(tags)' \
+            --quiet 2>/dev/null)
+
+          for TAG in $TAGS; do
+            if [[ "$TAG" != "latest" && "$TAG" != "${{ github.sha }}" ]]; then
+              echo "Deleting old image: ${{ env.IMAGE }}:$TAG"
+              gcloud artifacts docker images delete \
+                "${{ env.IMAGE }}@$TAG" \
+                --quiet --delete-tags
+            fi
+          done
+          echo "Cleanup complete. Kept: latest, ${{ github.sha }}"
