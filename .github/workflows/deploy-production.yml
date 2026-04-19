@@ -40,7 +40,7 @@ jobs:
             --region ${{ env.REGION }} \
             --port 8080 \
             --memory 200Mi \
-            --cpu 0.15m \
+            --cpu 0.15 \
             --min-instances 0 \
             --max-instances 1 \
             --allow-unauthenticated \
