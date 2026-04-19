@@ -20,4 +20,5 @@ public class Supplier
     public ICollection<TransactionAttempt> TransactionAttempts { get; set; } = new List<TransactionAttempt>();
     public ICollection<SupplierCallback> SupplierCallbacks { get; set; } = new List<SupplierCallback>();
     public ICollection<SupplierBalanceLedger> Ledgers { get; set; } = new List<SupplierBalanceLedger>();
+    public ICollection<SupplierRegexPattern> RegexPatterns { get; set; } = new List<SupplierRegexPattern>();
 }

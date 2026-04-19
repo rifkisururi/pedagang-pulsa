@@ -25,6 +25,7 @@ public interface IAppDbContext
     DbSet<SupplierProduct> SupplierProducts { get; }
     DbSet<SupplierBalance> SupplierBalances { get; }
     DbSet<SupplierBalanceLedger> SupplierBalanceLedgers { get; }
+    DbSet<SupplierRegexPattern> SupplierRegexPatterns { get; }
     DbSet<Transaction> Transactions { get; }
     DbSet<TransactionAttempt> TransactionAttempts { get; }
     DbSet<SupplierCallback> SupplierCallbacks { get; }

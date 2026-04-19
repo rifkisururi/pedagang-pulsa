@@ -38,6 +38,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<SupplierProduct> SupplierProducts { get; set; }
     public DbSet<SupplierBalance> SupplierBalances { get; set; }
     public DbSet<SupplierBalanceLedger> SupplierBalanceLedgers { get; set; }
+    public DbSet<SupplierRegexPattern> SupplierRegexPatterns { get; set; }
 
     // Transaction
     public DbSet<Transaction> Transactions { get; set; }
@@ -431,6 +432,21 @@ public class AppDbContext : DbContext, IAppDbContext
             entity.HasOne(e => e.Attempt)
                 .WithMany(a => a.SupplierCallbacks)
                 .HasForeignKey(e => e.AttemptId);
+        });
+
+        // SupplierRegexPattern
+        modelBuilder.Entity<SupplierRegexPattern>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Label).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Regex).IsRequired();
+            entity.Property(e => e.SampleMessage).HasMaxLength(2000);
+            entity.HasIndex(e => new { e.SupplierId, e.SeqNo }).IsUnique();
+            entity.HasIndex(e => e.SupplierId);
+            entity.HasOne(e => e.Supplier)
+                .WithMany(s => s.RegexPatterns)
+                .HasForeignKey(e => e.SupplierId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // IdempotencyKey

@@ -1,0 +1,174 @@
+@model PedagangPulsa.Web.Areas.Admin.ViewModels.SupplierRegexPatternViewModel
+
+@{
+    ViewData["Title"] = "Edit Regex Pattern";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="bi bi-pencil"></i> Edit Regex Pattern</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a asp-action="Index" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to List
+        </a>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+                <form asp-action="Edit" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="Id" />
+
+                    <h5 class="mb-3">Informasi Supplier</h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label asp-for="SupplierId" class="form-label">Supplier <span class="text-danger">*</span></label>
+                            <select asp-for="SupplierId" asp-items="ViewBag.Suppliers" class="form-select" required>
+                                <option value="">-- Pilih Supplier --</option>
+                            </select>
+                            <span asp-validation-for="SupplierId" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="SeqNo" class="form-label">Seq No <span class="text-danger">*</span></label>
+                            <input asp-for="SeqNo" class="form-control" type="number" min="1" required />
+                            <span asp-validation-for="SeqNo" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="IsActive" class="form-label">Status</label>
+                            <div class="form-check form-switch mt-2">
+                                <input asp-for="IsActive" class="form-check-input" type="checkbox" />
+                                <label asp-for="IsActive" class="form-check-label">Active</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h5 class="mb-3">Pola Regex</h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-12">
+                            <label asp-for="Label" class="form-label">Label <span class="text-danger">*</span></label>
+                            <input asp-for="Label" class="form-control" placeholder="Contoh: Stok Tidak Cukup, Transaksi Sukses" required />
+                            <span asp-validation-for="Label" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="IsTrxSukses" class="form-label">Status Transaksi</label>
+                            <div class="form-check form-switch mt-2">
+                                <input asp-for="IsTrxSukses" class="form-check-input" type="checkbox" />
+                                <label asp-for="IsTrxSukses" class="form-check-label">Sukses</label>
+                            </div>
+                            <small class="text-muted">Centang jika regex ini menandakan transaksi sukses</small>
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="Regex" class="form-label">Regex Pattern <span class="text-danger">*</span></label>
+                            <textarea asp-for="Regex" class="form-control font-monospace" rows="3" placeholder="Contoh: (?&lt;produk&gt;\w+)\s+ke\s+(?&lt;tujuan&gt;\d+)" required></textarea>
+                            <span asp-validation-for="Regex" class="text-danger small"></span>
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="SampleMessage" class="form-label">Sample Message</label>
+                            <textarea asp-for="SampleMessage" class="form-control" rows="3" placeholder="Paste contoh pesan dari supplier untuk testing..."></textarea>
+                            <span asp-validation-for="SampleMessage" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <!-- Regex Tester -->
+                    <h5 class="mb-3">Test Regex</h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-12">
+                            <label class="form-label">Test Message</label>
+                            <textarea id="testMessage" class="form-control" rows="3" placeholder="Masukkan pesan untuk di-test terhadap regex di atas..."></textarea>
+                        </div>
+                        <div class="col-auto">
+                            <button type="button" class="btn btn-outline-primary" id="btnTestRegex">
+                                <i class="bi bi-play-circle"></i> Test Regex
+                            </button>
+                        </div>
+                        <div class="col-12" id="testResult" style="display:none;">
+                            <div class="card">
+                                <div class="card-header">Hasil Test</div>
+                                <div class="card-body" id="testResultBody"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Simpan
+                        </button>
+                        <a asp-action="Index" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle"></i> Batal
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Pre-fill test message with sample if available
+        @if (!string.IsNullOrEmpty(Model.SampleMessage))
+        {
+            <text>
+            $('#testMessage').val('@Html.Raw(Model.SampleMessage.Replace("\r", "").Replace("\n", "\\n").Replace("'", "\\'"))');
+            </text>
+        }
+
+        $('#btnTestRegex').on('click', function () {
+            var regex = $('#Regex').val();
+            var message = $('#testMessage').val();
+
+            if (!regex || !message) {
+                alert('Regex dan Test Message harus diisi.');
+                return;
+            }
+
+            $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status"></span> Testing...');
+
+            $.ajax({
+                url: '/SupplierRegexPattern/TestRegex',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ regex: regex, testMessage: message }),
+                success: function (result) {
+                    var $body = $('#testResultBody');
+                    $body.empty();
+
+                    if (result.success) {
+                        $body.html('<div class="alert alert-success mb-0"><i class="bi bi-check-circle me-2"></i>' + escapeHtml(result.message) + '</div>');
+
+                        if (result.groups && result.groups.length > 0) {
+                            var tableHtml = '<table class="table table-sm table-bordered mt-2"><thead><tr><th>Group</th><th>Value</th></tr></thead><tbody>';
+                            result.groups.forEach(function (g) {
+                                tableHtml += '<tr><td><code>' + escapeHtml(g.name) + '</code></td><td>' + escapeHtml(g.value) + '</td></tr>';
+                            });
+                            tableHtml += '</tbody></table>';
+                            $body.append(tableHtml);
+                        }
+                    } else {
+                        $body.html('<div class="alert alert-danger mb-0"><i class="bi bi-x-circle me-2"></i>' + escapeHtml(result.message) + '</div>');
+                    }
+
+                    $('#testResult').show();
+                },
+                error: function () {
+                    $('#testResultBody').html('<div class="alert alert-danger mb-0">Terjadi kesalahan saat testing.</div>');
+                    $('#testResult').show();
+                },
+                complete: function () {
+                    $('#btnTestRegex').prop('disabled', false).html('<i class="bi bi-play-circle"></i> Test Regex');
+                }
+            });
+        });
+
+        function escapeHtml(text) {
+            var map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, function (m) { return map[m]; });
+        }
+    </script>
+}

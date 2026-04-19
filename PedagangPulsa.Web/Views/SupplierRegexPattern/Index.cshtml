@@ -1,0 +1,222 @@
+@model dynamic
+
+@{
+    ViewData["Title"] = "Regex Patterns";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="bi bi-braces"></i> Supplier Regex Patterns</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        @if (User.IsInRole("SuperAdmin"))
+        {
+            <a asp-action="Create" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Add Pattern
+            </a>
+        }
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i> @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">Supplier</label>
+                <select class="form-select" id="supplierFilter">
+                    <option value="">Semua Supplier</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">Search</label>
+                <input type="text" class="form-control" id="searchInput" placeholder="Cari label atau regex...">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Status Trx</label>
+                <select class="form-select" id="trxStatusFilter">
+                    <option value="">Semua</option>
+                    <option value="true">Sukses</option>
+                    <option value="false">Gagal</option>
+                </select>
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small fw-bold">&nbsp;</label>
+                <button type="button" class="btn btn-outline-secondary w-100" id="resetFilters">
+                    <i class="bi bi-arrow-clockwise"></i> Reset
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped" id="patternsTable" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Supplier</th>
+                        <th>Seq</th>
+                        <th>Label</th>
+                        <th>Status</th>
+                        <th>Regex</th>
+                        <th>Sample</th>
+                        <th>Active</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" />
+
+    <script>
+        $(document).ready(function () {
+            // Load suppliers for filter
+            $.get('/SupplierRegexPattern/GetSuppliersSelect', function (data) {
+                var select = $('#supplierFilter');
+                data.forEach(function (item) {
+                    select.append('<option value="' + item.value + '">' + item.text + '</option>');
+                });
+
+                // Check URL param
+                const urlParams = new URLSearchParams(window.location.search);
+                const supplierId = urlParams.get('supplierId');
+                if (supplierId) {
+                    select.val(supplierId);
+                }
+            });
+
+            var table = $('#patternsTable').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: '/SupplierRegexPattern/GetData',
+                    type: 'POST',
+                    data: function (d) {
+                        d.supplierId = $('#supplierFilter').val() || null;
+                        d.search = $('#searchInput').val() || null;
+                        d.isTrxSukses = $('#trxStatusFilter').val() || null;
+                        return d;
+                    }
+                },
+                order: [[0, 'asc'], [1, 'asc']],
+                columns: [
+                    {
+                        data: 'supplierName',
+                        render: function (data) {
+                            return '<span class="fw-semibold">' + data + '</span>';
+                        }
+                    },
+                    { data: 'seqNo', width: '50px' },
+                    {
+                        data: 'label',
+                        render: function (data) {
+                            return '<span class="fw-semibold">' + data + '</span>';
+                        }
+                    },
+                    {
+                        data: 'isTrxSukses',
+                        width: '80px',
+                        render: function (data) {
+                            if (data) {
+                                return '<span class="badge bg-success">Sukses</span>';
+                            }
+                            return '<span class="badge bg-danger">Gagal</span>';
+                        }
+                    },
+                    {
+                        data: 'regexTruncated',
+                        render: function (data, type, row) {
+                            return '<code class="small">' + escapeHtml(data) + '</code>';
+                        }
+                    },
+                    {
+                        data: 'sampleTruncated',
+                        render: function (data) {
+                            if (!data) return '<span class="text-muted">-</span>';
+                            return '<small class="text-muted">' + escapeHtml(data) + '</small>';
+                        }
+                    },
+                    {
+                        data: 'isActive',
+                        width: '60px',
+                        render: function (data) {
+                            if (data) {
+                                return '<span class="badge bg-success">Yes</span>';
+                            }
+                            return '<span class="badge bg-secondary">No</span>';
+                        }
+                    },
+                    {
+                        data: null,
+                        orderable: false,
+                        width: '120px',
+                        render: function (data, type, row) {
+                            var actions = '<div class="btn-group" role="group">';
+                            actions += '<a href="/SupplierRegexPattern/Edit/' + row.id + '" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>';
+                            @if (User.IsInRole("SuperAdmin")) {
+                                <text>
+                                actions += '<button type="button" class="btn btn-sm btn-outline-danger" title="Delete" onclick="confirmDelete(' + row.id + ')"><i class="bi bi-trash"></i></button>';
+                                </text>
+                            }
+                            actions += '</div>';
+                            return actions;
+                        }
+                    }
+                ],
+                pageLength: 25,
+                lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]]
+            });
+
+            $('#supplierFilter, #trxStatusFilter').on('change', function () {
+                table.ajax.reload();
+            });
+
+            $('#searchInput').on('keyup', function (e) {
+                if (e.key === 'Enter') {
+                    table.ajax.reload();
+                }
+            });
+
+            $('#resetFilters').on('click', function () {
+                $('#supplierFilter').val('');
+                $('#searchInput').val('');
+                $('#trxStatusFilter').val('');
+                table.ajax.reload();
+            });
+        });
+
+        function confirmDelete(id) {
+            if (confirm('Apakah Anda yakin ingin menghapus regex pattern ini?')) {
+                var token = $('input[name="__RequestVerificationToken"]').val();
+                $.post({
+                    url: '/SupplierRegexPattern/Delete/' + id,
+                    data: {
+                        __RequestVerificationToken: token
+                    },
+                    success: function () {
+                        location.reload();
+                    },
+                    error: function () {
+                        alert('Gagal menghapus pattern.');
+                    }
+                });
+            }
+        }
+
+        function escapeHtml(text) {
+            var map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, function (m) { return map[m]; });
+        }
+    </script>
+}

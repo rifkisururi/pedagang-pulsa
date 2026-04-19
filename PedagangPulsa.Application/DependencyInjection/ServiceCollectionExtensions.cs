@@ -19,6 +19,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<SupplierService>();
         services.AddScoped<SupplierProductService>();
         services.AddScoped<SupplierBalanceService>();
+        services.AddScoped<SupplierRegexPatternService>();
         services.AddScoped<TransactionService>();
         services.AddScoped<TopupService>();
         services.AddScoped<BalanceService>();
