@@ -1,0 +1,144 @@
+name: Deploy Web to Staging
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - 'PedagangPulsa.Web/**'
+      - 'PedagangPulsa.Application/**'
+      - 'PedagangPulsa.Infrastructure/**'
+      - 'PedagangPulsa.Domain/**'
+      - '.github/workflows/deploy-web-staging.yml'
+
+env:
+  PROJECT_ID: pedagangpulsa27
+  REGION: asia-southeast1
+  SERVICE_NAME: pedagangpulsa-web-dev
+  IMAGE: asia-southeast1-docker.pkg.dev/pedagangpulsa27/docker-repo/pedagangpulsa-web-dev
+  DOMAIN: admin-dev.pedagangpulsa.com
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build & Push Image
+        run: |
+          docker build -t ${{ env.IMAGE }}:${{ github.sha }} -t ${{ env.IMAGE }}:latest -f PedagangPulsa.Web/Dockerfile .
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.IMAGE }}:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --port 8080 \
+            --memory 256Mi \
+            --cpu 1 \
+            --min-instances 0 \
+            --max-instances 10 \
+            --timeout 300 \
+            --concurrency 50 \
+            --allow-unauthenticated \
+            --set-env-vars "ASPNETCORE_ENVIRONMENT=Staging,ConnectionStrings__DefaultConnection=${{ secrets.DB_CONNECTION }},ConnectionStrings__Redis=${{ secrets.REDIS_CONNECTION }},Jwt__Key=${{ secrets.JWT_KEY }},Jwt__Issuer=PedagangPulsa.Api,Jwt__Audience=PedagangPulsa.Client" \
+            --project ${{ env.PROJECT_ID }}
+
+      - name: Map Custom Domain
+        run: |
+          gcloud beta run domain-mappings create \
+            --service=${{ env.SERVICE_NAME }} \
+            --domain=${{ env.DOMAIN }} \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --quiet 2>/dev/null || echo "Domain mapping already exists, skipping..."
+
+      - name: Cleanup old Cloud Run revisions
+        run: |
+          echo "=== Cloud Run revision cleanup ==="
+          REVISIONS=$(gcloud run revisions list \
+            --service=${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --format='value(name)' \
+            --sort-by=creationTimestamp \
+            --quiet)
+
+          TOTAL=$(echo "$REVISIONS" | wc -l | tr -d ' ')
+          TO_DELETE=$((TOTAL - 2))
+
+          if [ "$TO_DELETE" -gt 0 ]; then
+            echo "Found $TOTAL revision(s), keeping 2, deleting $TO_DELETE"
+            echo "$REVISIONS" | head -n "$TO_DELETE" | while IFS= read -r REV; do
+              echo "Deleting revision: $REV"
+              gcloud run revisions delete "$REV" \
+                --region=${{ env.REGION }} \
+                --project=${{ env.PROJECT_ID }} \
+                --quiet 2>/dev/null && echo "  Deleted." || echo "  WARNING: failed to delete $REV"
+            done
+          else
+            echo "No old revisions to delete (total: $TOTAL)"
+          fi
+          echo "=== Revision cleanup complete ==="
+
+      - name: Cleanup old images
+        run: |
+          echo "=== Image cleanup ==="
+
+          # Get digests for latest and current SHA tags (to keep)
+          gcloud artifacts tags list \
+            --repository=docker-repo \
+            --location=${{ env.REGION }} \
+            --package=pedagangpulsa-web-dev \
+            --filter="name:latest OR name:${{ github.sha }}" \
+            --format='value(version)' \
+            --quiet 2>/dev/null | sort -u > /tmp/keep.txt
+
+          # Get all digests
+          gcloud artifacts docker images list "${{ env.IMAGE }}" \
+            --format='value(version)' \
+            --quiet 2>/dev/null | sort -u > /tmp/all.txt
+
+          # Find digests to delete
+          grep -vFf /tmp/keep.txt /tmp/all.txt > /tmp/delete.txt || true
+
+          DELETE_COUNT=$(wc -l < /tmp/delete.txt | tr -d ' ')
+          if [ "$DELETE_COUNT" -gt 0 ]; then
+            echo "Found $DELETE_COUNT old image(s) to delete"
+            while IFS= read -r DIGEST; do
+              # First, remove any SHA tags pointing to this image
+              gcloud artifacts tags list \
+                --repository=docker-repo \
+                --location=${{ env.REGION }} \
+                --package=pedagangpulsa-web-dev \
+                --filter="version:$DIGEST" \
+                --format='value(name)' \
+                --quiet 2>/dev/null | while IFS= read -r TAG; do
+                  echo "  Removing tag: $TAG"
+                  gcloud artifacts tags delete "$TAG" \
+                    --repository=docker-repo \
+                    --location=${{ env.REGION }} \
+                    --package=pedagangpulsa-web-dev \
+                    --quiet 2>/dev/null || true
+                done
+              echo "Deleting image: $DIGEST"
+              gcloud artifacts docker images delete "${{ env.IMAGE }}@$DIGEST" \
+                --quiet --delete-tags 2>/dev/null && echo "  Deleted." || echo "  WARNING: failed to delete $DIGEST"
+            done < /tmp/delete.txt
+          else
+            echo "No old images to delete"
+          fi
+
+          rm -f /tmp/keep.txt /tmp/all.txt /tmp/delete.txt
+          echo "=== Cleanup complete. Kept: latest, ${{ github.sha }} ==="
