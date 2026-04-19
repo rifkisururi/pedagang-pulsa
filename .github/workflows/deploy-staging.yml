@@ -42,7 +42,7 @@ jobs:
             --memory 200Mi \
             --cpu 0.15 \
             --min-instances 0 \
-            --max-instances 1 \
+            --max-instances 20 \
             --allow-unauthenticated \
             --set-env-vars "ASPNETCORE_ENVIRONMENT=Staging,ConnectionStrings__DefaultConnection=${{ secrets.DB_CONNECTION }},ConnectionStrings__Redis=${{ secrets.REDIS_CONNECTION }},Jwt__Key=${{ secrets.JWT_KEY }},Jwt__Issuer=PedagangPulsa.Api,Jwt__Audience=PedagangPulsa.Client,EnableSwagger=true,EnableScalar=true" \
             --project ${{ env.PROJECT_ID }}
@@ -56,11 +56,39 @@ jobs:
             --project=${{ env.PROJECT_ID }} \
             --quiet 2>/dev/null || echo "Domain mapping already exists, skipping..."
 
+      - name: Cleanup old Cloud Run revisions
+        run: |
+          echo "=== Cloud Run revision cleanup ==="
+          REVISIONS=$(gcloud run revisions list \
+            --service=${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --format='value(name)' \
+            --sort-by=creationTimestamp \
+            --quiet)
+
+          TOTAL=$(echo "$REVISIONS" | wc -l | tr -d ' ')
+          TO_DELETE=$((TOTAL - 2))
+
+          if [ "$TO_DELETE" -gt 0 ]; then
+            echo "Found $TOTAL revision(s), keeping 2, deleting $TO_DELETE"
+            echo "$REVISIONS" | head -n "$TO_DELETE" | while IFS= read -r REV; do
+              echo "Deleting revision: $REV"
+              gcloud run revisions delete "$REV" \
+                --region=${{ env.REGION }} \
+                --project=${{ env.PROJECT_ID }} \
+                --quiet 2>/dev/null && echo "  Deleted." || echo "  WARNING: failed to delete $REV"
+            done
+          else
+            echo "No old revisions to delete (total: $TOTAL)"
+          fi
+          echo "=== Revision cleanup complete ==="
+
       - name: Cleanup old images
         run: |
           echo "=== Image cleanup ==="
 
-          # Write digests to keep into a file
+          # Get digests for latest and current SHA tags (to keep)
           gcloud artifacts tags list \
             --repository=docker-repo \
             --location=${{ env.REGION }} \
@@ -69,21 +97,36 @@ jobs:
             --format='value(version)' \
             --quiet 2>/dev/null | sort -u > /tmp/keep.txt
 
-          # Delete all digests not in the keep list
+          # Get all digests
           gcloud artifacts docker images list "${{ env.IMAGE }}" \
             --format='value(version)' \
             --quiet 2>/dev/null | sort -u > /tmp/all.txt
 
-          # Find digests to delete (in all.txt but not in keep.txt)
+          # Find digests to delete
           grep -vFf /tmp/keep.txt /tmp/all.txt > /tmp/delete.txt || true
 
           DELETE_COUNT=$(wc -l < /tmp/delete.txt | tr -d ' ')
           if [ "$DELETE_COUNT" -gt 0 ]; then
             echo "Found $DELETE_COUNT old image(s) to delete"
             while IFS= read -r DIGEST; do
-              echo "Deleting: $DIGEST"
+              # First, remove any SHA tags pointing to this image
+              gcloud artifacts tags list \
+                --repository=docker-repo \
+                --location=${{ env.REGION }} \
+                --package=pedagangpulsa-api-dev \
+                --filter="version:$DIGEST" \
+                --format='value(name)' \
+                --quiet 2>/dev/null | while IFS= read -r TAG; do
+                  echo "  Removing tag: $TAG"
+                  gcloud artifacts tags delete "$TAG" \
+                    --repository=docker-repo \
+                    --location=${{ env.REGION }} \
+                    --package=pedagangpulsa-api-dev \
+                    --quiet 2>/dev/null
+                done
+              echo "Deleting image: $DIGEST"
               gcloud artifacts docker images delete "${{ env.IMAGE }}@$DIGEST" \
-                --quiet --delete-tags 2>/dev/null && echo "  Deleted." || echo "  WARNING: failed to delete $DIGEST"
+                --quiet 2>/dev/null && echo "  Deleted." || echo "  WARNING: failed to delete $DIGEST"
             done < /tmp/delete.txt
           else
             echo "No old images to delete"

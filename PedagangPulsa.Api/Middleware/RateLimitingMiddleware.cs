@@ -10,7 +10,7 @@ public class RateLimitingMiddleware
 
     private static readonly RateLimitRule[] _rules =
     [
-        new("login", "/api/auth/login", HttpMethods.Post, 60, TimeSpan.FromMinutes(1), RateLimitKeyType.IP),
+        //new("login", "/api/auth/login", HttpMethods.Post, 60, TimeSpan.FromMinutes(1), RateLimitKeyType.IP),
         new("register", "/api/auth/register", HttpMethods.Post, 60, TimeSpan.FromMinutes(1), RateLimitKeyType.IP),
         new("pin_verify", "/api/auth/pin/verify", HttpMethods.Post, 10, TimeSpan.FromMinutes(1), RateLimitKeyType.User),
         new("change_pin", "/api/auth/pin", HttpMethods.Put, 5, TimeSpan.FromMinutes(1), RateLimitKeyType.User),
