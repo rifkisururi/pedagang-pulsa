@@ -22,7 +22,9 @@ public class ReportService
         var startOfDay = date.Date;
         var endOfDay = date.Date.AddDays(1).AddTicks(-1);
 
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only reports to eliminate change tracking overhead, reducing memory allocations and CPU usage.
         var transactions = await _context.Transactions
+            .AsNoTracking()
             .Include(t => t.Product)
             .Include(t => t.Attempts)
             .ThenInclude(a => a.Supplier)
@@ -123,7 +125,9 @@ public class ReportService
 
     public async Task<ProfitBySupplierReport> GetProfitBySupplierAsync(DateTime? startDate = null, DateTime? endDate = null)
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only reports to eliminate change tracking overhead
         var query = _context.TransactionAttempts
+            .AsNoTracking()
             .Include(a => a.Supplier)
             .Include(a => a.Transaction)
             .Where(a => a.Status == AttemptStatus.Success);
@@ -172,7 +176,9 @@ public class ReportService
 
     public async Task<ProfitByProductReport> GetProfitByProductAsync(DateTime? startDate = null, DateTime? endDate = null)
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only reports to eliminate change tracking overhead
         var query = _context.Transactions
+            .AsNoTracking()
             .Include(t => t.Product)
             .Where(t => t.Status == TransactionStatus.Success);
 
