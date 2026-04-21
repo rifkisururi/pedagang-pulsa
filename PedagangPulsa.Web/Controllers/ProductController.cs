@@ -55,8 +55,14 @@ public class ProductController : Controller
             Description = product.Description,
             CategoryId = product.CategoryId,
             CategoryName = product.Category?.Name ?? "Unknown",
+            ProductGroupId = product.ProductGroupId,
+            ProductGroupName = product.ProductGroup?.Name,
             Operator = product.Operator,
             Denomination = product.Denomination,
+            ValidityDays = product.ValidityDays,
+            ValidityText = product.ValidityText,
+            QuotaMb = product.QuotaMb,
+            QuotaText = product.QuotaText,
             IsActive = product.IsActive,
             LevelPrices = product.ProductLevelPrices.Select(lp => new ProductDetailViewModel.PriceItem
             {
@@ -66,7 +72,19 @@ public class ProductController : Controller
                 CostPrice = costPrice,
                 ComputedSellPrice = costPrice > 0 ? costPrice + lp.Margin : 0,
                 MarginPercent = costPrice > 0 ? lp.Margin / costPrice * 100 : 0
-            }).ToList()
+            }).ToList(),
+            SupplierProducts = product.SupplierProducts
+                .OrderBy(sp => sp.Seq)
+                .Select(sp => new ProductDetailViewModel.SupplierProductItem
+                {
+                    Id = sp.Id,
+                    SupplierName = sp.Supplier?.Name ?? "Unknown",
+                    SupplierProductCode = sp.SupplierProductCode,
+                    SupplierProductName = sp.SupplierProductName,
+                    CostPrice = sp.CostPrice,
+                    Seq = sp.Seq,
+                    IsActive = sp.IsActive
+                }).ToList()
         };
 
         foreach (var level in levels)
@@ -95,6 +113,7 @@ public class ProductController : Controller
     public async Task<IActionResult> Create()
     {
         var categories = await _productService.GetCategoriesAsync();
+        var groups = await _productService.GetProductGroupsAsync();
         var levels = await _productService.GetLevelsAsync();
 
         var model = new ProductViewModel
@@ -103,6 +122,13 @@ public class ProductController : Controller
             {
                 Id = c.Id,
                 Name = c.Name
+            }).ToList(),
+            AvailableGroups = groups.Select(g => new ProductViewModel.GroupItem
+            {
+                Id = g.Id,
+                CategoryId = g.CategoryId,
+                Name = g.Name,
+                Operator = g.Operator
             }).ToList(),
             AvailableLevels = levels.Select(l => new ProductViewModel.LevelItem
             {
@@ -121,18 +147,7 @@ public class ProductController : Controller
     {
         if (!ModelState.IsValid)
         {
-            var categories = await _productService.GetCategoriesAsync();
-            var levels = await _productService.GetLevelsAsync();
-            model.AvailableCategories = categories.Select(c => new ProductViewModel.CategoryItem
-            {
-                Id = c.Id,
-                Name = c.Name
-            }).ToList();
-            model.AvailableLevels = levels.Select(l => new ProductViewModel.LevelItem
-            {
-                Id = l.Id,
-                Name = l.Name
-            }).ToList();
+            await PopulateDropdowns(model);
             return View(model);
         }
 
@@ -141,9 +156,14 @@ public class ProductController : Controller
             Code = model.Code,
             Name = model.Name,
             CategoryId = model.CategoryId,
+            ProductGroupId = model.ProductGroupId,
             Operator = model.Operator,
             Description = model.Description,
             Denomination = model.Denomination,
+            ValidityDays = model.ValidityDays,
+            ValidityText = model.ValidityText,
+            QuotaMb = model.QuotaMb,
+            QuotaText = model.QuotaText,
             IsActive = model.IsActive,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -167,6 +187,7 @@ public class ProductController : Controller
         if (result == null)
         {
             ModelState.AddModelError("", "Failed to create product.");
+            await PopulateDropdowns(model);
             return View(model);
         }
 
@@ -186,6 +207,7 @@ public class ProductController : Controller
         }
 
         var categories = await _productService.GetCategoriesAsync();
+        var groups = await _productService.GetProductGroupsAsync();
         var levels = await _productService.GetLevelsAsync();
 
         var model = new ProductViewModel
@@ -194,7 +216,12 @@ public class ProductController : Controller
             Code = product.Code,
             Name = product.Name,
             CategoryId = product.CategoryId,
+            ProductGroupId = product.ProductGroupId,
             Denomination = product.Denomination,
+            ValidityDays = product.ValidityDays,
+            ValidityText = product.ValidityText,
+            QuotaMb = product.QuotaMb,
+            QuotaText = product.QuotaText,
             Operator = product.Operator,
             Description = product.Description,
             IsActive = product.IsActive,
@@ -202,6 +229,13 @@ public class ProductController : Controller
             {
                 Id = c.Id,
                 Name = c.Name
+            }).ToList(),
+            AvailableGroups = groups.Select(g => new ProductViewModel.GroupItem
+            {
+                Id = g.Id,
+                CategoryId = g.CategoryId,
+                Name = g.Name,
+                Operator = g.Operator
             }).ToList(),
             AvailableLevels = levels.Select(l => new ProductViewModel.LevelItem
             {
@@ -225,18 +259,7 @@ public class ProductController : Controller
     {
         if (!ModelState.IsValid)
         {
-            var categories = await _productService.GetCategoriesAsync();
-            var levels = await _productService.GetLevelsAsync();
-            model.AvailableCategories = categories.Select(c => new ProductViewModel.CategoryItem
-            {
-                Id = c.Id,
-                Name = c.Name
-            }).ToList();
-            model.AvailableLevels = levels.Select(l => new ProductViewModel.LevelItem
-            {
-                Id = l.Id,
-                Name = l.Name
-            }).ToList();
+            await PopulateDropdowns(model);
             return View(model);
         }
 
@@ -246,7 +269,12 @@ public class ProductController : Controller
             Code = model.Code,
             Name = model.Name,
             CategoryId = model.CategoryId,
+            ProductGroupId = model.ProductGroupId,
             Denomination = model.Denomination,
+            ValidityDays = model.ValidityDays,
+            ValidityText = model.ValidityText,
+            QuotaMb = model.QuotaMb,
+            QuotaText = model.QuotaText,
             Operator = model.Operator,
             Description = model.Description,
             IsActive = model.IsActive,
@@ -270,6 +298,7 @@ public class ProductController : Controller
         if (result == null)
         {
             ModelState.AddModelError("", "Failed to update product. Product not found.");
+            await PopulateDropdowns(model);
             return View(model);
         }
 
@@ -325,6 +354,7 @@ public class ProductController : Controller
         [FromForm] int length,
         [FromForm] string? search = null,
         [FromForm] int? categoryId = null,
+        [FromForm] int? groupId = null,
         [FromForm] string? isActive = null,
         [FromForm] string? orderColumn = null,
         [FromForm] string? orderDirection = null)
@@ -343,6 +373,7 @@ public class ProductController : Controller
             pageSize,
             search,
             categoryId,
+            groupId,
             activeFilter,
             orderColumn,
             orderDirection);
@@ -354,7 +385,12 @@ public class ProductController : Controller
             Name = p.Name,
             Operator = p.Operator,
             Category = p.Category?.Name ?? "Unknown",
+            ProductGroup = p.ProductGroup?.Name,
             Denomination = p.Denomination,
+            ValidityDays = p.ValidityDays,
+            ValidityText = p.ValidityText,
+            QuotaMb = p.QuotaMb,
+            QuotaText = p.QuotaText,
             IsActive = p.IsActive ? "Active" : "Inactive"
         }).ToList();
 
@@ -375,6 +411,20 @@ public class ProductController : Controller
         {
             id = c.Id,
             name = c.Name
+        });
+        return Json(result);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetGroups(int? categoryId = null)
+    {
+        var groups = await _productService.GetProductGroupsAsync(categoryId);
+        var result = groups.Select(g => new
+        {
+            id = g.Id,
+            categoryId = g.CategoryId,
+            name = g.Name,
+            @operator = g.Operator
         });
         return Json(result);
     }
@@ -417,4 +467,29 @@ public class ProductController : Controller
     }
 
     #endregion
+
+    private async Task PopulateDropdowns(ProductViewModel model)
+    {
+        var categories = await _productService.GetCategoriesAsync();
+        var groups = await _productService.GetProductGroupsAsync();
+        var levels = await _productService.GetLevelsAsync();
+
+        model.AvailableCategories = categories.Select(c => new ProductViewModel.CategoryItem
+        {
+            Id = c.Id,
+            Name = c.Name
+        }).ToList();
+        model.AvailableGroups = groups.Select(g => new ProductViewModel.GroupItem
+        {
+            Id = g.Id,
+            CategoryId = g.CategoryId,
+            Name = g.Name,
+            Operator = g.Operator
+        }).ToList();
+        model.AvailableLevels = levels.Select(l => new ProductViewModel.LevelItem
+        {
+            Id = l.Id,
+            Name = l.Name
+        }).ToList();
+    }
 }

@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +11,8 @@ using System.Text.Json;
 namespace PedagangPulsa.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class ProductController : Controller
 {
     private readonly AppDbContext _context;
@@ -123,6 +125,7 @@ public class ProductController : Controller
 
         var query = _context.Products.AsNoTracking()
             .Include(p => p.Category)
+            .Include(p => p.ProductGroup)
             .Where(p => p.IsActive);
 
         if (categoryId.HasValue)
@@ -166,8 +169,14 @@ public class ProductController : Controller
                 Name = p.Name,
                 Code = p.Code,
                 CategoryName = p.Category!.Name,
+                ProductGroupId = p.ProductGroupId,
+                ProductGroupName = p.ProductGroup!.Name,
                 Operator = p.Operator,
                 Denomination = p.Denomination,
+                ValidityDays = p.ValidityDays,
+                ValidityText = p.ValidityText,
+                QuotaMb = p.QuotaMb,
+                QuotaText = p.QuotaText,
                 Description = p.Description
             })
             .ToListAsync();
@@ -237,6 +246,7 @@ public class ProductController : Controller
 
         var product = await _context.Products
             .Include(p => p.Category)
+            .Include(p => p.ProductGroup)
             .Where(p => p.Id == id && p.IsActive)
             .Select(p => new
             {
@@ -244,6 +254,7 @@ public class ProductController : Controller
                 p.Name,
                 p.Code,
                 CategoryName = p.Category!.Name,
+                ProductGroupName = p.ProductGroup != null ? p.ProductGroup.Name : null,
                 p.Operator,
                 p.Denomination,
                 p.Description

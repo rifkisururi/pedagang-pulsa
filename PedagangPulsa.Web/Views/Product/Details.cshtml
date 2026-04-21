@@ -30,20 +30,32 @@
                         <td><span class="fw-bold">@Model.Code</span></td>
                     </tr>
                     <tr>
-                        <th>Operator</th>
-                        <td>@(string.IsNullOrEmpty(Model.Operator) ? "-" : Model.Operator)</td>
-                    </tr>
-                    <tr>
                         <th>Product Name</th>
                         <td>@Model.Name</td>
                     </tr>
                     <tr>
+                        <th>Operator</th>
+                        <td>@(string.IsNullOrEmpty(Model.Operator) ? "-" : Model.Operator)</td>
+                    </tr>
+                    <tr>
                         <th>Category</th>
-                        <td>@Model.CategoryName</td>
+                        <td><span class="badge bg-info">@Model.CategoryName</span></td>
+                    </tr>
+                    <tr>
+                        <th>Product Group</th>
+                        <td>@(!string.IsNullOrEmpty(Model.ProductGroupName) ? Model.ProductGroupName : "<span class=\"text-muted\">-</span>")</td>
                     </tr>
                     <tr>
                         <th>Denomination</th>
-                        <td>@(Model.Denomination.HasValue ? Model.Denomination.Value.ToString("N0") : "-")</td>
+                        <td>@(Model.Denomination.HasValue ? "Rp " + Model.Denomination.Value.ToString("N0") : "-")</td>
+                    </tr>
+                    <tr>
+                        <th>Masa Aktif</th>
+                        <td>@(!string.IsNullOrEmpty(Model.ValidityText) ? Model.ValidityText : (Model.ValidityDays.HasValue ? Model.ValidityDays.Value + " Hari" : "-"))</td>
+                    </tr>
+                    <tr>
+                        <th>Kuota</th>
+                        <td>@(!string.IsNullOrEmpty(Model.QuotaText) ? Model.QuotaText : (Model.QuotaMb.HasValue ? Model.QuotaMb.Value.ToString("N0") + " MB" : "-"))</td>
                     </tr>
                     <tr>
                         <th>Status</th>
@@ -57,7 +69,6 @@
                                 <span class="badge bg-danger">Inactive</span>
                             }
                         </td>
-                    </tr>
                     <tr>
                         <th>Description</th>
                         <td>@(string.IsNullOrEmpty(Model.Description) ? "-" : Model.Description)</td>
@@ -80,6 +91,7 @@
                                 <th>Level</th>
                                 <th class="text-end">Cost Price</th>
                                 <th class="text-end">Margin</th>
+                                <th class="text-end">Margin %</th>
                                 <th class="text-end">Sell Price</th>
                             </tr>
                         </thead>
@@ -92,6 +104,7 @@
                                     </td>
                                     <td class="text-end">Rp @price.CostPrice.ToString("N0")</td>
                                     <td class="text-end text-primary">Rp @price.Margin.ToString("N0")</td>
+                                    <td class="text-end text-muted">@price.MarginPercent.ToString("F1")%</td>
                                     <td class="text-end fw-bold">Rp @price.ComputedSellPrice.ToString("N0")</td>
                                 </tr>
                             }
@@ -102,3 +115,54 @@
         </div>
     </div>
 </div>
+
+@if (Model.SupplierProducts.Any())
+{
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">Supplier Products</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Supplier</th>
+                                    <th>Supplier Code</th>
+                                    <th>Supplier Name</th>
+                                    <th class="text-end">Cost Price</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var sp in Model.SupplierProducts)
+                                {
+                                    <tr>
+                                        <td>@sp.Seq</td>
+                                        <td><span class="badge bg-secondary">@sp.SupplierName</span></td>
+                                        <td><code>@sp.SupplierProductCode</code></td>
+                                        <td>@(sp.SupplierProductName ?? "-")</td>
+                                        <td class="text-end fw-bold">Rp @sp.CostPrice.ToString("N0")</td>
+                                        <td>
+                                            @if (sp.IsActive)
+                                            {
+                                                <span class="badge bg-success">Active</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Inactive</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}

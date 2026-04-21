@@ -31,14 +31,20 @@
                 </select>
             </div>
             <div class="col-md-2">
+                <label class="form-label small fw-bold">Group</label>
+                <select class="form-select" id="groupFilter">
+                    <option value="">All Groups</option>
+                </select>
+            </div>
+            <div class="col-md-1">
                 <label class="form-label small fw-bold">Status</label>
                 <select class="form-select" id="statusFilter">
-                    <option value="">All Status</option>
+                    <option value="">All</option>
                     <option value="true">Active</option>
                     <option value="false">Inactive</option>
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <label class="form-label small fw-bold">&nbsp;</label>
                 <button type="button" class="btn btn-outline-secondary w-100" id="resetFilters">
                     <i class="bi bi-arrow-clockwise"></i> Reset
@@ -53,9 +59,11 @@
                     <tr>
                         <th>Code</th>
                         <th>Name</th>
-                        <th>Operator</th>
+                        <th>Group</th>
                         <th>Category</th>
-                        <th>Denom</th>
+                        <th>Harga</th>
+                        <th>Masa Aktif</th>
+                        <th>Kuota</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
@@ -71,12 +79,37 @@
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" />
 
     <script>
+        var allGroups = [];
+
         $(document).ready(function() {
             // Load categories for filter dropdown
             $.get('/Product/GetCategories', function(data) {
                 data.forEach(function(category) {
                     $('#categoryFilter').append('<option value="' + category.id + '">' + category.name + '</option>');
                 });
+            });
+
+            // Load groups for filter dropdown
+            function loadGroups(categoryId) {
+                var url = '/Product/GetGroups';
+                if (categoryId) url += '?categoryId=' + categoryId;
+                $.get(url, function(data) {
+                    allGroups = data;
+                    var $groupFilter = $('#groupFilter');
+                    var selectedVal = $groupFilter.val();
+                    $groupFilter.find('option:not(:first)').remove();
+                    data.forEach(function(group) {
+                        $groupFilter.append('<option value="' + group.id + '">' + group.name + '</option>');
+                    });
+                    $groupFilter.val(selectedVal);
+                });
+            }
+            loadGroups(null);
+
+            // Reload groups when category changes
+            $('#categoryFilter').on('change', function() {
+                var catId = $(this).val() || null;
+                loadGroups(catId);
             });
 
             var table = $('#productsTable').DataTable({
@@ -88,6 +121,7 @@
                     data: function(d) {
                         d.search = $('#searchInput').val();
                         d.categoryId = $('#categoryFilter').val() || null;
+                        d.groupId = $('#groupFilter').val() || null;
                         d.isActive = $('#statusFilter').val() || null;
                         return d;
                     }
@@ -106,17 +140,28 @@
                             return '<a href="/Product/Details/' + row.id + '" class="text-decoration-none fw-bold">' + data + '</a>';
                         }
                     },
-                    { 
-                        data: 'operator',
-                        render: function(data) { return data || '-'; }
+                    {
+                        data: 'productGroup',
+                        render: function(data) {
+                            if (!data) return '<span class="text-muted">-</span>';
+                            return '<span class="text-truncate d-inline-block" style="max-width:150px" title="' + data + '">' + data + '</span>';
+                        }
                     },
                     { data: 'category' },
                     {
                         data: 'denomination',
                         render: function(data) {
                             if (!data) return '-';
-                            return Number(data).toLocaleString('id-ID');
+                            return 'Rp ' + Number(data).toLocaleString('id-ID');
                         }
+                    },
+                    {
+                        data: 'validityText',
+                        render: function(data) { return data || '-'; }
+                    },
+                    {
+                        data: 'quotaText',
+                        render: function(data) { return data || '-'; }
                     },
                     {
                         data: 'isActive',
@@ -149,7 +194,7 @@
             });
 
             // Apply filters on change
-            $('#searchInput, #categoryFilter, #statusFilter').on('change', function() {
+            $('#categoryFilter, #groupFilter, #statusFilter').on('change', function() {
                 table.ajax.reload();
             });
 
@@ -163,7 +208,9 @@
             $('#resetFilters').on('click', function() {
                 $('#searchInput').val('');
                 $('#categoryFilter').val('');
+                $('#groupFilter').val('');
                 $('#statusFilter').val('');
+                loadGroups(null);
                 table.ajax.reload();
             });
         });

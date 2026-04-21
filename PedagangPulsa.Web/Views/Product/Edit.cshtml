@@ -44,7 +44,7 @@
                         </div>
                         <div class="col-md-6">
                             <label asp-for="CategoryId" class="form-label">Category <span class="text-danger">*</span></label>
-                            <select asp-for="CategoryId" class="form-select" required>
+                            <select asp-for="CategoryId" class="form-select" id="categoryId" required>
                                 <option value="">-- Select Category --</option>
                                 @if (Model.AvailableCategories != null)
                                 {
@@ -57,12 +57,52 @@
                             <span asp-validation-for="CategoryId" class="text-danger small"></span>
                         </div>
                         <div class="col-md-6">
+                            <label asp-for="ProductGroupId" class="form-label">Product Group</label>
+                            <select asp-for="ProductGroupId" class="form-select" id="groupId">
+                                <option value="">-- Select Group --</option>
+                                @if (Model.AvailableGroups != null)
+                                {
+                                    @foreach (var grp in Model.AvailableGroups)
+                                    {
+                                        <option value="@grp.Id" data-category="@grp.CategoryId">@grp.Name</option>
+                                    }
+                                }
+                            </select>
+                            <span asp-validation-for="ProductGroupId" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
                             <label asp-for="Denomination" class="form-label">Denomination</label>
                             <div class="input-group">
                                 <span class="input-group-text">Rp</span>
                                 <input asp-for="Denomination" class="form-control" type="number" step="1" min="0" />
                             </div>
                             <span asp-validation-for="Denomination" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="ValidityDays" class="form-label">Masa Aktif (Hari)</label>
+                            <div class="input-group">
+                                <input asp-for="ValidityDays" class="form-control" type="number" min="1" placeholder="30" />
+                                <span class="input-group-text">Hari</span>
+                            </div>
+                            <span asp-validation-for="ValidityDays" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="ValidityText" class="form-label">Teks Masa Aktif</label>
+                            <input asp-for="ValidityText" class="form-control" placeholder="e.g., 30 Hari" />
+                            <span asp-validation-for="ValidityText" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="QuotaMb" class="form-label">Kuota (MB)</label>
+                            <div class="input-group">
+                                <input asp-for="QuotaMb" class="form-control" type="number" min="1" placeholder="5120" />
+                                <span class="input-group-text">MB</span>
+                            </div>
+                            <span asp-validation-for="QuotaMb" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="QuotaText" class="form-label">Teks Kuota</label>
+                            <input asp-for="QuotaText" class="form-control" placeholder="e.g., 5 GB" />
+                            <span asp-validation-for="QuotaText" class="text-danger small"></span>
                         </div>
                         <div class="col-12">
                             <label asp-for="Description" class="form-label">Description</label>
@@ -135,4 +175,36 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        var allGroups = @Html.Raw(Json.Serialize(Model.AvailableGroups ?? new List<PedagangPulsa.Web.Areas.Admin.ViewModels.ProductViewModel.GroupItem>()));
+
+        function filterGroups(categoryId) {
+            var $groupSelect = $('#groupId');
+            var currentVal = $groupSelect.val();
+            $groupSelect.find('option:not(:first)').remove();
+
+            var filtered = categoryId
+                ? allGroups.filter(function(g) { return g.categoryId === parseInt(categoryId); })
+                : allGroups;
+
+            filtered.forEach(function(g) {
+                $groupSelect.append('<option value="' + g.id + '">' + g.name + '</option>');
+            });
+
+            // Restore selection if still valid
+            if (currentVal && filtered.some(function(g) { return g.id === parseInt(currentVal); })) {
+                $groupSelect.val(currentVal);
+            }
+        }
+
+        $('#categoryId').on('change', function() {
+            filterGroups($(this).val());
+        });
+
+        // Initial filter based on current category
+        $(document).ready(function() {
+            var catId = $('#categoryId').val();
+            if (catId) filterGroups(catId);
+        });
+    </script>
 }

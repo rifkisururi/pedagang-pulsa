@@ -20,12 +20,14 @@ public class ProductService
         int pageSize,
         string? search = null,
         int? categoryId = null,
+        int? groupId = null,
         bool? isActive = null,
         string? sortColumn = null,
         string? sortDirection = null)
     {
         var query = _context.Products
             .Include(p => p.Category)
+            .Include(p => p.ProductGroup)
             .AsQueryable();
 
         // Apply search filter
@@ -42,6 +44,12 @@ public class ProductService
         if (categoryId.HasValue)
         {
             query = query.Where(p => p.CategoryId == categoryId.Value);
+        }
+
+        // Apply group filter
+        if (groupId.HasValue)
+        {
+            query = query.Where(p => p.ProductGroupId == groupId.Value);
         }
 
         // Apply active status filter
@@ -105,7 +113,9 @@ public class ProductService
     {
         return await _context.Products
             .Include(p => p.Category)
+            .Include(p => p.ProductGroup)
             .Include(p => p.ProductLevelPrices)
+            .Include(p => p.SupplierProducts).ThenInclude(sp => sp.Supplier)
             .FirstOrDefaultAsync(p => p.Id == id);
     }
 
@@ -168,9 +178,14 @@ public class ProductService
         existing.Name = product.Name;
         existing.Code = product.Code;
         existing.CategoryId = product.CategoryId;
+        existing.ProductGroupId = product.ProductGroupId;
         existing.Denomination = product.Denomination;
         existing.Operator = product.Operator;
         existing.Description = product.Description;
+        existing.ValidityDays = product.ValidityDays;
+        existing.ValidityText = product.ValidityText;
+        existing.QuotaMb = product.QuotaMb;
+        existing.QuotaText = product.QuotaText;
         existing.IsActive = product.IsActive;
         existing.UpdatedAt = DateTime.UtcNow;
 
@@ -249,6 +264,22 @@ public class ProductService
             .Where(p => p.ProductId == productId)
             .Include(p => p.Level)
             .OrderBy(p => p.LevelId)
+            .ToListAsync();
+    }
+
+    public async Task<List<ProductGroup>> GetProductGroupsAsync(int? categoryId = null)
+    {
+        var query = _context.ProductGroups
+            .Where(g => g.IsActive)
+            .AsQueryable();
+
+        if (categoryId.HasValue)
+        {
+            query = query.Where(g => g.CategoryId == categoryId.Value);
+        }
+
+        return await query
+            .OrderBy(g => g.Name)
             .ToListAsync();
     }
 }

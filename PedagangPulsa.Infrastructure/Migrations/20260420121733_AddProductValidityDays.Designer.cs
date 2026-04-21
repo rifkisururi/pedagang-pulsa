@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PedagangPulsa.Infrastructure.Data;
@@ -11,9 +12,11 @@ using PedagangPulsa.Infrastructure.Data;
 namespace PedagangPulsa.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260420121733_AddProductValidityDays")]
+    partial class AddProductValidityDays
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -447,15 +450,6 @@ namespace PedagangPulsa.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<int?>("ProductGroupId")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("QuotaMb")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("QuotaText")
-                        .HasColumnType("text");
-
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -471,8 +465,6 @@ namespace PedagangPulsa.Infrastructure.Migrations
                         .IsUnique();
 
                     b.HasIndex("Operator");
-
-                    b.HasIndex("ProductGroupId");
 
                     b.HasIndex("CategoryId", "IsActive");
 
@@ -512,44 +504,6 @@ namespace PedagangPulsa.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("ProductCategories");
-                });
-
-            modelBuilder.Entity("PedagangPulsa.Domain.Entities.ProductGroup", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("CategoryId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Operator")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CategoryId");
-
-                    b.ToTable("ProductGroups");
                 });
 
             modelBuilder.Entity("PedagangPulsa.Domain.Entities.ProductLevelPrice", b =>
@@ -1471,23 +1425,6 @@ namespace PedagangPulsa.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("PedagangPulsa.Domain.Entities.ProductGroup", "ProductGroup")
-                        .WithMany("Products")
-                        .HasForeignKey("ProductGroupId");
-
-                    b.Navigation("Category");
-
-                    b.Navigation("ProductGroup");
-                });
-
-            modelBuilder.Entity("PedagangPulsa.Domain.Entities.ProductGroup", b =>
-                {
-                    b.HasOne("PedagangPulsa.Domain.Entities.ProductCategory", "Category")
-                        .WithMany()
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("Category");
                 });
 
@@ -1742,11 +1679,6 @@ namespace PedagangPulsa.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("PedagangPulsa.Domain.Entities.ProductCategory", b =>
-                {
-                    b.Navigation("Products");
-                });
-
-            modelBuilder.Entity("PedagangPulsa.Domain.Entities.ProductGroup", b =>
                 {
                     b.Navigation("Products");
                 });

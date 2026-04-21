@@ -19,6 +19,7 @@ public interface IAppDbContext
     DbSet<TopupRequest> TopupRequests { get; }
     DbSet<PeerTransfer> PeerTransfers { get; }
     DbSet<ProductCategory> ProductCategories { get; }
+    DbSet<ProductGroup> ProductGroups { get; }
     DbSet<Product> Products { get; }
     DbSet<ProductLevelPrice> ProductLevelPrices { get; }
     DbSet<Supplier> Suppliers { get; }

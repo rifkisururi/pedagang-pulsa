@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PedagangPulsa.Application.Abstractions.Persistence;
@@ -6,7 +7,8 @@ using PedagangPulsa.Application.Abstractions.Persistence;
 namespace PedagangPulsa.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class PingController : ControllerBase
 {
     private readonly IAppDbContext _dbContext;

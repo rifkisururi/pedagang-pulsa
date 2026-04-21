@@ -1,0 +1,191 @@
+@model dynamic
+
+@{
+    ViewData["Title"] = "Product Groups";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="bi bi-collection"></i> Product Groups</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        @if (User.IsInRole("SuperAdmin"))
+        {
+            <a asp-action="Create" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Add Group
+            </a>
+        }
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i> @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">Search</label>
+                <input type="text" class="form-control" id="searchInput" placeholder="Cari nama group atau operator...">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Category</label>
+                <select class="form-select" id="categoryFilter">
+                    <option value="">Semua Category</option>
+                </select>
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small fw-bold">Status</label>
+                <select class="form-select" id="statusFilter">
+                    <option value="">Semua</option>
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                </select>
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small fw-bold">&nbsp;</label>
+                <button type="button" class="btn btn-outline-secondary w-100" id="resetFilters">
+                    <i class="bi bi-arrow-clockwise"></i> Reset
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped" id="groupsTable" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Operator</th>
+                        <th>Category</th>
+                        <th class="text-end">Products</th>
+                        <th class="text-end">Sort</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" />
+
+    <script>
+        $(document).ready(function () {
+            $.get('/ProductGroup/GetCategories', function (data) {
+                var select = $('#categoryFilter');
+                data.forEach(function (item) {
+                    select.append('<option value="' + item.id + '">' + item.name + '</option>');
+                });
+            });
+
+            var table = $('#groupsTable').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: '/ProductGroup/GetData',
+                    type: 'POST',
+                    data: function (d) {
+                        d.search = $('#searchInput').val() || null;
+                        d.categoryId = $('#categoryFilter').val() || null;
+                        d.isActive = $('#statusFilter').val() || null;
+                        return d;
+                    }
+                },
+                order: [[2, 'asc'], [0, 'asc']],
+                columns: [
+                    {
+                        data: 'name',
+                        render: function (data) {
+                            return '<span class="fw-semibold">' + escapeHtml(data) + '</span>';
+                        }
+                    },
+                    {
+                        data: 'operator',
+                        render: function (data) {
+                            if (!data) return '<span class="text-muted">-</span>';
+                            return '<span class="badge bg-info">' + escapeHtml(data) + '</span>';
+                        }
+                    },
+                    { data: 'categoryName' },
+                    {
+                        data: 'productCount',
+                        className: 'text-end',
+                        render: function (data) {
+                            return '<span class="badge bg-light text-dark">' + data + '</span>';
+                        }
+                    },
+                    { data: 'sortOrder', className: 'text-end' },
+                    {
+                        data: 'isActive',
+                        render: function (data) {
+                            if (data) {
+                                return '<span class="badge bg-success">Active</span>';
+                            }
+                            return '<span class="badge bg-secondary">Inactive</span>';
+                        }
+                    },
+                    {
+                        data: null,
+                        orderable: false,
+                        render: function (data, type, row) {
+                            var actions = '<div class="btn-group" role="group">';
+                            actions += '<a href="/ProductGroup/Edit/' + row.id + '" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>';
+                            @if (User.IsInRole("SuperAdmin")) {
+                                <text>
+                                actions += '<button type="button" class="btn btn-sm btn-outline-danger" title="Delete" onclick="confirmDelete(' + row.id + ')"><i class="bi bi-trash"></i></button>';
+                                </text>
+                            }
+                            actions += '</div>';
+                            return actions;
+                        }
+                    }
+                ],
+                pageLength: 25,
+                lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]]
+            });
+
+            $('#categoryFilter, #statusFilter').on('change', function () {
+                table.ajax.reload();
+            });
+
+            $('#searchInput').on('keyup', function (e) {
+                if (e.key === 'Enter') {
+                    table.ajax.reload();
+                }
+            });
+
+            $('#resetFilters').on('click', function () {
+                $('#searchInput').val('');
+                $('#categoryFilter').val('');
+                $('#statusFilter').val('');
+                table.ajax.reload();
+            });
+        });
+
+        function confirmDelete(id) {
+            if (confirm('Apakah Anda yakin ingin menghapus group ini?')) {
+                var token = $('input[name="__RequestVerificationToken"]').val();
+                $.post({
+                    url: '/ProductGroup/Delete/' + id,
+                    data: { __RequestVerificationToken: token },
+                    success: function () { location.reload(); },
+                    error: function () { alert('Gagal menghapus group.'); }
+                });
+            }
+        }
+
+        function escapeHtml(text) {
+            var map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, function (m) { return map[m]; });
+        }
+    </script>
+}

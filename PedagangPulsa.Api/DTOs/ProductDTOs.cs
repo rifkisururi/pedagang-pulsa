@@ -6,8 +6,14 @@ public class ProductListDto
     public string Name { get; set; } = string.Empty;
     public string Code { get; set; } = string.Empty;
     public string CategoryName { get; set; } = string.Empty;
+    public int? ProductGroupId { get; set; }
+    public string? ProductGroupName { get; set; }
     public string? Operator { get; set; }
     public decimal? Denomination { get; set; }
+    public int? ValidityDays { get; set; }
+    public string? ValidityText { get; set; }
+    public int? QuotaMb { get; set; }
+    public string? QuotaText { get; set; }
     public string? Description { get; set; }
     public decimal? Price { get; set; }
     public bool Available { get; set; }

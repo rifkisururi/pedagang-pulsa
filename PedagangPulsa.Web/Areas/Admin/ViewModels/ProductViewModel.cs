@@ -17,8 +17,22 @@ public class ProductViewModel
     [Required(ErrorMessage = "Category is required")]
     public int CategoryId { get; set; }
 
+    public int? ProductGroupId { get; set; }
+
     [Range(0, double.MaxValue, ErrorMessage = "Denomination must be greater than or equal to 0")]
     public decimal? Denomination { get; set; }
+
+    [Range(1, 3650, ErrorMessage = "ValidityDays must be between 1 and 3650")]
+    public int? ValidityDays { get; set; }
+
+    [StringLength(50, ErrorMessage = "ValidityText cannot be longer than 50 characters")]
+    public string? ValidityText { get; set; }
+
+    [Range(1, int.MaxValue, ErrorMessage = "QuotaMb must be greater than 0")]
+    public int? QuotaMb { get; set; }
+
+    [StringLength(50, ErrorMessage = "QuotaText cannot be longer than 50 characters")]
+    public string? QuotaText { get; set; }
 
     [StringLength(50, ErrorMessage = "Operator cannot be longer than 50 characters")]
     public string? Operator { get; set; }
@@ -31,12 +45,21 @@ public class ProductViewModel
     public List<LevelPriceItem>? LevelPrices { get; set; }
 
     public List<CategoryItem> AvailableCategories { get; set; } = new();
+    public List<GroupItem> AvailableGroups { get; set; } = new();
     public List<LevelItem> AvailableLevels { get; set; } = new();
 
     public class CategoryItem
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
+    }
+
+    public class GroupItem
+    {
+        public int Id { get; set; }
+        public int CategoryId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Operator { get; set; }
     }
 
     public class LevelItem

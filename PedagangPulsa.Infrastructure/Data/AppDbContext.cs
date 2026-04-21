@@ -30,6 +30,7 @@ public class AppDbContext : DbContext, IAppDbContext
 
     // Product
     public DbSet<ProductCategory> ProductCategories { get; set; }
+    public DbSet<ProductGroup> ProductGroups { get; set; }
     public DbSet<Product> Products { get; set; }
     public DbSet<ProductLevelPrice> ProductLevelPrices { get; set; }
 
@@ -283,6 +284,17 @@ public class AppDbContext : DbContext, IAppDbContext
             entity.HasIndex(e => e.Code).IsUnique();
         });
 
+        // ProductGroup
+        modelBuilder.Entity<ProductGroup>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired();
+            entity.Property(e => e.Operator).HasMaxLength(50);
+            entity.HasOne(e => e.Category)
+                .WithMany()
+                .HasForeignKey(e => e.CategoryId);
+        });
+
         // Product
         modelBuilder.Entity<Product>(entity =>
         {
@@ -297,6 +309,9 @@ public class AppDbContext : DbContext, IAppDbContext
             entity.HasOne(e => e.Category)
                 .WithMany(c => c.Products)
                 .HasForeignKey(e => e.CategoryId);
+            entity.HasOne(e => e.ProductGroup)
+                .WithMany(g => g.Products)
+                .HasForeignKey(e => e.ProductGroupId);
         });
 
         // ProductLevelPrice
