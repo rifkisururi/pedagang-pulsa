@@ -27,7 +27,9 @@ public class UserService
         string? sortColumn = null,
         string? sortDirection = null)
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only user queries to eliminate change tracking overhead, saving memory allocations and CPU cycles per request.
         var query = _context.Users
+            .AsNoTracking()
             .Include(u => u.Level)
             .Include(u => u.Balance)
             .AsQueryable();
@@ -162,7 +164,9 @@ public class UserService
 
     public async Task<List<UserLevel>> GetAllLevelsAsync()
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only lookups.
         return await _context.UserLevels
+            .AsNoTracking()
             .OrderBy(l => l.Id)
             .ToListAsync();
     }
@@ -212,7 +216,9 @@ public class UserService
 
     public async Task<List<ProductCategory>> GetCategoriesAsync()
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only lookups.
         return await _context.ProductCategories
+            .AsNoTracking()
             .Where(c => c.IsActive)
             .OrderBy(c => c.SortOrder)
             .ToListAsync();

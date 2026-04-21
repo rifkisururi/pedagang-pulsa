@@ -24,7 +24,9 @@ public class ProductService
         string? sortColumn = null,
         string? sortDirection = null)
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only queries to eliminate change tracking overhead, reducing memory allocations and CPU usage per request.
         var query = _context.Products
+            .AsNoTracking()
             .Include(p => p.Category)
             .AsQueryable();
 
@@ -126,7 +128,9 @@ public class ProductService
 
     public async Task<List<ProductCategory>> GetCategoriesAsync()
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only lookups.
         return await _context.ProductCategories
+            .AsNoTracking()
             .Where(c => c.IsActive)
             .OrderBy(c => c.SortOrder)
             .ToListAsync();
@@ -134,7 +138,9 @@ public class ProductService
 
     public async Task<List<UserLevel>> GetLevelsAsync()
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only lookups.
         return await _context.UserLevels
+            .AsNoTracking()
             .OrderBy(l => l.Id)
             .ToListAsync();
     }
@@ -209,7 +215,9 @@ public class ProductService
 
     public async Task<List<Product>> GetActiveProductsAsync()
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only product list.
         return await _context.Products
+            .AsNoTracking()
             .Include(p => p.Category)
             .Where(p => p.IsActive)
             .OrderBy(p => p.Name)
@@ -245,7 +253,9 @@ public class ProductService
 
     public async Task<List<ProductLevelPrice>> GetProductPricesAsync(Guid productId)
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only price lists.
         return await _context.ProductLevelPrices
+            .AsNoTracking()
             .Where(p => p.ProductId == productId)
             .Include(p => p.Level)
             .OrderBy(p => p.LevelId)
