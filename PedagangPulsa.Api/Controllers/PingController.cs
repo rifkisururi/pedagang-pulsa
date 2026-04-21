@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PedagangPulsa.Application.Abstractions.Persistence;
+using System.Reflection;
 
 namespace PedagangPulsa.Api.Controllers;
 
@@ -21,7 +22,8 @@ public class PingController : ControllerBase
     {
         var sw = Stopwatch.StartNew();
         sw.Stop();
-        return Ok(new { message = "pong", durationMs = sw.Elapsed.TotalMilliseconds });
+        var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
+        return Ok(new { message = "pong", version, durationMs = sw.Elapsed.TotalMilliseconds });
     }
 
     [HttpGet("db")]
@@ -30,6 +32,7 @@ public class PingController : ControllerBase
         var sw = Stopwatch.StartNew();
         await _dbContext.Database.ExecuteSqlRawAsync("SELECT 1");
         sw.Stop();
-        return Ok(new { message = "pong", durationMs = sw.Elapsed.TotalMilliseconds });
+        var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
+        return Ok(new { message = "pong", version, durationMs = sw.Elapsed.TotalMilliseconds });
     }
 }
