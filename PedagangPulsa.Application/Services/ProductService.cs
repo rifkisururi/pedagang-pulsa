@@ -24,7 +24,9 @@ public class ProductService
         string? sortColumn = null,
         string? sortDirection = null)
     {
+        // ⚡ Bolt Optimization: Added AsNoTracking to read-only paged query to reduce memory and CPU usage
         var query = _context.Products
+            .AsNoTracking()
             .Include(p => p.Category)
             .AsQueryable();
 

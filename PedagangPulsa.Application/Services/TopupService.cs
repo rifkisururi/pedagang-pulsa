@@ -25,7 +25,9 @@ public class TopupService
         string? sortColumn = null,
         string? sortDirection = null)
     {
+        // ⚡ Bolt Optimization: Added AsNoTracking to read-only paged query to reduce memory and CPU usage
         var query = _context.TopupRequests
+            .AsNoTracking()
             .Include(t => t.User)
             .AsQueryable();
 

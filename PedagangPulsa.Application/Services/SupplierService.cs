@@ -21,7 +21,8 @@ public class SupplierService
         string? search = null,
         bool? isActive = null)
     {
-        var query = _context.Suppliers.AsQueryable();
+        // ⚡ Bolt Optimization: Added AsNoTracking to read-only paged query to reduce memory and CPU usage
+        var query = _context.Suppliers.AsNoTracking().AsQueryable();
 
         // Apply search filter
         if (!string.IsNullOrWhiteSpace(search))

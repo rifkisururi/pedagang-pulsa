@@ -27,7 +27,9 @@ public class SupplierBalanceService
         string? orderColumn = null,
         string? orderDirection = null)
     {
+        // ⚡ Bolt Optimization: Added AsNoTracking to read-only paged query to reduce memory and CPU usage
         var query = _context.SupplierBalanceLedgers
+            .AsNoTracking()
             .Include(bl => bl.Supplier)
             .AsQueryable();
 

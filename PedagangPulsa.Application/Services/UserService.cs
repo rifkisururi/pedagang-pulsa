@@ -27,7 +27,9 @@ public class UserService
         string? sortColumn = null,
         string? sortDirection = null)
     {
+        // ⚡ Bolt Optimization: Added AsNoTracking to read-only paged query to reduce memory and CPU usage
         var query = _context.Users
+            .AsNoTracking()
             .Include(u => u.Level)
             .Include(u => u.Balance)
             .AsQueryable();

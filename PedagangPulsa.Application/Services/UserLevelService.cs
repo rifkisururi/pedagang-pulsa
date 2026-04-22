@@ -94,7 +94,8 @@ public class UserLevelService
         string? search = null,
         bool? isActive = null)
     {
-        var query = _context.UserLevels.AsQueryable();
+        // ⚡ Bolt Optimization: Added AsNoTracking to read-only paged query to reduce memory and CPU usage
+        var query = _context.UserLevels.AsNoTracking().AsQueryable();
 
         // Apply search filter
         if (!string.IsNullOrWhiteSpace(search))

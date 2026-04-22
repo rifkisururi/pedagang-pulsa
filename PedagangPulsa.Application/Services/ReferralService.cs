@@ -27,7 +27,9 @@ public class ReferralService
         string? orderColumn = null,
         string? orderDirection = null)
     {
+        // ⚡ Bolt Optimization: Added AsNoTracking to read-only paged query to reduce memory and CPU usage
         var query = _context.ReferralLogs
+            .AsNoTracking()
             .Include(rl => rl.Referrer)
             .Include(rl => rl.Referee)
             .AsQueryable();
