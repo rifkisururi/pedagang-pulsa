@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using PedagangPulsa.Api.Controllers;
@@ -23,6 +24,8 @@ public class ProductControllerTests : IAsyncDisposable
     private readonly TestDbContext _context;
     private readonly Mock<ILogger<ProductController>> _loggerMock;
     private readonly Mock<IRedisService> _redisServiceMock;
+    private readonly Mock<IProductCacheService> _productCacheMock;
+    private readonly IConfiguration _configuration;
     private readonly ProductController _controller;
 
     public ProductControllerTests()
@@ -32,7 +35,16 @@ public class ProductControllerTests : IAsyncDisposable
 
         _loggerMock = MockServices.CreateLogger<ProductController>();
         _redisServiceMock = new Mock<IRedisService>();
-        _controller = new ProductController(_context, _loggerMock.Object, _redisServiceMock.Object);
+        _redisServiceMock.Setup(r => r.GetAsync(It.IsAny<string>())).ReturnsAsync((string?)null);
+        _productCacheMock = new Mock<IProductCacheService>();
+        _configuration = new ConfigurationBuilder().Build();
+
+        _controller = new ProductController(
+            _context,
+            _loggerMock.Object,
+            _redisServiceMock.Object,
+            _productCacheMock.Object,
+            _configuration);
     }
 
     private void SetupAuthenticatedUser(Guid userId)
@@ -45,6 +57,8 @@ public class ProductControllerTests : IAsyncDisposable
             HttpContext = new DefaultHttpContext { User = principal }
         };
     }
+
+    // ===== Existing endpoint tests =====
 
     [Fact]
     public async Task GetCategories_ReturnsAllCategories()
@@ -231,6 +245,189 @@ public class ProductControllerTests : IAsyncDisposable
 
         response.success.Should().Be(true);
         response.data.Should().NotBeNull();
+    }
+
+    // ===== Catalog endpoint tests =====
+
+    [Fact]
+    public async Task GetCatalogCategories_ReturnsActiveCategories()
+    {
+        // Arrange
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
+        SetupAuthenticatedUser(user1.Id);
+
+        // Act
+        var result = await _controller.GetCatalogCategories();
+
+        // Assert
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = okResult.Value.Should().BeOfType<CatalogCategoryListResponse>().Subject;
+
+        response.Success.Should().BeTrue();
+        response.Data.Should().NotBeEmpty();
+        response.Data.Should().OnlyContain(c => c.Id > 0 && !string.IsNullOrEmpty(c.Name) && !string.IsNullOrEmpty(c.Code));
+    }
+
+    [Fact]
+    public async Task GetCatalogCategories_ReturnsCachedResponse_WhenAvailable()
+    {
+        // Arrange
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
+        SetupAuthenticatedUser(user1.Id);
+
+        var cachedResponse = new CatalogCategoryListResponse
+        {
+            Success = true,
+            Data = new List<CatalogCategoryDto> { new() { Id = 99, Name = "Cached", Code = "CACHED" } }
+        };
+        var camelOpts = new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase };
+        var cachedJson = System.Text.Json.JsonSerializer.Serialize(cachedResponse, camelOpts);
+        _redisServiceMock.Setup(r => r.GetAsync("catalog:categories")).ReturnsAsync(cachedJson);
+
+        // Act
+        var result = await _controller.GetCatalogCategories();
+
+        // Assert
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = okResult.Value.Should().BeOfType<CatalogCategoryListResponse>().Subject;
+
+        response.Success.Should().BeTrue();
+        response.Data.Should().HaveCount(1);
+        response.Data[0].Name.Should().Be("Cached");
+    }
+
+    [Fact]
+    public async Task GetCatalogByCategory_ReturnsGroupedProducts()
+    {
+        // Arrange
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
+        SetupAuthenticatedUser(user1.Id);
+
+        var category = await _context.ProductCategories.FirstAsync();
+
+        // Act
+        var result = await _controller.GetCatalogByCategory(category.Id);
+
+        // Assert
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = okResult.Value.Should().BeOfType<CatalogByCategoryResponse>().Subject;
+
+        response.Success.Should().BeTrue();
+        response.CategoryId.Should().Be(category.Id);
+        response.CategoryName.Should().Be(category.Name);
+        response.Data.Should().NotBeEmpty();
+
+        // Verify products within groups have price info
+        var groupWithProducts = response.Data.FirstOrDefault(g => g.Products.Count > 0);
+        if (groupWithProducts != null)
+        {
+            groupWithProducts.Products.Should().OnlyContain(p => p.Id != Guid.Empty);
+            groupWithProducts.Products.Should().OnlyContain(p => !string.IsNullOrEmpty(p.Name));
+        }
+    }
+
+    [Fact]
+    public async Task GetCatalogByCategory_ReturnsCachedResponse_WhenAvailable()
+    {
+        // Arrange
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
+        SetupAuthenticatedUser(user1.Id);
+
+        var cachedResponse = new CatalogByCategoryResponse
+        {
+            Success = true,
+            CategoryId = 1,
+            CategoryName = "Cached Category",
+            Data = new List<CatalogGroupDto>
+            {
+                new() { Id = 1, Name = "Cached Group", Products = new List<CatalogProductDto>() }
+            }
+        };
+        var camelOpts = new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase };
+        var cachedJson = System.Text.Json.JsonSerializer.Serialize(cachedResponse, camelOpts);
+        _redisServiceMock.Setup(r => r.GetAsync(It.Is<string>(k => k.StartsWith("catalog:")))).ReturnsAsync(cachedJson);
+
+        // Act
+        var result = await _controller.GetCatalogByCategory(1);
+
+        // Assert
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = okResult.Value.Should().BeOfType<CatalogByCategoryResponse>().Subject;
+
+        response.CategoryName.Should().Be("Cached Category");
+    }
+
+    [Fact]
+    public async Task GetCatalogByCategory_WithInvalidCategory_ReturnsNotFound()
+    {
+        // Arrange
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
+        SetupAuthenticatedUser(user1.Id);
+
+        // Act
+        var result = await _controller.GetCatalogByCategory(99999);
+
+        // Assert
+        var notFoundResult = result.Should().BeOfType<NotFoundObjectResult>().Subject;
+        var error = notFoundResult.Value.Should().BeOfType<ErrorResponse>().Subject;
+
+        error.ErrorCode.Should().Be("CATEGORY_NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task GetCatalogByCategory_WithoutAuthentication_ReturnsUnauthorized()
+    {
+        // Arrange - user without NameIdentifier claim
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity()) }
+        };
+
+        // Act
+        var result = await _controller.GetCatalogByCategory(1);
+
+        // Assert
+        var unauthorizedResult = result.Should().BeOfType<UnauthorizedObjectResult>().Subject;
+        var error = unauthorizedResult.Value.Should().BeOfType<ErrorResponse>().Subject;
+        error.ErrorCode.Should().Be("INVALID_TOKEN");
+    }
+
+    [Fact]
+    public async Task GetCatalogByCategory_ComputesPriceBasedOnUserLevel()
+    {
+        // Arrange
+        var user1 = await _context.Users.FirstAsync(u => u.UserName == "user1");
+        var user2 = await _context.Users.FirstAsync(u => u.UserName == "user2");
+
+        var category = await _context.ProductCategories.FirstAsync();
+
+        // Act - user1 (member1)
+        SetupAuthenticatedUser(user1.Id);
+        var result1 = await _controller.GetCatalogByCategory(category.Id);
+        var okResult1 = result1.Should().BeOfType<OkObjectResult>().Subject;
+        var response1 = okResult1.Value.Should().BeOfType<CatalogByCategoryResponse>().Subject;
+        var user1Prices = response1.Data
+            .SelectMany(g => g.Products)
+            .Where(p => p.Price.HasValue)
+            .ToDictionary(p => p.Id, p => p.Price!.Value);
+
+        // Act - user2 (member2)
+        SetupAuthenticatedUser(user2.Id);
+        _redisServiceMock.Setup(r => r.GetAsync(It.IsAny<string>())).ReturnsAsync((string?)null);
+        var result2 = await _controller.GetCatalogByCategory(category.Id);
+        var okResult2 = result2.Should().BeOfType<OkObjectResult>().Subject;
+        var response2 = okResult2.Value.Should().BeOfType<CatalogByCategoryResponse>().Subject;
+        var user2Prices = response2.Data
+            .SelectMany(g => g.Products)
+            .Where(p => p.Price.HasValue)
+            .ToDictionary(p => p.Id, p => p.Price!.Value);
+
+        // Assert - different levels should produce different prices (margin differs per level)
+        foreach (var productId in user1Prices.Keys.Intersect(user2Prices.Keys))
+        {
+            user1Prices[productId].Should().NotBe(user2Prices[productId],
+                $"prices for product {productId} should differ between user levels");
+        }
     }
 
     public async ValueTask DisposeAsync()

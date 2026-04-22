@@ -121,10 +121,32 @@ public class TestDbContext : AppDbContext
 
         ProductCategories.Add(category);
 
+        var group1 = new ProductGroup
+        {
+            Name = "Pulsa Indosat",
+            Operator = "Indosat",
+            CategoryId = category.Id,
+            SortOrder = 1,
+            IsActive = true
+        };
+
+        var group2 = new ProductGroup
+        {
+            Name = "Pulsa Telkomsel",
+            Operator = "Telkomsel",
+            CategoryId = category.Id,
+            SortOrder = 2,
+            IsActive = true
+        };
+
+        ProductGroups.AddRange(group1, group2);
+        await SaveChangesAsync();
+
         var product1 = new Product
         {
             Id = Guid.NewGuid(),
             CategoryId = category.Id,
+            ProductGroupId = group1.Id,
             Name = "Pulsa Indosat 5.000",
             Code = "IS5",
             Denomination = 5000,
@@ -136,6 +158,7 @@ public class TestDbContext : AppDbContext
         {
             Id = Guid.NewGuid(),
             CategoryId = category.Id,
+            ProductGroupId = group2.Id,
             Name = "Pulsa Telkomsel 10.000",
             Code = "TS10",
             Denomination = 10000,

@@ -333,6 +333,187 @@ public class ProductController : Controller
         });
     }
 
+    [HttpGet("catalog/categories")]
+    [Authorize]
+    public async Task<IActionResult> GetCatalogCategories()
+    {
+        const string cacheKey = "catalog:categories";
+        var cached = await _redis.GetAsync(cacheKey);
+        if (cached != null)
+        {
+            return Ok(JsonSerializer.Deserialize<CatalogCategoryListResponse>(cached, _jsonOpts)!);
+        }
+
+        var categories = await _context.ProductCategories.AsNoTracking()
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.SortOrder)
+            .Select(c => new CatalogCategoryDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                Code = c.Code,
+                Icon = c.IconUrl
+            })
+            .ToListAsync();
+
+        var response = new CatalogCategoryListResponse { Success = true, Data = categories };
+        await _redis.SetAsync(cacheKey, JsonSerializer.Serialize(response, _jsonOpts), TimeSpan.FromMinutes(10));
+
+        return Ok(response);
+    }
+
+    [HttpGet("catalog/{categoryId}")]
+    [Authorize]
+    public async Task<IActionResult> GetCatalogByCategory(int categoryId)
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token",
+                ErrorCode = "INVALID_TOKEN"
+            });
+        }
+
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
+
+        var user = await _context.Users.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null)
+        {
+            return NotFound(new ErrorResponse
+            {
+                Message = "User not found",
+                ErrorCode = "USER_NOT_FOUND"
+            });
+        }
+
+        var cacheKey = $"catalog:{categoryId}:{user.LevelId}";
+        var cached = await _redis.GetAsync(cacheKey);
+        if (cached != null)
+        {
+            return Ok(JsonSerializer.Deserialize<CatalogByCategoryResponse>(cached, _jsonOpts)!);
+        }
+
+        var category = await _context.ProductCategories.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == categoryId && c.IsActive);
+
+        if (category == null)
+        {
+            return NotFound(new ErrorResponse
+            {
+                Message = "Category not found",
+                ErrorCode = "CATEGORY_NOT_FOUND"
+            });
+        }
+
+        // Load groups for this category
+        var groups = await _context.ProductGroups.AsNoTracking()
+            .Where(g => g.CategoryId == categoryId && g.IsActive)
+            .OrderBy(g => g.SortOrder)
+            .ToListAsync();
+
+        // Load all active products for this category
+        var products = await _context.Products.AsNoTracking()
+            .Where(p => p.CategoryId == categoryId && p.IsActive)
+            .OrderBy(p => p.ProductGroupId)
+            .ThenBy(p => p.Name)
+            .ToListAsync();
+
+        var productIds = products.Select(p => p.Id).ToList();
+
+        // Batch load cost prices (lowest seq supplier)
+        var costPrices = await _context.SupplierProducts
+            .Where(sp => productIds.Contains(sp.ProductId) && sp.IsActive)
+            .GroupBy(sp => sp.ProductId)
+            .Select(g => new { ProductId = g.Key, CostPrice = g.OrderBy(sp => sp.Seq).First().CostPrice })
+            .ToDictionaryAsync(x => x.ProductId, x => x.CostPrice);
+
+        // Batch load margins for user's level
+        var margins = await _context.ProductLevelPrices
+            .Where(plp => productIds.Contains(plp.ProductId) && plp.LevelId == user.LevelId && plp.IsActive)
+            .GroupBy(plp => plp.ProductId)
+            .Select(g => new { ProductId = g.Key, Margin = g.OrderByDescending(plp => plp.UpdatedAt).First().Margin })
+            .ToDictionaryAsync(x => x.ProductId, x => x.Margin);
+
+        // Build product DTOs with prices, grouped by ProductGroupId
+        var productsByGroup = new Dictionary<int, List<CatalogProductDto>>();
+        List<CatalogProductDto>? ungrouped = null;
+
+        foreach (var p in products)
+        {
+            var hasCost = costPrices.TryGetValue(p.Id, out var cost) && cost > 0;
+            var hasMargin = margins.TryGetValue(p.Id, out var margin) && margin > 0;
+
+            var dto = new CatalogProductDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Code = p.Code,
+                Denomination = p.Denomination,
+                ValidityDays = p.ValidityDays,
+                ValidityText = p.ValidityText,
+                QuotaMb = p.QuotaMb,
+                QuotaText = p.QuotaText,
+                Description = p.Description,
+                Price = (hasCost && hasMargin) ? cost + margin : null,
+                Available = hasCost && hasMargin
+            };
+
+            if (p.ProductGroupId.HasValue)
+            {
+                if (!productsByGroup.ContainsKey(p.ProductGroupId.Value))
+                    productsByGroup[p.ProductGroupId.Value] = new();
+                productsByGroup[p.ProductGroupId.Value].Add(dto);
+            }
+            else
+            {
+                ungrouped ??= new();
+                ungrouped.Add(dto);
+            }
+        }
+
+        var groupDtos = groups.Select(g => new CatalogGroupDto
+        {
+            Id = g.Id,
+            Name = g.Name,
+            Operator = g.Operator,
+            Products = productsByGroup.GetValueOrDefault(g.Id, new())
+        }).ToList();
+
+        if (ungrouped is { Count: > 0 })
+        {
+            groupDtos.Add(new CatalogGroupDto
+            {
+                Id = 0,
+                Name = "Lainnya",
+                Operator = null,
+                Products = ungrouped
+            });
+        }
+
+        var response = new CatalogByCategoryResponse
+        {
+            Success = true,
+            CategoryId = category.Id,
+            CategoryName = category.Name,
+            Data = groupDtos
+        };
+
+        await _redis.SetAsync(cacheKey, JsonSerializer.Serialize(response, _jsonOpts), TimeSpan.FromMinutes(5));
+
+        return Ok(response);
+    }
+
     /// <summary>
     /// Invalidate product cache. Requires X-Api-Key header for authentication.
     /// </summary>
