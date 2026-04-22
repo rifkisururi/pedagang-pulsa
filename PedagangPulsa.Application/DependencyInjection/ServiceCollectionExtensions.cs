@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<UserLevelService>();
         services.AddScoped<ExportService>();
         services.AddScoped<FcmService>();
+        services.AddScoped<DashboardService>();
         services.AddScoped<AuthService>(serviceProvider =>
             new AuthService(
                 serviceProvider.GetRequiredService<IAppDbContext>(),

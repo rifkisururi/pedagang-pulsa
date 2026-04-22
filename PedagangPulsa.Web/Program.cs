@@ -1,4 +1,5 @@
 using PedagangPulsa.Application.DependencyInjection;
+using PedagangPulsa.Domain.Configuration;
 using PedagangPulsa.Infrastructure.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +14,10 @@ var redisConnectionString = builder.Configuration.GetConnectionString("Redis")
 builder.Services.AddRedisInfrastructure(redisConnectionString);
 
 builder.Services.AddApplicationServices();
+
+// Pricing config
+builder.Services.Configure<PricingConfig>(
+    builder.Configuration.GetSection("Pricing"));
 
 // Add Authentication
 builder.Services.AddAuthentication(options =>

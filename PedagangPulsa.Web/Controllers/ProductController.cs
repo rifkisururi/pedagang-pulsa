@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using PedagangPulsa.Application.Abstractions.Caching;
 using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Application.Services;
+using PedagangPulsa.Domain.Configuration;
 using PedagangPulsa.Domain.Entities;
 using PedagangPulsa.Web.Areas.Admin.ViewModels;
 
@@ -16,13 +18,15 @@ public class ProductController : Controller
     private readonly IAppDbContext _context;
     private readonly ILogger<ProductController> _logger;
     private readonly IProductCacheService _productCache;
+    private readonly PricingConfig _pricingConfig;
 
-    public ProductController(ProductService productService, IAppDbContext context, ILogger<ProductController> logger, IProductCacheService productCache)
+    public ProductController(ProductService productService, IAppDbContext context, ILogger<ProductController> logger, IProductCacheService productCache, IOptions<PricingConfig> pricingConfig)
     {
         _productService = productService;
         _context = context;
         _logger = logger;
         _productCache = productCache;
+        _pricingConfig = pricingConfig.Value;
     }
 
     public IActionResult Index()
@@ -95,10 +99,10 @@ public class ProductController : Controller
                 {
                     LevelId = level.Id,
                     LevelName = level.Name,
-                    Margin = 200,
+                    Margin = _pricingConfig.GetDefaultMargin(costPrice),
                     CostPrice = costPrice,
-                    ComputedSellPrice = costPrice > 0 ? costPrice + 200 : 0,
-                    MarginPercent = costPrice > 0 ? 200 / costPrice * 100 : 0
+                    ComputedSellPrice = costPrice > 0 ? costPrice + _pricingConfig.GetDefaultMargin(costPrice) : 0,
+                    MarginPercent = costPrice > 0 ? _pricingConfig.GetDefaultMargin(costPrice) / costPrice * 100 : 0
                 });
             }
         }
@@ -245,7 +249,7 @@ public class ProductController : Controller
             LevelPrices = levels.Select(l => new ProductViewModel.LevelPriceItem
             {
                 LevelId = l.Id,
-                Margin = product.ProductLevelPrices.FirstOrDefault(lp => lp.LevelId == l.Id)?.Margin ?? 200
+                Margin = product.ProductLevelPrices.FirstOrDefault(lp => lp.LevelId == l.Id)?.Margin ?? _pricingConfig.GetDefaultMargin(0)
             }).ToList()
         };
 

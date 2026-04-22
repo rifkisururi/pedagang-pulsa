@@ -1,8 +1,31 @@
-@model PedagangPulsa.Web.Areas.Admin.ViewModels.DashboardViewModel
+@using PedagangPulsa.Web.Areas.Admin.ViewModels
+@model DashboardViewModel
 
 @{
     ViewData["Title"] = "Dashboard";
     Layout = "_AdminLayout";
+}
+
+@functions {
+    static string FormatCurrency(decimal amount)
+    {
+        if (amount >= 1_000_000_000m) return $"Rp {amount / 1_000_000_000m:F1}B";
+        if (amount >= 1_000_000m) return $"Rp {amount / 1_000_000m:F1}M";
+        if (amount >= 1_000m) return $"Rp {amount / 1_000m:F1}K";
+        return $"Rp {amount:N0}";
+    }
+
+    static string FormatPercent(double value)
+    {
+        return $"{value:F1}%";
+    }
+
+    static string TrendIcon(double vsYesterday)
+    {
+        if (vsYesterday > 0) return $"<span class=\"text-success\"><i class=\"bi bi-arrow-up\"></i> {FormatPercent(vsYesterday)}</span>";
+        if (vsYesterday < 0) return $"<span class=\"text-danger\"><i class=\"bi bi-arrow-down\"></i> {FormatPercent(Math.Abs(vsYesterday))}</span>";
+        return "<span class=\"text-muted\">0%</span>";
+    }
 }
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
@@ -14,7 +37,7 @@
         </div>
         <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle">
             <i class="bi bi-calendar3"></i>
-            This Week
+            Today
         </button>
     </div>
 </div>
@@ -32,9 +55,9 @@
                     </div>
                     <div class="flex-grow-1 ms-3">
                         <h6 class="text-muted mb-1 text-uppercase small fw-bold">Transactions Today</h6>
-                        <h4 class="mb-0 fw-bold">1,234</h4>
+                        <h4 class="mb-0 fw-bold">@Model.TotalTransactionsToday.ToString("N0")</h4>
                         <p class="mb-0 small">
-                            <span class="text-success"><i class="bi bi-arrow-up"></i> 12.5%</span>
+                            @Html.Raw(TrendIcon(Model.TransactionsVsYesterday))
                             <span class="text-muted">vs yesterday</span>
                         </p>
                     </div>
@@ -54,9 +77,9 @@
                     </div>
                     <div class="flex-grow-1 ms-3">
                         <h6 class="text-muted mb-1 text-uppercase small fw-bold">Revenue Today</h6>
-                        <h4 class="mb-0 fw-bold">Rp 45.2M</h4>
+                        <h4 class="mb-0 fw-bold">@FormatCurrency(Model.RevenueToday)</h4>
                         <p class="mb-0 small">
-                            <span class="text-success"><i class="bi bi-arrow-up"></i> 8.3%</span>
+                            @Html.Raw(TrendIcon((double)Model.RevenueVsYesterday))
                             <span class="text-muted">vs yesterday</span>
                         </p>
                     </div>
@@ -76,9 +99,9 @@
                     </div>
                     <div class="flex-grow-1 ms-3">
                         <h6 class="text-muted mb-1 text-uppercase small fw-bold">Profit Today</h6>
-                        <h4 class="mb-0 fw-bold">Rp 2.8M</h4>
+                        <h4 class="mb-0 fw-bold">@FormatCurrency(Model.ProfitToday)</h4>
                         <p class="mb-0 small">
-                            <span class="text-success">6.2%</span>
+                            <span class="@(Model.ProfitVsYesterday >= 0 ? "text-success" : "text-danger")">@FormatPercent((double)Model.ProfitMargin)</span>
                             <span class="text-muted">margin</span>
                         </p>
                     </div>
@@ -98,9 +121,9 @@
                     </div>
                     <div class="flex-grow-1 ms-3">
                         <h6 class="text-muted mb-1 text-uppercase small fw-bold">Failed Transactions</h6>
-                        <h4 class="mb-0 fw-bold">23</h4>
+                        <h4 class="mb-0 fw-bold">@Model.FailedTransactions.ToString("N0")</h4>
                         <p class="mb-0 small">
-                            <span class="text-danger">1.9%</span>
+                            <span class="text-danger">@FormatPercent(Model.FailedRate)</span>
                             <span class="text-muted">of total</span>
                         </p>
                     </div>
@@ -123,9 +146,9 @@
                     </div>
                     <div class="flex-grow-1 ms-3">
                         <h6 class="text-muted mb-1 text-uppercase small fw-bold">Active Users</h6>
-                        <h4 class="mb-0 fw-bold">5,432</h4>
+                        <h4 class="mb-0 fw-bold">@Model.ActiveUsers.ToString("N0")</h4>
                         <p class="mb-0 small">
-                            <span class="text-success"><i class="bi bi-arrow-up"></i> 34</span>
+                            <span class="text-success"><i class="bi bi-arrow-up"></i> @Model.NewUsersThisWeek</span>
                             <span class="text-muted">this week</span>
                         </p>
                     </div>
@@ -145,9 +168,9 @@
                     </div>
                     <div class="flex-grow-1 ms-3">
                         <h6 class="text-muted mb-1 text-uppercase small fw-bold">New Users Today</h6>
-                        <h4 class="mb-0 fw-bold">18</h4>
+                        <h4 class="mb-0 fw-bold">@Model.NewUsersToday.ToString("N0")</h4>
                         <p class="mb-0 small">
-                            <span class="text-success"><i class="bi bi-arrow-up"></i> 5</span>
+                            @Html.Raw(TrendIcon(Model.NewUsersVsYesterday))
                             <span class="text-muted">vs yesterday</span>
                         </p>
                     </div>
@@ -167,9 +190,9 @@
                     </div>
                     <div class="flex-grow-1 ms-3">
                         <h6 class="text-muted mb-1 text-uppercase small fw-bold">Pending Topup</h6>
-                        <h4 class="mb-0 fw-bold">7</h4>
+                        <h4 class="mb-0 fw-bold">@Model.PendingTopupCount.ToString("N0")</h4>
                         <p class="mb-0 small">
-                            <span class="text-primary">Rp 8.5M</span>
+                            <span class="text-primary">@FormatCurrency(Model.PendingTopupAmount)</span>
                             <span class="text-muted">total</span>
                         </p>
                     </div>
@@ -189,7 +212,7 @@
                     </div>
                     <div class="flex-grow-1 ms-3">
                         <h6 class="text-muted mb-1 text-uppercase small fw-bold">Total User Balance</h6>
-                        <h4 class="mb-0 fw-bold">Rp 125.8M</h4>
+                        <h4 class="mb-0 fw-bold">@FormatCurrency(Model.TotalUserBalance)</h4>
                         <p class="mb-0 small">
                             <span class="text-muted">across all users</span>
                         </p>
@@ -222,22 +245,37 @@
             </div>
             <div class="card-body">
                 <div class="d-flex flex-column gap-3">
-                    <div class="d-flex justify-content-between align-items-center p-2 bg-success bg-opacity-10 rounded">
-                        <span class="fw-bold">Digiflazz</span>
-                        <span class="badge bg-success">Rp 15.2M</span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center p-2 bg-success bg-opacity-10 rounded">
-                        <span class="fw-bold">VIPReseller</span>
-                        <span class="badge bg-success">Rp 8.7M</span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center p-2 bg-warning bg-opacity-10 rounded">
-                        <span class="fw-bold">MobilePulsa</span>
-                        <span class="badge bg-warning">Rp 450K</span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center p-2 bg-danger bg-opacity-10 rounded">
-                        <span class="fw-bold">Apipulsa</span>
-                        <span class="badge bg-danger">Rp 80K</span>
-                    </div>
+                    @if (Model.SupplierStatuses.Any())
+                    {
+                        foreach (var supplier in Model.SupplierStatuses)
+                        {
+                            var balanceClass = supplier.ActiveBalance switch
+                            {
+                                >= 5_000_000m => "bg-success bg-opacity-10",
+                                >= 500_000m => "bg-warning bg-opacity-10",
+                                _ => "bg-danger bg-opacity-10"
+                            };
+                            var badgeClass = supplier.ActiveBalance switch
+                            {
+                                >= 5_000_000m => "bg-success",
+                                >= 500_000m => "bg-warning",
+                                _ => "bg-danger"
+                            };
+                            var statusIcon = supplier.IsActive ? "bi-check-circle-fill text-success" : "bi-x-circle-fill text-danger";
+
+                            <div class="d-flex justify-content-between align-items-center p-2 @balanceClass rounded">
+                                <span class="fw-bold">
+                                    <i class="bi @statusIcon me-1"></i>
+                                    @supplier.Name
+                                </span>
+                                <span class="badge @badgeClass">@FormatCurrency(supplier.ActiveBalance)</span>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center mb-0">No active suppliers found</p>
+                    }
                 </div>
             </div>
         </div>
@@ -269,14 +307,14 @@
                 labels: ['00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'],
                 datasets: [{
                     label: 'Today',
-                    data: [12, 8, 5, 3, 2, 5, 15, 45, 78, 95, 112, 98, 85, 92, 105, 115, 108, 95, 88, 72, 58, 42, 28, 18],
+                    data: @Json.Serialize(Model.HourlyTransactionsToday),
                     borderColor: 'rgb(102, 126, 234)',
                     backgroundColor: 'rgba(102, 126, 234, 0.1)',
                     tension: 0.4,
                     fill: true
                 }, {
                     label: 'Yesterday',
-                    data: [10, 7, 4, 3, 2, 4, 12, 42, 75, 92, 108, 95, 82, 88, 100, 110, 105, 92, 85, 70, 55, 40, 25, 15],
+                    data: @Json.Serialize(Model.HourlyTransactionsYesterday),
                     borderColor: 'rgb(118, 75, 162)',
                     backgroundColor: 'rgba(118, 75, 162, 0.1)',
                     tension: 0.4,
@@ -301,31 +339,19 @@
 
         // Revenue Chart
         const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+        const revenueLabels = @Json.Serialize(Model.DailyRevenueItems.Select(r => r.Label));
+        const revenueFullDates = @Json.Serialize(Model.DailyRevenueItems.Select(r => r.FullDate));
+        const revenueData = @Json.Serialize(Model.DailyRevenueItems.Select(r => Math.Round(r.Revenue / 1_000_000m, 1)));
+
         new Chart(revenueCtx, {
             type: 'bar',
             data: {
-                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                labels: revenueFullDates,
                 datasets: [{
                     label: 'Revenue (Millions)',
-                    data: [42.5, 45.2, 38.7, 48.3, 52.1, 44.8, 45.2],
-                    backgroundColor: [
-                        'rgba(102, 126, 234, 0.8)',
-                        'rgba(118, 75, 162, 0.8)',
-                        'rgba(102, 126, 234, 0.8)',
-                        'rgba(118, 75, 162, 0.8)',
-                        'rgba(102, 126, 234, 0.8)',
-                        'rgba(118, 75, 162, 0.8)',
-                        'rgba(102, 126, 234, 0.8)'
-                    ],
-                    borderColor: [
-                        'rgb(102, 126, 234)',
-                        'rgb(118, 75, 162)',
-                        'rgb(102, 126, 234)',
-                        'rgb(118, 75, 162)',
-                        'rgb(102, 126, 234)',
-                        'rgb(118, 75, 162)',
-                        'rgb(102, 126, 234)'
-                    ],
+                    data: revenueData,
+                    backgroundColor: revenueData.map((_, i) => i % 2 === 0 ? 'rgba(102, 126, 234, 0.8)' : 'rgba(118, 75, 162, 0.8)'),
+                    borderColor: revenueData.map((_, i) => i % 2 === 0 ? 'rgb(102, 126, 234)' : 'rgb(118, 75, 162)'),
                     borderWidth: 1
                 }]
             },
@@ -335,6 +361,13 @@
                 plugins: {
                     legend: {
                         display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Rp ' + context.parsed.y + 'M';
+                            }
+                        }
                     }
                 },
                 scales: {

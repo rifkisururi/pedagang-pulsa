@@ -2,8 +2,10 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using PedagangPulsa.Api.DTOs;
 using PedagangPulsa.Application.Abstractions.Caching;
+using PedagangPulsa.Domain.Configuration;
 using PedagangPulsa.Infrastructure.Data;
 using System.Security.Claims;
 using System.Text.Json;
@@ -20,19 +22,21 @@ public class ProductController : Controller
     private readonly IRedisService _redis;
     private readonly IProductCacheService _productCache;
     private readonly IConfiguration _configuration;
+    private readonly PricingConfig _pricingConfig;
 
     private static readonly JsonSerializerOptions _jsonOpts = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    public ProductController(AppDbContext context, ILogger<ProductController> logger, IRedisService redis, IProductCacheService productCache, IConfiguration configuration)
+    public ProductController(AppDbContext context, ILogger<ProductController> logger, IRedisService redis, IProductCacheService productCache, IConfiguration configuration, IOptions<PricingConfig> pricingConfig)
     {
         _context = context;
         _logger = logger;
         _redis = redis;
         _productCache = productCache;
         _configuration = configuration;
+        _pricingConfig = pricingConfig.Value;
     }
 
     [HttpGet("categories")]
@@ -192,8 +196,11 @@ public class ProductController : Controller
             var hasCost = costPrices.TryGetValue(dto.Id, out var cost) && cost > 0;
             var hasMargin = margins.TryGetValue(dto.Id, out var margin) && margin > 0;
 
-            dto.Price = (hasCost && hasMargin) ? cost + margin : (decimal?)null;
-            dto.Available = hasCost && hasMargin;
+            // Fallback to default margin from config if no margin set
+            var effectiveMargin = hasMargin ? margin : _pricingConfig.GetDefaultMargin(cost);
+
+            dto.Price = (hasCost && effectiveMargin > 0) ? cost + effectiveMargin : (decimal?)null;
+            dto.Available = hasCost && effectiveMargin > 0;
         }
 
         var productResponse = new ProductListResponse
@@ -282,9 +289,10 @@ public class ProductController : Controller
             .FirstOrDefaultAsync();
 
         decimal computedSellPrice = 0;
-        if (levelPrice > 0 && costPrice > 0)
+        var effectiveMargin = levelPrice > 0 ? levelPrice : _pricingConfig.GetDefaultMargin(costPrice);
+        if (effectiveMargin > 0 && costPrice > 0)
         {
-            computedSellPrice = costPrice + levelPrice;
+            computedSellPrice = costPrice + effectiveMargin;
         }
 
         return Ok(new
@@ -454,6 +462,9 @@ public class ProductController : Controller
             var hasCost = costPrices.TryGetValue(p.Id, out var cost) && cost > 0;
             var hasMargin = margins.TryGetValue(p.Id, out var margin) && margin > 0;
 
+            // Fallback to default margin from config if no margin set
+            var effectiveMargin = hasMargin ? margin : _pricingConfig.GetDefaultMargin(cost);
+
             var dto = new CatalogProductDto
             {
                 Id = p.Id,
@@ -465,8 +476,8 @@ public class ProductController : Controller
                 QuotaMb = p.QuotaMb,
                 QuotaText = p.QuotaText,
                 Description = p.Description,
-                Price = (hasCost && hasMargin) ? cost + margin : null,
-                Available = hasCost && hasMargin
+                Price = (hasCost && effectiveMargin > 0) ? cost + effectiveMargin : null,
+                Available = hasCost && effectiveMargin > 0
             };
 
             if (p.ProductGroupId.HasValue)

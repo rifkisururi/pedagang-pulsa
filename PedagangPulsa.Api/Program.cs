@@ -64,6 +64,10 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
     options.MultipartBodyLengthLimit = 5242880; // 5MB
 });
 
+// Pricing config
+builder.Services.Configure<PedagangPulsa.Domain.Configuration.PricingConfig>(
+    builder.Configuration.GetSection("Pricing"));
+
 // CORS
 builder.Services.AddCors(options =>
 {

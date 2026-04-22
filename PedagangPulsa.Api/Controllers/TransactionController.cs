@@ -2,8 +2,10 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using PedagangPulsa.Api.DTOs;
 using PedagangPulsa.Application.Services;
+using PedagangPulsa.Domain.Configuration;
 using PedagangPulsa.Domain.Entities;
 using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Infrastructure.Data;
@@ -20,15 +22,18 @@ public class TransactionController : ControllerBase
     private readonly AppDbContext _context;
     private readonly ILogger<TransactionController> _logger;
     private readonly AuthService _authService;
+    private readonly PricingConfig _pricingConfig;
 
     public TransactionController(
         AppDbContext context,
         ILogger<TransactionController> logger,
-        AuthService authService)
+        AuthService authService,
+        IOptions<PricingConfig> pricingConfig)
     {
         _context = context;
         _logger = logger;
         _authService = authService;
+        _pricingConfig = pricingConfig.Value;
     }
 
     private async Task<decimal> GetBestCostPriceAsync(Guid productId)
@@ -137,15 +142,6 @@ public class TransactionController : ControllerBase
             var levelPrice = product.ProductLevelPrices
                 .FirstOrDefault(plp => plp.LevelId == user.LevelId && plp.IsActive);
 
-            if (levelPrice == null || levelPrice.Margin < 0)
-            {
-                return BadRequest(new ErrorResponse
-                {
-                    Message = "Product not available for your level",
-                    ErrorCode = "PRODUCT_NOT_AVAILABLE"
-                });
-            }
-
             var costPrice = await GetBestCostPriceAsync(request.ProductId);
 
             if (costPrice <= 0)
@@ -157,7 +153,7 @@ public class TransactionController : ControllerBase
                 });
             }
 
-            var sellPrice = costPrice + levelPrice.Margin;
+            var sellPrice = costPrice + (levelPrice?.Margin > 0 ? levelPrice.Margin : _pricingConfig.GetDefaultMargin(costPrice));
 
             // Lock user balance row to prevent concurrent balance modifications
             if (!isInMemory)
