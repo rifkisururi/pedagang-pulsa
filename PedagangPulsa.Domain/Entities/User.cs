@@ -42,4 +42,5 @@ public class User
     public ICollection<PeerTransfer> ReceivedTransfers { get; set; } = new List<PeerTransfer>();
     public ICollection<ReferralLog> ReferralLogsAsReferrer { get; set; } = new List<ReferralLog>();
     public ICollection<ReferralLog> ReferralLogsAsReferee { get; set; } = new List<ReferralLog>();
+    public ICollection<UserExternalLogin> ExternalLogins { get; set; } = new List<UserExternalLogin>();
 }

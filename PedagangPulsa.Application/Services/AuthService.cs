@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using PedagangPulsa.Application.Abstractions.Auth;
 using PedagangPulsa.Application.Abstractions.Caching;
 using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Domain.Entities;
@@ -21,6 +22,7 @@ public class AuthService
     private readonly IAppDbContext _context;
     private readonly ILogger<AuthService> _logger;
     private readonly IRedisService? _redisService;
+    private readonly IGoogleTokenValidator? _googleTokenValidator;
     private readonly string _jwtSecret;
     private readonly string _jwtIssuer;
     private readonly string _jwtAudience;
@@ -29,6 +31,7 @@ public class AuthService
         IAppDbContext context,
         ILogger<AuthService> logger,
         IRedisService? redisService = null,
+        IGoogleTokenValidator? googleTokenValidator = null,
         string? jwtSecret = null,
         string? jwtIssuer = null,
         string? jwtAudience = null)
@@ -36,6 +39,7 @@ public class AuthService
         _context = context;
         _logger = logger;
         _redisService = redisService;
+        _googleTokenValidator = googleTokenValidator;
         _jwtSecret = jwtSecret ?? DefaultJwtSecret;
         _jwtIssuer = jwtIssuer ?? DefaultJwtIssuer;
         _jwtAudience = jwtAudience ?? DefaultJwtAudience;
@@ -608,6 +612,326 @@ public class AuthService
         _logger.LogInformation("Password changed successfully for user {UserId}", userId);
 
         return (true, string.Empty);
+    }
+
+    public async Task<(User? User, string AccessToken, string RefreshToken, string ErrorMessage, bool RequiresPinSetup)> LoginWithGoogleAsync(string googleIdToken)
+    {
+        if (_googleTokenValidator == null)
+        {
+            return (null, string.Empty, string.Empty, "Google login is not configured", false);
+        }
+
+        // 1. Validate Google ID token
+        var (validationResult, validationError) = await _googleTokenValidator.ValidateAsync(googleIdToken);
+        if (validationResult == null)
+        {
+            return (null, string.Empty, string.Empty, validationError, false);
+        }
+
+        if (!validationResult.EmailVerified)
+        {
+            return (null, string.Empty, string.Empty, "Google email is not verified", false);
+        }
+
+        // 2. Check if a UserExternalLogin already exists for this Google account
+        var existingLogin = await _context.UserExternalLogins
+            .Include(el => el.User)
+                .ThenInclude(u => u.Level)
+            .Include(el => el.User)
+                .ThenInclude(u => u.Balance)
+            .FirstOrDefaultAsync(el => el.Provider == "Google" && el.ProviderKey == validationResult.Subject);
+
+        if (existingLogin?.User != null)
+        {
+            var user = existingLogin.User;
+            existingLogin.LastUsedAt = DateTime.UtcNow;
+
+            if (user.Status != UserStatus.Active)
+            {
+                return (null, string.Empty, string.Empty,
+                    user.Status == UserStatus.Suspended ? "Account is suspended" : "Account is inactive",
+                    false);
+            }
+
+            var accessToken = GenerateAccessToken(user);
+            var refreshToken = GenerateRefreshToken();
+
+            _context.RefreshTokens.Add(new RefreshToken
+            {
+                UserId = user.Id,
+                Token = refreshToken,
+                ExpiresAt = DateTime.UtcNow.AddDays(30),
+                IsRevoked = false,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Google login successful for user {UserId}", user.Id);
+            return (user, accessToken, refreshToken, string.Empty, false);
+        }
+
+        // 3. No existing external login. Check if a user already exists with this email.
+        var existingUserByEmail = await _context.Users
+            .Include(u => u.Balance)
+            .Include(u => u.Level)
+            .FirstOrDefaultAsync(u => u.Email == validationResult.Email);
+
+        if (existingUserByEmail != null)
+        {
+            _context.UserExternalLogins.Add(new UserExternalLogin
+            {
+                UserId = existingUserByEmail.Id,
+                Provider = "Google",
+                ProviderKey = validationResult.Subject,
+                ProviderDisplayName = validationResult.Name,
+                Email = validationResult.Email,
+                AvatarUrl = validationResult.Picture,
+                CreatedAt = DateTime.UtcNow,
+                LastUsedAt = DateTime.UtcNow
+            });
+
+            var accessToken = GenerateAccessToken(existingUserByEmail);
+            var refreshToken = GenerateRefreshToken();
+
+            _context.RefreshTokens.Add(new RefreshToken
+            {
+                UserId = existingUserByEmail.Id,
+                Token = refreshToken,
+                ExpiresAt = DateTime.UtcNow.AddDays(30),
+                IsRevoked = false,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Google account linked to existing user {UserId}", existingUserByEmail.Id);
+            return (existingUserByEmail, accessToken, refreshToken, string.Empty, false);
+        }
+
+        // 4. Brand new user -- auto-register
+        var defaultLevel = await _context.UserLevels
+            .FirstOrDefaultAsync(l => l.Name == "Bronze");
+
+        if (defaultLevel == null)
+        {
+            return (null, string.Empty, string.Empty, "Default user level not configured", false);
+        }
+
+        var baseUsername = validationResult.Email.Split('@')[0];
+        var username = await GenerateUniqueUsernameAsync(baseUsername);
+
+        var tempPin = Random.Shared.Next(100000, 999999).ToString();
+
+        var newUser = new User
+        {
+            UserName = username,
+            FullName = validationResult.Name ?? validationResult.GivenName,
+            Email = validationResult.Email,
+            Phone = null,
+            PasswordHash = null,
+            PinHash = BCrypt.Net.BCrypt.HashPassword(tempPin, workFactor: 12),
+            PinFailedAttempts = 0,
+            PinLockedAt = null,
+            LevelId = defaultLevel.Id,
+            CanTransferOverride = null,
+            ReferralCode = GenerateReferralCode(username),
+            ReferredBy = null,
+            Status = UserStatus.Active,
+            EmailVerifiedAt = DateTime.UtcNow,
+            PhoneVerifiedAt = null,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        newUser.Level = defaultLevel;
+        newUser.Balance = new UserBalance
+        {
+            UserId = newUser.Id,
+            ActiveBalance = 0,
+            HeldBalance = 0,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.Users.Add(newUser);
+        _context.UserBalances.Add(newUser.Balance);
+        _context.UserExternalLogins.Add(new UserExternalLogin
+        {
+            UserId = newUser.Id,
+            Provider = "Google",
+            ProviderKey = validationResult.Subject,
+            ProviderDisplayName = validationResult.Name,
+            Email = validationResult.Email,
+            AvatarUrl = validationResult.Picture,
+            CreatedAt = DateTime.UtcNow,
+            LastUsedAt = DateTime.UtcNow
+        });
+
+        var newAccessToken = GenerateAccessToken(newUser);
+        var newRefreshToken = GenerateRefreshToken();
+
+        _context.RefreshTokens.Add(new RefreshToken
+        {
+            UserId = newUser.Id,
+            Token = newRefreshToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(30),
+            IsRevoked = false,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("New user {Username} auto-registered via Google login", username);
+        return (newUser, newAccessToken, newRefreshToken, string.Empty, true);
+    }
+
+    public async Task<(bool Success, string ErrorMessage)> InitializePinAsync(Guid userId, string newPin)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null)
+        {
+            return (false, "User not found");
+        }
+
+        user.PinHash = BCrypt.Net.BCrypt.HashPassword(newPin, workFactor: 12);
+        user.PinFailedAttempts = 0;
+        user.PinLockedAt = null;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("PIN initialized for user {UserId}", userId);
+        return (true, string.Empty);
+    }
+
+    private async Task<string> GenerateUniqueUsernameAsync(string baseUsername)
+    {
+        var username = baseUsername.Length > 50 ? baseUsername[..47] : baseUsername;
+        username = new string(username.Where(char.IsLetterOrDigit).ToArray());
+
+        if (string.IsNullOrWhiteSpace(username))
+            username = "user";
+
+        var exists = await _context.Users.AnyAsync(u => u.UserName == username);
+        if (!exists)
+            return username;
+
+        for (var i = 0; i < 10; i++)
+        {
+            var candidate = $"{username}{Random.Shared.Next(100, 9999)}";
+            if (candidate.Length > 50)
+                candidate = candidate[..50];
+            exists = await _context.Users.AnyAsync(u => u.UserName == candidate);
+            if (!exists)
+                return candidate;
+        }
+
+        return $"g_{Guid.NewGuid():N}";
+    }
+
+    public async Task<(UserExternalLogin? ExternalLogin, string ErrorMessage)> LinkGoogleAsync(Guid userId, string googleIdToken)
+    {
+        if (_googleTokenValidator == null)
+        {
+            return (null, "Google login is not configured");
+        }
+
+        var (validationResult, validationError) = await _googleTokenValidator.ValidateAsync(googleIdToken);
+        if (validationResult == null)
+        {
+            return (null, validationError);
+        }
+
+        if (!validationResult.EmailVerified)
+        {
+            return (null, "Google email is not verified");
+        }
+
+        // Check if this Google account is already linked to any user
+        var existingLink = await _context.UserExternalLogins
+            .FirstOrDefaultAsync(el => el.Provider == "Google" && el.ProviderKey == validationResult.Subject);
+
+        if (existingLink != null)
+        {
+            if (existingLink.UserId == userId)
+            {
+                return (null, "Google account is already linked to your account");
+            }
+            return (null, "Google account is already linked to another account");
+        }
+
+        // Check if user already has a Google login
+        var userGoogleLink = await _context.UserExternalLogins
+            .FirstOrDefaultAsync(el => el.UserId == userId && el.Provider == "Google");
+
+        if (userGoogleLink != null)
+        {
+            return (null, "Your account already has a Google login linked");
+        }
+
+        var externalLogin = new UserExternalLogin
+        {
+            UserId = userId,
+            Provider = "Google",
+            ProviderKey = validationResult.Subject,
+            ProviderDisplayName = validationResult.Name,
+            Email = validationResult.Email,
+            AvatarUrl = validationResult.Picture,
+            CreatedAt = DateTime.UtcNow,
+            LastUsedAt = DateTime.UtcNow
+        };
+
+        _context.UserExternalLogins.Add(externalLogin);
+
+        // Update email verified status if not yet verified
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user != null && !user.EmailVerifiedAt.HasValue && user.Email == validationResult.Email)
+        {
+            user.EmailVerifiedAt = DateTime.UtcNow;
+            user.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Google account linked for user {UserId}", userId);
+        return (externalLogin, string.Empty);
+    }
+
+    public async Task<(bool Success, string ErrorMessage)> UnlinkGoogleAsync(Guid userId)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null)
+        {
+            return (false, "User not found");
+        }
+
+        var googleLink = await _context.UserExternalLogins
+            .FirstOrDefaultAsync(el => el.UserId == userId && el.Provider == "Google");
+
+        if (googleLink == null)
+        {
+            return (false, "No Google account linked");
+        }
+
+        // Prevent unlinking if user has no password set (Google-only account)
+        if (string.IsNullOrWhiteSpace(user.PasswordHash))
+        {
+            return (false, "Cannot unlink Google account. Please set a password first.");
+        }
+
+        _context.UserExternalLogins.Remove(googleLink);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Google account unlinked for user {UserId}", userId);
+        return (true, string.Empty);
+    }
+
+    public async Task<UserExternalLogin?> GetGoogleLinkStatusAsync(Guid userId)
+    {
+        return await _context.UserExternalLogins
+            .FirstOrDefaultAsync(el => el.UserId == userId && el.Provider == "Google");
     }
 
     private static string GenerateReferralCode(string username)

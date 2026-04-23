@@ -46,7 +46,7 @@ jobs:
             --timeout 300 \
             --concurrency 50 \
             --allow-unauthenticated \
-            --set-env-vars "ASPNETCORE_ENVIRONMENT=Staging,ConnectionStrings__DefaultConnection=${{ secrets.DB_CONNECTION }},ConnectionStrings__Redis=${{ secrets.REDIS_CONNECTION }},Jwt__Key=${{ secrets.JWT_KEY }},Jwt__Issuer=PedagangPulsa.Api,Jwt__Audience=PedagangPulsa.Client,EnableSwagger=true,EnableScalar=true" \
+            --set-env-vars "ASPNETCORE_ENVIRONMENT=Staging,ConnectionStrings__DefaultConnection=${{ secrets.DB_CONNECTION }},ConnectionStrings__Redis=${{ secrets.REDIS_CONNECTION }},Jwt__Key=${{ secrets.JWT_KEY }},Jwt__Issuer=PedagangPulsa.Api,Jwt__Audience=PedagangPulsa.Client,EnableSwagger=true,EnableScalar=true,SmsGate__Username=${{ secrets.SMSGATE_USERNAME }},SmsGate__Password=${{ secrets.SMSGATE_PASSWORD }},GoogleAuth__ClientId=${{ secrets.GOOGLE_CLIENT_ID }}" \
             --project ${{ env.PROJECT_ID }}
 
       - name: Map Custom Domain

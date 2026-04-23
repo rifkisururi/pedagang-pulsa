@@ -3,13 +3,16 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using PedagangPulsa.Application.Abstractions.Auth;
 using PedagangPulsa.Application.Abstractions.Caching;
 using PedagangPulsa.Application.Abstractions.Fcm;
 using PedagangPulsa.Application.Abstractions.Persistence;
+using PedagangPulsa.Application.Abstractions.Sms;
 using PedagangPulsa.Application.Abstractions.Suppliers;
 using PedagangPulsa.Infrastructure.Caching;
 using PedagangPulsa.Infrastructure.Data;
 using PedagangPulsa.Infrastructure.Fcm;
+using PedagangPulsa.Infrastructure.Sms;
 using PedagangPulsa.Infrastructure.Suppliers;
 using StackExchange.Redis;
 
@@ -38,6 +41,9 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient("Fcm", client => client.Timeout = TimeSpan.FromSeconds(10));
         services.AddHttpClient("GoogleAuth", client => client.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<IFcmClient, FcmClient>();
+        services.AddHttpClient("SmsGate", client => client.Timeout = TimeSpan.FromSeconds(15));
+        services.AddScoped<ISmsClient, SmsGateClient>();
+        services.AddScoped<IGoogleTokenValidator, PedagangPulsa.Infrastructure.Auth.GoogleTokenValidator>();
 
         return services;
     }

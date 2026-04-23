@@ -9,4 +9,5 @@ public interface IRedisService
     Task<string?> GetAndRemoveAsync(string key);
     Task<long> TtlAsync(string key);
     Task RemoveByPatternAsync(string pattern);
+    Task<long> IncrementAsync(string key, TimeSpan? expiry = null);
 }

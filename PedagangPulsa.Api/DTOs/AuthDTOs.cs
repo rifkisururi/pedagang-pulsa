@@ -107,6 +107,9 @@ public class UserDto
     public decimal Balance { get; set; }
     public string ReferralCode { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
+    public bool PhoneVerified { get; set; }
+    public bool EmailVerified { get; set; }
+    public bool HasPassword { get; set; }
 }
 
 public class UserMeResponse
@@ -152,4 +155,64 @@ public class ChangePasswordResponse
 {
     public bool Success { get; set; }
     public string Message { get; set; } = string.Empty;
+}
+
+public class GoogleLoginRequest
+{
+    [Required(ErrorMessage = "Google ID token is required")]
+    public string IdToken { get; set; } = string.Empty;
+}
+
+public class GoogleLoginResponse
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public string AccessToken { get; set; } = string.Empty;
+    public string RefreshToken { get; set; } = string.Empty;
+    public int ExpiresIn { get; set; }
+    public bool RequiresPinSetup { get; set; }
+    public UserDto User { get; set; } = null!;
+}
+
+public class InitializePinRequest
+{
+    [Required(ErrorMessage = "PIN is required")]
+    [StringLength(6, MinimumLength = 6, ErrorMessage = "PIN must be exactly 6 digits")]
+    [RegularExpression(@"^\d{6}$", ErrorMessage = "PIN must be 6 digits")]
+    public string Pin { get; set; } = string.Empty;
+}
+
+public class InitializePinResponse
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
+
+public class GoogleLinkRequest
+{
+    [Required(ErrorMessage = "Google ID token is required")]
+    public string IdToken { get; set; } = string.Empty;
+}
+
+public class GoogleLinkResponse
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
+
+public class GoogleUnlinkResponse
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
+
+public class GoogleStatusResponse
+{
+    public bool Success { get; set; }
+    public bool IsLinked { get; set; }
+    public string? Provider { get; set; }
+    public string? Email { get; set; }
+    public string? DisplayName { get; set; }
+    public string? AvatarUrl { get; set; }
+    public DateTime? LinkedAt { get; set; }
 }

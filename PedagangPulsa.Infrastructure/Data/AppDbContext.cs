@@ -19,6 +19,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<BalanceLedger> BalanceLedgers { get; set; }
     public DbSet<PinResetToken> PinResetTokens { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
+    public DbSet<UserExternalLogin> UserExternalLogins { get; set; }
 
     // Referral
     public DbSet<ReferralLog> ReferralLogs { get; set; }
@@ -212,6 +213,23 @@ public class AppDbContext : DbContext, IAppDbContext
             entity.HasIndex(e => new { e.UserId, e.IsRevoked, e.ExpiresAt });
             entity.HasOne(e => e.User)
                 .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // UserExternalLogin
+        modelBuilder.Entity<UserExternalLogin>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Provider).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.ProviderKey).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.ProviderDisplayName).HasMaxLength(200);
+            entity.Property(e => e.Email).HasMaxLength(100);
+            entity.Property(e => e.AvatarUrl).HasMaxLength(500);
+            entity.HasIndex(e => new { e.Provider, e.ProviderKey }).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.ExternalLogins)
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });

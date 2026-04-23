@@ -68,6 +68,14 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
 builder.Services.Configure<PedagangPulsa.Domain.Configuration.PricingConfig>(
     builder.Configuration.GetSection("Pricing"));
 
+// Google Auth config
+builder.Services.Configure<PedagangPulsa.Domain.Configuration.GoogleAuthConfig>(
+    builder.Configuration.GetSection("GoogleAuth"));
+
+// SMS Gate config
+builder.Services.Configure<PedagangPulsa.Domain.Configuration.SmsGateConfig>(
+    builder.Configuration.GetSection("SmsGate"));
+
 // CORS
 builder.Services.AddCors(options =>
 {
@@ -139,5 +147,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapGet("/", () => "ok");
 
 app.Run();

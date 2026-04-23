@@ -14,6 +14,7 @@ public interface IAppDbContext
     DbSet<BalanceLedger> BalanceLedgers { get; }
     DbSet<PinResetToken> PinResetTokens { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
+    DbSet<UserExternalLogin> UserExternalLogins { get; }
     DbSet<ReferralLog> ReferralLogs { get; }
     DbSet<BankAccount> BankAccounts { get; }
     DbSet<TopupRequest> TopupRequests { get; }

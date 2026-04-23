@@ -13,10 +13,12 @@ namespace PedagangPulsa.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly AuthService _authService;
+    private readonly PhoneVerificationService _phoneVerificationService;
 
-    public AuthController(AuthService authService)
+    public AuthController(AuthService authService, PhoneVerificationService phoneVerificationService)
     {
         _authService = authService;
+        _phoneVerificationService = phoneVerificationService;
     }
 
     [HttpPost("register")]
@@ -76,7 +78,10 @@ public class AuthController : ControllerBase
                 LevelId = user.LevelId,
                 Balance = user.Balance?.ActiveBalance ?? 0,
                 ReferralCode = user.ReferralCode,
-                CreatedAt = user.CreatedAt
+                CreatedAt = user.CreatedAt,
+                PhoneVerified = user.PhoneVerifiedAt.HasValue,
+                EmailVerified = user.EmailVerifiedAt.HasValue,
+                HasPassword = !string.IsNullOrWhiteSpace(user.PasswordHash)
             }
         });
     }
@@ -125,7 +130,10 @@ public class AuthController : ControllerBase
                 LevelId = user.LevelId,
                 Balance = user.Balance?.ActiveBalance ?? 0,
                 ReferralCode = user.ReferralCode,
-                CreatedAt = user.CreatedAt
+                CreatedAt = user.CreatedAt,
+                PhoneVerified = user.PhoneVerifiedAt.HasValue,
+                EmailVerified = user.EmailVerifiedAt.HasValue,
+                HasPassword = !string.IsNullOrWhiteSpace(user.PasswordHash)
             }
         });
     }
@@ -166,6 +174,97 @@ public class AuthController : ControllerBase
             AccessToken = result.AccessToken,
             RefreshToken = result.RefreshToken,
             ExpiresIn = 900
+        });
+    }
+
+    [HttpPost("google")]
+    public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new ErrorResponse
+            {
+                Message = "Validation failed",
+                Errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList()
+            });
+        }
+
+        var result = await _authService.LoginWithGoogleAsync(request.IdToken);
+
+        if (!string.IsNullOrWhiteSpace(result.ErrorMessage))
+        {
+            var errorCode = result.ErrorMessage.Contains("not configured", StringComparison.OrdinalIgnoreCase)
+                ? "GOOGLE_AUTH_NOT_CONFIGURED"
+                : result.ErrorMessage.Contains("suspended", StringComparison.OrdinalIgnoreCase) || result.ErrorMessage.Contains("inactive", StringComparison.OrdinalIgnoreCase)
+                    ? "ACCOUNT_INACTIVE"
+                    : "GOOGLE_AUTH_FAILED";
+
+            return Unauthorized(new ErrorResponse
+            {
+                Message = result.ErrorMessage,
+                ErrorCode = errorCode
+            });
+        }
+
+        var user = result.User!;
+        return Ok(new GoogleLoginResponse
+        {
+            Success = true,
+            Message = result.RequiresPinSetup
+                ? "Account created successfully. Please set your PIN to continue."
+                : "Login successful",
+            AccessToken = result.AccessToken,
+            RefreshToken = result.RefreshToken,
+            ExpiresIn = 900,
+            RequiresPinSetup = result.RequiresPinSetup,
+            User = new UserDto
+            {
+                Id = user.Id,
+                Username = user.UserName,
+                Email = user.Email,
+                FullName = user.FullName,
+                Phone = user.Phone,
+                Level = user.Level?.Name ?? string.Empty,
+                LevelId = user.LevelId,
+                Balance = user.Balance?.ActiveBalance ?? 0,
+                ReferralCode = user.ReferralCode,
+                CreatedAt = user.CreatedAt,
+                PhoneVerified = user.PhoneVerifiedAt.HasValue,
+                EmailVerified = user.EmailVerifiedAt.HasValue,
+                HasPassword = !string.IsNullOrWhiteSpace(user.PasswordHash)
+            }
+        });
+    }
+
+    [HttpPost("pin/initialize")]
+    [Authorize]
+    public async Task<IActionResult> InitializePin([FromBody] InitializePinRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new ErrorResponse
+            {
+                Message = "Validation failed",
+                Errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList()
+            });
+        }
+
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse { Message = "Invalid token", ErrorCode = "INVALID_TOKEN" });
+        }
+
+        var result = await _authService.InitializePinAsync(userId, request.Pin);
+        if (!result.Success)
+        {
+            return BadRequest(new ErrorResponse { Message = result.ErrorMessage, ErrorCode = "PIN_INIT_FAILED" });
+        }
+
+        return Ok(new InitializePinResponse
+        {
+            Success = true,
+            Message = "PIN set successfully"
         });
     }
 
@@ -283,7 +382,10 @@ public class AuthController : ControllerBase
                 LevelId = user.LevelId,
                 Balance = user.Balance?.ActiveBalance ?? 0,
                 ReferralCode = user.ReferralCode,
-                CreatedAt = user.CreatedAt
+                CreatedAt = user.CreatedAt,
+                PhoneVerified = user.PhoneVerifiedAt.HasValue,
+                EmailVerified = user.EmailVerifiedAt.HasValue,
+                HasPassword = !string.IsNullOrWhiteSpace(user.PasswordHash)
             }
         });
     }
@@ -397,6 +499,203 @@ public class AuthController : ControllerBase
         {
             Success = true,
             Message = "Password changed successfully"
+        });
+    }
+
+    [HttpPost("phone/request")]
+    public async Task<IActionResult> RequestPhoneOtp([FromBody] RequestPhoneOtpRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new ErrorResponse
+            {
+                Message = "Validation failed",
+                Errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList()
+            });
+        }
+
+        var result = await _phoneVerificationService.RequestOtpAsync(request.PhoneNumber);
+
+        if (!result.Success)
+        {
+            var statusCode = result.ErrorCode switch
+            {
+                "SMS_GATEWAY_UNAVAILABLE" => 503,
+                "PHONE_OTP_RATE_LIMITED" => 429,
+                _ => 400
+            };
+
+            return StatusCode(statusCode, new ErrorResponse
+            {
+                Message = result.Message!,
+                ErrorCode = result.ErrorCode
+            });
+        }
+
+        return Ok(new RequestPhoneOtpResponse
+        {
+            Success = true,
+            Message = "OTP berhasil dikirim",
+            ExpiresIn = 300
+        });
+    }
+
+    [HttpPost("phone/verify")]
+    public async Task<IActionResult> VerifyPhoneOtp([FromBody] VerifyPhoneOtpRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new ErrorResponse
+            {
+                Message = "Validation failed",
+                Errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList()
+            });
+        }
+
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token",
+                ErrorCode = "INVALID_TOKEN"
+            });
+        }
+
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Message = "Invalid token format",
+                ErrorCode = "INVALID_TOKEN_FORMAT"
+            });
+        }
+
+        var result = await _phoneVerificationService.VerifyOtpAsync(request.PhoneNumber, request.Otp, userId);
+
+        if (!result.Success)
+        {
+            var statusCode = result.ErrorCode switch
+            {
+                "OTP_MAX_ATTEMPTS" => 429,
+                "USER_NOT_FOUND" => 404,
+                _ => 400
+            };
+
+            return StatusCode(statusCode, new ErrorResponse
+            {
+                Message = result.Message!,
+                ErrorCode = result.ErrorCode
+            });
+        }
+
+        return Ok(new VerifyPhoneOtpResponse
+        {
+            Success = true,
+            Message = "Nomor telepon berhasil diverifikasi",
+            PhoneVerified = true
+        });
+    }
+
+    [HttpGet("google/status")]
+    [Authorize]
+    public async Task<IActionResult> GoogleStatus()
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse { Message = "Invalid token", ErrorCode = "INVALID_TOKEN" });
+        }
+
+        var link = await _authService.GetGoogleLinkStatusAsync(userId);
+        return Ok(new GoogleStatusResponse
+        {
+            Success = true,
+            IsLinked = link != null,
+            Provider = link?.Provider,
+            Email = link?.Email,
+            DisplayName = link?.ProviderDisplayName,
+            AvatarUrl = link?.AvatarUrl,
+            LinkedAt = link?.CreatedAt
+        });
+    }
+
+    [HttpPost("google/link")]
+    [Authorize]
+    public async Task<IActionResult> GoogleLink([FromBody] GoogleLinkRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new ErrorResponse
+            {
+                Message = "Validation failed",
+                Errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList()
+            });
+        }
+
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse { Message = "Invalid token", ErrorCode = "INVALID_TOKEN" });
+        }
+
+        var result = await _authService.LinkGoogleAsync(userId, request.IdToken);
+        if (!string.IsNullOrWhiteSpace(result.ErrorMessage))
+        {
+            var errorCode = result.ErrorMessage.Contains("already linked", StringComparison.OrdinalIgnoreCase)
+                ? "ALREADY_LINKED"
+                : result.ErrorMessage.Contains("not configured", StringComparison.OrdinalIgnoreCase)
+                    ? "GOOGLE_AUTH_NOT_CONFIGURED"
+                    : "GOOGLE_LINK_FAILED";
+
+            var statusCode = result.ErrorMessage.Contains("another account", StringComparison.OrdinalIgnoreCase)
+                ? 409
+                : 400;
+
+            return StatusCode(statusCode, new ErrorResponse
+            {
+                Message = result.ErrorMessage,
+                ErrorCode = errorCode
+            });
+        }
+
+        return Ok(new GoogleLinkResponse
+        {
+            Success = true,
+            Message = "Google account linked successfully"
+        });
+    }
+
+    [HttpDelete("google/unlink")]
+    [Authorize]
+    public async Task<IActionResult> GoogleUnlink()
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ErrorResponse { Message = "Invalid token", ErrorCode = "INVALID_TOKEN" });
+        }
+
+        var result = await _authService.UnlinkGoogleAsync(userId);
+        if (!result.Success)
+        {
+            var errorCode = result.ErrorMessage.Contains("no password", StringComparison.OrdinalIgnoreCase)
+                ? "PASSWORD_REQUIRED"
+                : result.ErrorMessage.Contains("no Google", StringComparison.OrdinalIgnoreCase)
+                    ? "NOT_LINKED"
+                    : "GOOGLE_UNLINK_FAILED";
+
+            return BadRequest(new ErrorResponse
+            {
+                Message = result.ErrorMessage,
+                ErrorCode = errorCode
+            });
+        }
+
+        return Ok(new GoogleUnlinkResponse
+        {
+            Success = true,
+            Message = "Google account unlinked successfully"
         });
     }
 }

@@ -87,6 +87,16 @@ public sealed class RedisService : IRedisService, IAsyncDisposable
         }
     }
 
+    public async Task<long> IncrementAsync(string key, TimeSpan? expiry = null)
+    {
+        var value = await _db.StringIncrementAsync(key);
+        if (expiry.HasValue && value == 1)
+        {
+            await _db.KeyExpireAsync(key, expiry.Value);
+        }
+        return value;
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_redis is IAsyncDisposable asyncDisposable)

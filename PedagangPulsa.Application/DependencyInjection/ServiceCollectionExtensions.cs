@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using PedagangPulsa.Application.Abstractions.Auth;
 using PedagangPulsa.Application.Abstractions.Caching;
 using PedagangPulsa.Application.Abstractions.Persistence;
 using PedagangPulsa.Application.Services;
@@ -34,6 +35,7 @@ public static class ServiceCollectionExtensions
                 serviceProvider.GetRequiredService<IAppDbContext>(),
                 serviceProvider.GetRequiredService<ILogger<AuthService>>(),
                 serviceProvider.GetService<IRedisService>(),
+                serviceProvider.GetService<IGoogleTokenValidator>(),
                 jwtSecret: jwtSecret,
                 jwtIssuer: jwtIssuer,
                 jwtAudience: jwtAudience));
