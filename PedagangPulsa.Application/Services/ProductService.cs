@@ -24,7 +24,9 @@ public class ProductService
         string? sortColumn = null,
         string? sortDirection = null)
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only product list to eliminate change tracking overhead, saving CPU and memory per request.
         var query = _context.Products
+            .AsNoTracking()
             .Include(p => p.Category)
             .AsQueryable();
 
