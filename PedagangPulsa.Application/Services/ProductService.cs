@@ -120,7 +120,9 @@ public class ProductService
 
     public async Task<Product?> GetProductByIdAsync(Guid id)
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only product fetch to eliminate change tracking overhead.
         return await _context.Products
+            .AsNoTracking()
             .Include(p => p.Category)
             .Include(p => p.ProductLevelPrices)
             .FirstOrDefaultAsync(p => p.Id == id);
@@ -128,7 +130,9 @@ public class ProductService
 
     public async Task<List<ProductCategory>> GetCategoriesAsync()
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only categories fetch to eliminate change tracking overhead.
         return await _context.ProductCategories
+            .AsNoTracking()
             .Where(c => c.IsActive)
             .OrderBy(c => c.SortOrder)
             .ToListAsync();
@@ -136,7 +140,9 @@ public class ProductService
 
     public async Task<List<UserLevel>> GetLevelsAsync()
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only levels fetch to eliminate change tracking overhead.
         return await _context.UserLevels
+            .AsNoTracking()
             .OrderBy(l => l.Id)
             .ToListAsync();
     }
@@ -211,7 +217,9 @@ public class ProductService
 
     public async Task<List<Product>> GetActiveProductsAsync()
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only active products fetch to eliminate change tracking overhead.
         return await _context.Products
+            .AsNoTracking()
             .Include(p => p.Category)
             .Where(p => p.IsActive)
             .OrderBy(p => p.Name)
@@ -247,7 +255,9 @@ public class ProductService
 
     public async Task<List<ProductLevelPrice>> GetProductPricesAsync(Guid productId)
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only product prices fetch to eliminate change tracking overhead.
         return await _context.ProductLevelPrices
+            .AsNoTracking()
             .Where(p => p.ProductId == productId)
             .Include(p => p.Level)
             .OrderBy(p => p.LevelId)
