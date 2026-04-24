@@ -1,4 +1,15 @@
+using Microsoft.Extensions.Logging;
 using Npgsql;
+using System;
+
+using var loggerFactory = LoggerFactory.Create(builder =>
+{
+    builder
+        .AddConsole()
+        .SetMinimumLevel(LogLevel.Information);
+});
+
+var logger = loggerFactory.CreateLogger<Program>();
 
 var connectionString = "Host=ep-cold-field-a111o43u-pooler.ap-southeast-1.aws.neon.tech;Username=neondb_owner;Password=npg_hWbvwU2O5Bur;Database=neondb;SSL Mode=Require;Trust Server Certificate=true";
 
@@ -15,21 +26,28 @@ var dropCommands = new[]
     "DROP TYPE IF EXISTS user_status CASCADE;"
 };
 
-using var connection = new NpgsqlConnection(connectionString);
-await connection.OpenAsync();
-
-foreach (var command in dropCommands)
+try
 {
-    using var cmd = new NpgsqlCommand(command, connection);
-    try
-    {
-        await cmd.ExecuteNonQueryAsync();
-        Console.WriteLine($"Executed: {command}");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error: {ex.Message}");
-    }
-}
+    using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
 
-Console.WriteLine("Done!");
+    foreach (var command in dropCommands)
+    {
+        using var cmd = new NpgsqlCommand(command, connection);
+        try
+        {
+            await cmd.ExecuteNonQueryAsync();
+            logger.LogInformation("Executed: {Command}", command);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error executing command: {Command}", command);
+        }
+    }
+
+    logger.LogInformation("Done!");
+}
+catch (Exception ex)
+{
+    logger.LogCritical(ex, "A fatal error occurred during execution.");
+}
