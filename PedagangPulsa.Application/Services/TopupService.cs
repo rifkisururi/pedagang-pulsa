@@ -25,7 +25,9 @@ public class TopupService
         string? sortColumn = null,
         string? sortDirection = null)
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only topup requests list to eliminate change tracking overhead, saving CPU and memory per request.
         var query = _context.TopupRequests
+            .AsNoTracking()
             .Include(t => t.User)
             .AsQueryable();
 

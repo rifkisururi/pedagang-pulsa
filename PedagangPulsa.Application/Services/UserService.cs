@@ -27,7 +27,9 @@ public class UserService
         string? sortColumn = null,
         string? sortDirection = null)
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only user list to eliminate change tracking overhead, saving CPU and memory per request.
         var query = _context.Users
+            .AsNoTracking()
             .Include(u => u.Level)
             .Include(u => u.Balance)
             .AsQueryable();
