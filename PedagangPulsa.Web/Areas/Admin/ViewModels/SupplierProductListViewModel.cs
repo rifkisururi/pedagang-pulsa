@@ -16,7 +16,7 @@ public class SupplierProductListViewModel
         public decimal CostPrice { get; set; }
         public string SupplierProductCode { get; set; } = string.Empty;
         public string? SupplierProductName { get; set; }
-        
+
         // Alias for compatibility
         public string? SupplierSku => SupplierProductCode;
 
