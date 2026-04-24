@@ -30,6 +30,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ExportService>();
         services.AddScoped<FcmService>();
         services.AddScoped<DashboardService>();
+        services.AddScoped<PhoneVerificationService>();
         services.AddScoped<AuthService>(serviceProvider =>
             new AuthService(
                 serviceProvider.GetRequiredService<IAppDbContext>(),
