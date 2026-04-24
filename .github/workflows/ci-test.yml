@@ -1,0 +1,38 @@
+name: Run Unit Tests
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore PedagangPulsa.Tests/PedagangPulsa.Tests.csproj
+
+      - name: Build
+        run: dotnet build PedagangPulsa.Tests/PedagangPulsa.Tests.csproj --no-restore --configuration Release
+
+      - name: Run Tests
+        run: dotnet test PedagangPulsa.Tests/PedagangPulsa.Tests.csproj --no-build --configuration Release --logger "console;verbosity=detailed"
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: PedagangPulsa.Tests/TestResults/
+          retention-days: 7

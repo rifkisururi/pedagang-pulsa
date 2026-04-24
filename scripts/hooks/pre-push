@@ -1,0 +1,38 @@
+#!/bin/bash
+# pre-push hook: Block push to main if unit tests fail.
+# Install: Run scripts/setup-hooks.sh (or scripts/setup-hooks.bat on Windows)
+
+set -euo pipefail
+
+# Read stdin lines: local_ref local_sha remote_ref remote_sha
+while read -r local_ref local_sha remote_ref remote_sha; do
+    # Only check pushes targeting refs/heads/main
+    if [ "$remote_ref" = "refs/heads/main" ]; then
+        echo "============================================"
+        echo "  PRE-PUSH: Running unit tests (target: main)"
+        echo "============================================"
+
+        REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+        if dotnet test "$REPO_ROOT/PedagangPulsa.Tests/PedagangPulsa.Tests.csproj" \
+            --logger "console;verbosity=normal" \
+            2>&1; then
+            echo ""
+            echo "============================================"
+            echo "  All tests passed. Push allowed."
+            echo "============================================"
+            exit 0
+        else
+            echo ""
+            echo "============================================"
+            echo "  TESTS FAILED! Push to main is blocked."
+            echo "  Fix the failing tests and try again."
+            echo "  To bypass (emergency only):"
+            echo "    git push --no-verify"
+            echo "============================================"
+            exit 1
+        fi
+    fi
+done
+
+exit 0
