@@ -277,8 +277,8 @@ public class TransactionServiceTests : IAsyncLifetime
         // Assert
         processResult.Should().BeFalse();
 
-        // Refresh transaction - fetch from database instead of ReloadAsync
-        var updatedTransaction = await _context.Transactions.FindAsync(createResult.Transaction.Id);
+        // Refresh transaction - fetch from database using composite key (Id, CreatedAt)
+        var updatedTransaction = await _context.Transactions.FindAsync(createResult.Transaction.Id, createResult.Transaction.CreatedAt);
         updatedTransaction.Should().NotBeNull();
         updatedTransaction!.Status.Should().Be(TransactionStatus.Failed);
         updatedTransaction.ErrorMessage.Should().Be("All suppliers failed");
@@ -367,8 +367,8 @@ public class TransactionServiceTests : IAsyncLifetime
         await _transactionService.ProcessTransactionAsync(createResult.Transaction.Id);
 
         // Assert
-        // Fetch from database instead of ReloadAsync
-        var updatedTransaction = await _context.Transactions.FindAsync(createResult.Transaction.Id);
+        // Fetch from database using composite key (Id, CreatedAt)
+        var updatedTransaction = await _context.Transactions.FindAsync(createResult.Transaction.Id, createResult.Transaction.CreatedAt);
         updatedTransaction.Should().NotBeNull();
         initialStatus.Should().Be(TransactionStatus.Pending);
         updatedTransaction!.Status.Should().Be(TransactionStatus.Success);

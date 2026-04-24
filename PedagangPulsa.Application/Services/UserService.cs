@@ -137,7 +137,6 @@ public class UserService
         return await _context.Users
             .Include(u => u.Level)
             .Include(u => u.Balance)
-            .Include(u => u.Referrer)
             .Include(u => u.BalanceLedgers
                 .OrderByDescending(bl => bl.CreatedAt)
                 .Take(10))

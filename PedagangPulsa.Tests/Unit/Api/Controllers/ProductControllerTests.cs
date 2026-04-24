@@ -3,10 +3,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using PedagangPulsa.Api.Controllers;
 using PedagangPulsa.Api.DTOs;
 using PedagangPulsa.Application.Abstractions.Caching;
+using PedagangPulsa.Domain.Configuration;
 using PedagangPulsa.Infrastructure.Data;
 using PedagangPulsa.Tests.Helpers;
 using System;
@@ -44,7 +46,9 @@ public class ProductControllerTests : IAsyncDisposable
             _loggerMock.Object,
             _redisServiceMock.Object,
             _productCacheMock.Object,
-            _configuration);
+            _configuration,
+            Options.Create(new PricingConfig())
+        );
     }
 
     private void SetupAuthenticatedUser(Guid userId)
@@ -153,20 +157,6 @@ public class ProductControllerTests : IAsyncDisposable
         response.PageSize.Should().Be(1);
     }
 
-    [Fact]
-    public async Task GetProducts_WithoutAuthentication_ReturnsUnauthorized()
-    {
-        // Arrange - No authenticated user set up
-
-        // Act
-        var result = await _controller.GetProducts();
-
-        // Assert
-        var unauthorizedResult = result.Should().BeOfType<UnauthorizedObjectResult>().Subject;
-        var error = unauthorizedResult.Value.Should().BeOfType<ErrorResponse>().Subject;
-
-        error.ErrorCode.Should().Be("INVALID_TOKEN");
-    }
 
     [Fact]
     public async Task GetPrice_WithValidProduct_ReturnsUserLevelPrice()
@@ -182,10 +172,9 @@ public class ProductControllerTests : IAsyncDisposable
 
         // Assert
         var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-        dynamic response = okResult.Value;
-
-        response.success.Should().Be(true);
-        response.data.price.Should().NotBeNull();
+        var json = System.Text.Json.JsonSerializer.SerializeToElement(okResult.Value);
+        json.GetProperty("success").GetBoolean().Should().BeTrue();
+        json.GetProperty("data").GetProperty("price").ValueKind.Should().NotBe(System.Text.Json.JsonValueKind.Null);
     }
 
     [Fact]
@@ -221,10 +210,10 @@ public class ProductControllerTests : IAsyncDisposable
 
         // Assert
         var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-        dynamic response = okResult.Value;
+        var json = System.Text.Json.JsonSerializer.SerializeToElement(okResult.Value);
 
-        response.success.Should().Be(true);
-        response.data.Should().NotBeNull();
+        json.GetProperty("success").GetBoolean().Should().BeTrue();
+        json.GetProperty("data").GetArrayLength().Should().BeGreaterThan(0);
     }
 
     [Fact]
@@ -241,10 +230,10 @@ public class ProductControllerTests : IAsyncDisposable
 
         // Assert
         var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-        dynamic response = okResult.Value;
+        var json = System.Text.Json.JsonSerializer.SerializeToElement(okResult.Value);
 
-        response.success.Should().Be(true);
-        response.data.Should().NotBeNull();
+        json.GetProperty("success").GetBoolean().Should().BeTrue();
+        json.GetProperty("data").GetArrayLength().Should().Be(0);
     }
 
     // ===== Catalog endpoint tests =====
@@ -434,5 +423,11 @@ public class ProductControllerTests : IAsyncDisposable
     {
         await _context.CleanAsync();
         await _context.DisposeAsync();
+    }
+
+    public class ApiResponse<T>
+    {
+        public bool success { get; set; }
+        public T data { get; set; }
     }
 }

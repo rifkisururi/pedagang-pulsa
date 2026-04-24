@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using PedagangPulsa.Domain.Entities;
 using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Infrastructure.Data;
@@ -24,6 +25,7 @@ public class TestDbContext : AppDbContext
     {
         return new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .EnableSensitiveDataLogging()
             .EnableDetailedErrors()
             .Options;
@@ -60,7 +62,17 @@ public class TestDbContext : AppDbContext
             IsActive = true
         };
 
-        UserLevels.AddRange(member1Level, member2Level);
+        var bronzeLevel = new UserLevel
+        {
+            Name = "Bronze",
+            Description = "Default bronze level",
+            MarkupType = MarkupType.Percentage,
+            MarkupValue = 2.0m,
+            CanTransfer = false,
+            IsActive = true
+        };
+
+        UserLevels.AddRange(member1Level, member2Level, bronzeLevel);
         await SaveChangesAsync();
 
         AdminUsers.Add(new AdminUser

@@ -2,11 +2,13 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using PedagangPulsa.Api.Controllers;
 using PedagangPulsa.Api.DTOs;
 using PedagangPulsa.Application.Abstractions.Caching;
 using PedagangPulsa.Application.Services;
+using PedagangPulsa.Domain.Configuration;
 using PedagangPulsa.Domain.Entities;
 using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Infrastructure.Data;
@@ -45,7 +47,8 @@ public class TransactionControllerTests : IAsyncDisposable
         _controller = new TransactionController(
             _context,
             _loggerMock.Object,
-            _authService
+            _authService,
+            Options.Create(new PricingConfig())
         );
     }
 

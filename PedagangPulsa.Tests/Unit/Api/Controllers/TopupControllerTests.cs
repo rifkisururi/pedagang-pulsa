@@ -203,10 +203,10 @@ public class TopupControllerTests : IAsyncDisposable
         var result = await _controller.GetBankAccounts();
 
         var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-        dynamic response = okResult.Value!;
+        var json = System.Text.Json.JsonSerializer.SerializeToElement(okResult.Value!);
 
-        ((bool)response.success).Should().BeTrue();
-        response.data.Should().NotBeNull();
+        json.GetProperty("success").GetBoolean().Should().BeTrue();
+        json.GetProperty("data").GetArrayLength().Should().BeGreaterThan(0);
     }
 
     public async ValueTask DisposeAsync()

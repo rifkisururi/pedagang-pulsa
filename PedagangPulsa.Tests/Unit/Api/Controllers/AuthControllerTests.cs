@@ -6,8 +6,11 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using PedagangPulsa.Api.Controllers;
 using PedagangPulsa.Api.DTOs;
+using Microsoft.Extensions.Options;
 using PedagangPulsa.Application.Abstractions.Caching;
+using PedagangPulsa.Application.Abstractions.Sms;
 using PedagangPulsa.Application.Services;
+using PedagangPulsa.Domain.Configuration;
 using PedagangPulsa.Domain.Entities;
 using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Tests.Helpers;
@@ -40,7 +43,15 @@ public class AuthControllerTests : IAsyncDisposable
             jwtIssuer: "PedagangPulsa",
             jwtAudience: "PedagangPulsaMobile");
 
-        _controller = new AuthController(_authService);
+        var smsClientMock = new Mock<ISmsClient>();
+        var phoneVerificationService = new PhoneVerificationService(
+            _context,
+            _redisServiceMock.Object,
+            smsClientMock.Object,
+            Options.Create(new SmsGateConfig()),
+            MockServices.CreateLogger<PhoneVerificationService>().Object);
+
+        _controller = new AuthController(_authService, phoneVerificationService);
     }
 
     [Fact]
