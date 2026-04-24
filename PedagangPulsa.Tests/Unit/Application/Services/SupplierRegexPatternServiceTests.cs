@@ -49,12 +49,12 @@ public class SupplierRegexPatternServiceTests : IAsyncLifetime
 
         // Assert
         result.Should().NotBeNull();
-        result.Id.Should().BeGreaterThan(0);
-        result.Label.Should().Be("Transaksi Sukses");
-        result.Regex.Should().Be(@"SUKSES.*?(?<sn>\d+)");
-        result.SupplierId.Should().Be(supplier.Id);
-        result.SeqNo.Should().Be(1);
-        result.IsActive.Should().BeTrue();
+        result!.Id.Should().BeGreaterThan(0);
+        result!.Label.Should().Be("Transaksi Sukses");
+        result!.Regex.Should().Be(@"SUKSES.*?(?<sn>\d+)");
+        result!.SupplierId.Should().Be(supplier.Id);
+        result!.SeqNo.Should().Be(1);
+        result!.IsActive.Should().BeTrue();
 
         var saved = await _context.SupplierRegexPatterns.FindAsync(result.Id);
         saved.Should().NotBeNull();
@@ -326,23 +326,23 @@ public class SupplierRegexPatternServiceTests : IAsyncLifetime
             IsActive = true
         });
 
-        created.Label = "New Label";
-        created.Regex = @"new_regex";
-        created.IsTrxSukses = false;
-        created.IsActive = false;
-        created.SampleMessage = "Updated sample";
+        created!.Label = "New Label";
+        created!.Regex = @"new_regex";
+        created!.IsTrxSukses = false;
+        created!.IsActive = false;
+        created!.SampleMessage = "Updated sample";
 
         // Act
         var result = await _service.UpdateAsync(created);
 
         // Assert
         result.Should().NotBeNull();
-        result.Label.Should().Be("New Label");
-        result.Regex.Should().Be(@"new_regex");
-        result.IsTrxSukses.Should().BeFalse();
-        result.IsActive.Should().BeFalse();
-        result.SampleMessage.Should().Be("Updated sample");
-        result.UpdatedAt.Should().NotBeNull();
+        result!.Label.Should().Be("New Label");
+        result!.Regex.Should().Be(@"new_regex");
+        result!.IsTrxSukses.Should().BeFalse();
+        result!.IsActive.Should().BeFalse();
+        result!.SampleMessage.Should().Be("Updated sample");
+        result!.UpdatedAt.Should().NotBeNull();
     }
 
     [Fact]
@@ -390,7 +390,7 @@ public class SupplierRegexPatternServiceTests : IAsyncLifetime
         });
 
         // Try to update pattern2 to have same SeqNo as pattern1
-        pattern2.SeqNo = 1;
+        pattern2!.SeqNo = 1;
 
         // Act
         var result = await _service.UpdateAsync(pattern2);
@@ -420,7 +420,7 @@ public class SupplierRegexPatternServiceTests : IAsyncLifetime
         });
 
         // Act
-        var result = await _service.DeleteAsync(created.Id);
+        var result = await _service.DeleteAsync(created!.Id);
 
         // Assert
         result.Should().BeTrue();

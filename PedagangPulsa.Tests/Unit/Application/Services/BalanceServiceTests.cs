@@ -62,8 +62,8 @@ public class BalanceServiceTests : IAsyncLifetime
         result.Should().BeTrue();
 
         // Refresh from database
-        _context.Entry(user).ReloadAsync().Wait();
-        _context.Entry(user.Balance!).ReloadAsync().Wait();
+        await _context.Entry(user).ReloadAsync();
+        await _context.Entry(user.Balance!).ReloadAsync();
 
         user.Balance.ActiveBalance.Should().Be(initialActive - holdAmount);
         user.Balance.HeldBalance.Should().Be(initialHeld + holdAmount);
@@ -87,8 +87,8 @@ public class BalanceServiceTests : IAsyncLifetime
         result.Should().BeFalse();
 
         // Refresh from database
-        _context.Entry(user).ReloadAsync().Wait();
-        _context.Entry(user.Balance!).ReloadAsync().Wait();
+        await _context.Entry(user).ReloadAsync();
+        await _context.Entry(user.Balance!).ReloadAsync();
 
         user.Balance.ActiveBalance.Should().Be(initialActive);
         user.Balance.HeldBalance.Should().Be(initialHeld);
@@ -148,7 +148,7 @@ public class BalanceServiceTests : IAsyncLifetime
         var holdAmount = 50000m;
         await _transactionService.HoldBalanceAsync(user.Id, holdAmount, "TestHold", Guid.NewGuid());
 
-        _context.Entry(user.Balance!).ReloadAsync().Wait();
+        await _context.Entry(user.Balance!).ReloadAsync();
         var initialHeld = user.Balance!.HeldBalance;
 
         // Act
@@ -158,7 +158,7 @@ public class BalanceServiceTests : IAsyncLifetime
         result.Should().BeTrue();
 
         // Refresh from database
-        _context.Entry(user.Balance).ReloadAsync().Wait();
+        await _context.Entry(user.Balance).ReloadAsync();
 
         user.Balance.HeldBalance.Should().Be(initialHeld - holdAmount);
         user.Balance.ActiveBalance.Should().BeGreaterThanOrEqualTo(0);
@@ -174,7 +174,7 @@ public class BalanceServiceTests : IAsyncLifetime
         var holdAmount = 50000m;
         await _transactionService.HoldBalanceAsync(user.Id, holdAmount, "TestHold", Guid.NewGuid());
 
-        _context.Entry(user.Balance!).ReloadAsync().Wait();
+        await _context.Entry(user.Balance!).ReloadAsync();
         var initialHeld = user.Balance!.HeldBalance;
 
         // Act
@@ -184,7 +184,7 @@ public class BalanceServiceTests : IAsyncLifetime
         result.Should().BeFalse();
 
         // Refresh from database
-        _context.Entry(user.Balance).ReloadAsync().Wait();
+        await _context.Entry(user.Balance).ReloadAsync();
 
         user.Balance.HeldBalance.Should().Be(initialHeld); // Unchanged
     }
@@ -224,7 +224,7 @@ public class BalanceServiceTests : IAsyncLifetime
         var holdAmount = 50000m;
         await _transactionService.HoldBalanceAsync(user.Id, holdAmount, "TestHold", Guid.NewGuid());
 
-        _context.Entry(user.Balance!).ReloadAsync().Wait();
+        await _context.Entry(user.Balance!).ReloadAsync();
         var initialActive = user.Balance!.ActiveBalance;
         var initialHeld = user.Balance.HeldBalance;
 
@@ -235,7 +235,7 @@ public class BalanceServiceTests : IAsyncLifetime
         result.Should().BeTrue();
 
         // Refresh from database
-        _context.Entry(user.Balance).ReloadAsync().Wait();
+        await _context.Entry(user.Balance).ReloadAsync();
 
         user.Balance.ActiveBalance.Should().Be(initialActive + holdAmount);
         user.Balance.HeldBalance.Should().Be(initialHeld - holdAmount);
@@ -251,7 +251,7 @@ public class BalanceServiceTests : IAsyncLifetime
         var holdAmount = 50000m;
         await _transactionService.HoldBalanceAsync(user.Id, holdAmount, "TestHold", Guid.NewGuid());
 
-        _context.Entry(user.Balance!).ReloadAsync().Wait();
+        await _context.Entry(user.Balance!).ReloadAsync();
         var initialActive = user.Balance!.ActiveBalance;
         var initialHeld = user.Balance.HeldBalance;
 
@@ -262,7 +262,7 @@ public class BalanceServiceTests : IAsyncLifetime
         result.Should().BeFalse();
 
         // Refresh from database
-        _context.Entry(user.Balance).ReloadAsync().Wait();
+        await _context.Entry(user.Balance).ReloadAsync();
 
         user.Balance.ActiveBalance.Should().Be(initialActive); // Unchanged
         user.Balance.HeldBalance.Should().Be(initialHeld); // Unchanged
@@ -317,7 +317,7 @@ public class BalanceServiceTests : IAsyncLifetime
         result.Should().BeTrue();
 
         // Refresh from database
-        _context.Entry(user.Balance).ReloadAsync().Wait();
+        await _context.Entry(user.Balance).ReloadAsync();
 
         user.Balance.ActiveBalance.Should().Be(initialBalance + creditAmount);
     }
@@ -346,7 +346,7 @@ public class BalanceServiceTests : IAsyncLifetime
         result.Should().BeTrue();
 
         // Refresh from database
-        _context.Entry(user.Balance).ReloadAsync().Wait();
+        await _context.Entry(user.Balance).ReloadAsync();
 
         user.Balance.ActiveBalance.Should().Be(initialBalance + debitAmount);
     }
@@ -375,7 +375,7 @@ public class BalanceServiceTests : IAsyncLifetime
         result.Should().BeFalse();
 
         // Refresh from database
-        _context.Entry(user.Balance).ReloadAsync().Wait();
+        await _context.Entry(user.Balance).ReloadAsync();
 
         user.Balance.ActiveBalance.Should().Be(currentBalance); // Unchanged
     }
@@ -423,10 +423,10 @@ public class BalanceServiceTests : IAsyncLifetime
         var refId1 = Guid.NewGuid();
         await _transactionService.HoldBalanceAsync(user.Id, 50000m, "Hold1", refId1);
 
-        _context.Entry(user.Balance!).ReloadAsync().Wait();
+        await _context.Entry(user.Balance!).ReloadAsync();
         await _transactionService.ReleaseHeldBalanceAsync(user.Id, 50000m, "Release1");
 
-        _context.Entry(user.Balance).ReloadAsync().Wait();
+        await _context.Entry(user.Balance!).ReloadAsync();
         await _balanceService.AdjustUserBalanceAsync(
             user.Id,
             100000m,
@@ -468,11 +468,5 @@ public class BalanceServiceTests : IAsyncLifetime
                 ledger.ActiveAfter.Should().Be(ledger.ActiveBefore + ledger.Amount);
             }
         }
-    }
-
-    public void Dispose()
-    {
-        _context.Database.EnsureDeleted();
-        _context.Dispose();
     }
 }

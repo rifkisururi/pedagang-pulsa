@@ -75,7 +75,7 @@ public class TransactionServiceTests : IAsyncLifetime
         result.Transaction.SellPrice.Should().Be(amount);
 
         // Verify balance was held
-        _context.Entry(user.Balance!).ReloadAsync().Wait();
+        await _context.Entry(user.Balance!).ReloadAsync();
         user.Balance!.ActiveBalance.Should().BeLessThan(1000000m); // Initial was 1,000,000
         user.Balance.HeldBalance.Should().BeGreaterThan(0);
     }
@@ -148,7 +148,7 @@ public class TransactionServiceTests : IAsyncLifetime
         result.Transaction.Should().NotBeNull();
 
         // Refresh from database
-        _context.Entry(user.Balance).ReloadAsync().Wait();
+        await _context.Entry(user.Balance).ReloadAsync();
 
         user.Balance.ActiveBalance.Should().Be(initialActive - amount);
         user.Balance.HeldBalance.Should().Be(initialHeld + amount);
@@ -214,7 +214,7 @@ public class TransactionServiceTests : IAsyncLifetime
             5500m
         );
 
-        _context.Entry(user.Balance!).ReloadAsync().Wait();
+        await _context.Entry(user.Balance!).ReloadAsync();
         var initialHeld = user.Balance!.HeldBalance;
         var initialActive = user.Balance.ActiveBalance;
 
@@ -225,14 +225,14 @@ public class TransactionServiceTests : IAsyncLifetime
         processResult.Should().BeTrue();
 
         // Refresh transaction
-        _context.Entry(createResult.Transaction).ReloadAsync().Wait();
+        await _context.Entry(createResult.Transaction).ReloadAsync();
         createResult.Transaction.Status.Should().Be(TransactionStatus.Success);
         createResult.Transaction.SerialNumber.Should().Be("SN12345");
         createResult.Transaction.SupplierTrxId.Should().Be("TRX123");
         createResult.Transaction.CompletedAt.Should().NotBeNull();
 
         // Verify held balance was debited
-        _context.Entry(user.Balance).ReloadAsync().Wait();
+        await _context.Entry(user.Balance).ReloadAsync();
         user.Balance.HeldBalance.Should().BeLessThan(initialHeld);
         user.Balance.ActiveBalance.Should().Be(initialActive); // Should not change on success
     }
@@ -267,7 +267,7 @@ public class TransactionServiceTests : IAsyncLifetime
             5500m
         );
 
-        _context.Entry(user.Balance!).ReloadAsync().Wait();
+        await _context.Entry(user.Balance!).ReloadAsync();
         var initialHeld = user.Balance!.HeldBalance;
         var initialActive = user.Balance.ActiveBalance;
 
@@ -285,7 +285,7 @@ public class TransactionServiceTests : IAsyncLifetime
         updatedTransaction.CompletedAt.Should().NotBeNull();
 
         // Verify held balance was released
-        _context.Entry(user.Balance).ReloadAsync().Wait();
+        await _context.Entry(user.Balance).ReloadAsync();
         user.Balance.HeldBalance.Should().BeLessThan(initialHeld);
         user.Balance.ActiveBalance.Should().BeGreaterThan(initialActive);
     }
@@ -397,7 +397,7 @@ public class TransactionServiceTests : IAsyncLifetime
         var holdAmount = 5500m;
         await _transactionService.HoldBalanceAsync(user.Id, holdAmount, "TestHold", Guid.NewGuid());
 
-        _context.Entry(user.Balance!).ReloadAsync().Wait();
+        await _context.Entry(user.Balance!).ReloadAsync();
         var initialHeld = user.Balance!.HeldBalance;
 
         // Act
@@ -407,7 +407,7 @@ public class TransactionServiceTests : IAsyncLifetime
         result.Should().BeTrue();
 
         // Refresh from database
-        _context.Entry(user.Balance).ReloadAsync().Wait();
+        await _context.Entry(user.Balance).ReloadAsync();
 
         user.Balance.HeldBalance.Should().Be(initialHeld - holdAmount);
         user.Balance.ActiveBalance.Should().BeGreaterThanOrEqualTo(0);
@@ -423,7 +423,7 @@ public class TransactionServiceTests : IAsyncLifetime
         var holdAmount = 5500m;
         await _transactionService.HoldBalanceAsync(user.Id, holdAmount, "TestHold", Guid.NewGuid());
 
-        _context.Entry(user.Balance!).ReloadAsync().Wait();
+        await _context.Entry(user.Balance!).ReloadAsync();
         var initialActive = user.Balance!.ActiveBalance;
         var initialHeld = user.Balance.HeldBalance;
 
@@ -434,15 +434,9 @@ public class TransactionServiceTests : IAsyncLifetime
         result.Should().BeTrue();
 
         // Refresh from database
-        _context.Entry(user.Balance).ReloadAsync().Wait();
+        await _context.Entry(user.Balance).ReloadAsync();
 
         user.Balance.ActiveBalance.Should().Be(initialActive + holdAmount);
         user.Balance.HeldBalance.Should().Be(initialHeld - holdAmount);
-    }
-
-    public void Dispose()
-    {
-        _context.Database.EnsureDeleted();
-        _context.Dispose();
     }
 }

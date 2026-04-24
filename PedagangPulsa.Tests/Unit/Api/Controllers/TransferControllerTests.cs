@@ -180,7 +180,7 @@ public class TransferControllerTests : IAsyncDisposable
 
         // Assert
         var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-        dynamic response = okResult.Value;
+        dynamic response = okResult.Value!;
 
         ((bool)response.success).Should().Be(true);
         ((int)response.totalRecords).Should().BeGreaterOrEqualTo(0);
@@ -198,7 +198,7 @@ public class TransferControllerTests : IAsyncDisposable
 
         // Assert
         var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-        dynamic response = okResult.Value;
+        dynamic response = okResult.Value!;
 
         ((bool)response.success).Should().Be(true);
         ((int)response.page).Should().Be(1);

@@ -101,7 +101,7 @@ public class UserServiceTests : IAsyncLifetime
         result.Username.Should().Be("testuser");
         result.Level.Should().NotBeNull();
         result.Balance.Should().NotBeNull();
-        result.Balance.ActiveBalance.Should().Be(50000);
+        result.Balance!.ActiveBalance.Should().Be(50000);
     }
 
     [Fact]
@@ -227,7 +227,7 @@ public class UserServiceTests : IAsyncLifetime
 
         // Assert
         result.Should().NotBeNull();
-        result.Name.Should().Be("Platinum");
+        result!.Name.Should().Be("Platinum");
         result.MarkupValue.Should().Be(0.5m);
     }
 
@@ -274,17 +274,17 @@ public class UserServiceTests : IAsyncLifetime
 
         var created = await _userLevelService.CreateLevelAsync(level);
 
-        created.MarkupValue = 3;
-        created.CanTransfer = false;
-        created.Description = "Updated";
+        created!.MarkupValue = 3;
+        created!.CanTransfer = false;
+        created!.Description = "Updated";
 
         // Act
         var result = await _userLevelService.UpdateLevelAsync(created);
 
         // Assert
         result.Should().NotBeNull();
-        result.MarkupValue.Should().Be(3);
-        result.CanTransfer.Should().BeFalse();
+        result!.MarkupValue.Should().Be(3);
+        result!.CanTransfer.Should().BeFalse();
         result.Description.Should().Be("Updated");
     }
 
@@ -316,7 +316,7 @@ public class UserServiceTests : IAsyncLifetime
         var created = await _userLevelService.CreateLevelAsync(level);
 
         // Act
-        var result = await _userLevelService.DeleteLevelAsync(created.Id);
+        var result = await _userLevelService.DeleteLevelAsync(created!.Id);
 
         // Assert
         result.Should().BeTrue();
@@ -584,7 +584,7 @@ public class UserServiceTests : IAsyncLifetime
             .FirstOrDefaultAsync(u => u.Id == referrer.Id);
 
         updatedReferrer.Should().NotBeNull();
-        updatedReferrer!.Balance.ActiveBalance.Should().Be(105000);
+        updatedReferrer!.Balance!.ActiveBalance.Should().Be(105000);
 
         var updatedLog = await _context.ReferralLogs.FindAsync(referralLog.Id);
         updatedLog.Should().NotBeNull();
@@ -664,7 +664,7 @@ public class UserServiceTests : IAsyncLifetime
             .FirstOrDefaultAsync(u => u.Id == referrer.Id);
 
         referrerWithBalance.Should().NotBeNull();
-        referrerWithBalance!.Balance.ActiveBalance.Should().Be(100000); // Unchanged
+        referrerWithBalance!.Balance!.ActiveBalance.Should().Be(100000); // Unchanged
     }
 
     #endregion

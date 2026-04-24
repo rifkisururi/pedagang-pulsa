@@ -271,7 +271,7 @@ public class AuthServiceTests : IAsyncLifetime
         shouldSetLockout.Should().BeTrue();
 
         // Refresh user from database
-        _context.Entry(user).ReloadAsync().Wait();
+        await _context.Entry(user).ReloadAsync();
         user.PinFailedAttempts.Should().Be(0);
         user.PinLockedAt.Should().BeNull();
     }
@@ -291,7 +291,7 @@ public class AuthServiceTests : IAsyncLifetime
         pinSessionToken.Should().BeEmpty();
         shouldSetLockout.Should().BeFalse();
 
-        _context.Entry(user).ReloadAsync().Wait();
+        await _context.Entry(user).ReloadAsync();
         user.PinFailedAttempts.Should().Be(1);
     }
 
@@ -312,7 +312,7 @@ public class AuthServiceTests : IAsyncLifetime
         pinSessionToken.Should().BeEmpty();
         shouldSetLockout.Should().BeFalse();
 
-        _context.Entry(user).ReloadAsync().Wait();
+        await _context.Entry(user).ReloadAsync();
         user.PinFailedAttempts.Should().Be(2);
     }
 
@@ -333,7 +333,7 @@ public class AuthServiceTests : IAsyncLifetime
         pinSessionToken.Should().BeEmpty();
         shouldSetLockout.Should().BeFalse();
 
-        _context.Entry(user).ReloadAsync().Wait();
+        await _context.Entry(user).ReloadAsync();
         user.PinFailedAttempts.Should().Be(3);
         user.PinLockedAt.Should().NotBeNull();
         user.PinLockedAt.Should().BeCloseTo(DateTime.UtcNow, precision: TimeSpan.FromSeconds(5));
@@ -447,11 +447,5 @@ public class AuthServiceTests : IAsyncLifetime
         // Assert - Should not throw
         var func = async () => await authServiceNoRedis.SetPinSessionAsync(Guid.NewGuid(), "test-token");
         await func.Should().NotThrowAsync();
-    }
-
-    public void Dispose()
-    {
-        _context.Database.EnsureDeleted();
-        _context.Dispose();
     }
 }

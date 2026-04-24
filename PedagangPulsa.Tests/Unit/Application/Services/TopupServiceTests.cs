@@ -62,11 +62,11 @@ public class TopupServiceTests : IAsyncLifetime
         result.Should().BeTrue();
 
         // Refresh from database
-        _context.Entry(user.Balance).ReloadAsync().Wait();
+        await _context.Entry(user.Balance).ReloadAsync();
         user.Balance.ActiveBalance.Should().Be(initialBalance + 100000m);
 
         // Verify topup status
-        _context.Entry(topup).ReloadAsync().Wait();
+        await _context.Entry(topup).ReloadAsync();
         topup.Status.Should().Be(TopupStatus.Approved);
         topup.ApprovedAt.Should().NotBeNull();
         topup.ApprovedBy.Should().NotBeNull();
@@ -104,7 +104,7 @@ public class TopupServiceTests : IAsyncLifetime
         result.Should().BeTrue();
 
         // Refresh from database
-        _context.Entry(user.Balance).ReloadAsync().Wait();
+        await _context.Entry(user.Balance).ReloadAsync();
         user.Balance.ActiveBalance.Should().Be(initialBalance + actualAmount);
         user.Balance.ActiveBalance.Should().NotBe(initialBalance + 100000m);
     }
@@ -218,11 +218,11 @@ public class TopupServiceTests : IAsyncLifetime
         result.Should().BeTrue();
 
         // Refresh from database
-        _context.Entry(user.Balance).ReloadAsync().Wait();
+        await _context.Entry(user.Balance).ReloadAsync();
         user.Balance.ActiveBalance.Should().Be(initialBalance); // Unchanged
 
         // Verify topup status
-        _context.Entry(topup).ReloadAsync().Wait();
+        await _context.Entry(topup).ReloadAsync();
         topup.Status.Should().Be(TopupStatus.Rejected);
         topup.RejectReason.Should().Be("Invalid proof of payment");
         topup.RejectedAt.Should().NotBeNull();
@@ -412,11 +412,5 @@ public class TopupServiceTests : IAsyncLifetime
         // Assert - In a real scenario, validation would happen before saving
         // For now, we're just testing the builder
         topup.Amount.Should().Be(invalidAmount);
-    }
-
-    public void Dispose()
-    {
-        _context.Database.EnsureDeleted();
-        _context.Dispose();
     }
 }

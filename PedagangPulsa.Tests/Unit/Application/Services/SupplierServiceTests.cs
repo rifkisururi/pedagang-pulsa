@@ -67,9 +67,9 @@ public class SupplierServiceTests : IAsyncLifetime
 
         // Assert
         result.Should().NotBeNull();
-        result.Name.Should().Be("Digiflazz");
-        result.Code.Should().Be("DIGI");
-        result.Id.Should().BeGreaterThan(0);
+        result!.Name.Should().Be("Digiflazz");
+        result!.Code.Should().Be("DIGI");
+        result!.Id.Should().BeGreaterThan(0);
 
         var savedSupplier = await _context.Suppliers.FindAsync(result.Id);
         savedSupplier.Should().NotBeNull();
@@ -120,22 +120,22 @@ public class SupplierServiceTests : IAsyncLifetime
 
         var created = await _supplierService.CreateSupplierAsync(supplier);
 
-        created.ApiBaseUrl = "https://api.new-digiflazz.com";
-        created.MemberId = "new_member_id";
-        created.Pin = "new_pin";
-        created.Password = "new_password";
-        created.TimeoutSeconds = 60;
-        created.IsActive = false;
+        created!.ApiBaseUrl = "https://api.new-digiflazz.com";
+        created!.MemberId = "new_member_id";
+        created!.Pin = "new_pin";
+        created!.Password = "new_password";
+        created!.TimeoutSeconds = 60;
+        created!.IsActive = false;
 
         // Act
         var result = await _supplierService.UpdateSupplierAsync(created);
 
         // Assert
         result.Should().NotBeNull();
-        result.ApiBaseUrl.Should().Be("https://api.new-digiflazz.com");
-        result.MemberId.Should().Be("new_member_id");
-        result.TimeoutSeconds.Should().Be(60);
-        result.IsActive.Should().BeFalse();
+        result!.ApiBaseUrl.Should().Be("https://api.new-digiflazz.com");
+        result!.MemberId.Should().Be("new_member_id");
+        result!.TimeoutSeconds.Should().Be(60);
+        result!.IsActive.Should().BeFalse();
     }
 
     [Fact]
@@ -168,12 +168,12 @@ public class SupplierServiceTests : IAsyncLifetime
         var created = await _supplierService.CreateSupplierAsync(supplier);
 
         // Act
-        var result = await _supplierService.DeleteSupplierAsync(created.Id);
+        var result = await _supplierService.DeleteSupplierAsync(created!.Id);
 
         // Assert
         result.Should().BeTrue();
 
-        var deletedSupplier = await _context.Suppliers.FindAsync(created.Id);
+        var deletedSupplier = await _context.Suppliers.FindAsync(created!.Id);
         deletedSupplier.Should().BeNull();
     }
 
@@ -212,7 +212,7 @@ public class SupplierServiceTests : IAsyncLifetime
         var supplierProduct = new SupplierProduct
         {
             ProductId = product.Id,
-            SupplierId = createdSupplier.Id,
+            SupplierId = createdSupplier!.Id,
             SupplierProductCode = "SP1",
             CostPrice = 5000,
             Seq = 1
@@ -244,7 +244,7 @@ public class SupplierServiceTests : IAsyncLifetime
         var created = await _supplierService.CreateSupplierAsync(supplier);
 
         // Act
-        var result = await _supplierService.GetSupplierByIdAsync(created.Id);
+        var result = await _supplierService.GetSupplierByIdAsync(created!.Id);
 
         // Assert
         result.Should().NotBeNull();
@@ -301,7 +301,7 @@ public class SupplierServiceTests : IAsyncLifetime
         var supplierProduct = new SupplierProduct
         {
             ProductId = product.Id,
-            SupplierId = createdSupplier.Id,
+            SupplierId = createdSupplier!.Id,
             SupplierProductCode = "SP1",
             CostPrice = 5500,
             Seq = 1,
@@ -313,8 +313,8 @@ public class SupplierServiceTests : IAsyncLifetime
 
         // Assert
         result.Should().NotBeNull();
-        result.SupplierProductCode.Should().Be("SP1");
-        result.CostPrice.Should().Be(5500);
+        result!.SupplierProductCode.Should().Be("SP1");
+        result!.CostPrice.Should().Be(5500);
     }
 
     [Fact]
@@ -338,7 +338,7 @@ public class SupplierServiceTests : IAsyncLifetime
         var supplierProduct1 = new SupplierProduct
         {
             ProductId = product.Id,
-            SupplierId = createdSupplier.Id,
+            SupplierId = createdSupplier!.Id,
             SupplierProductCode = "SP1",
             CostPrice = 5500,
             Seq = 1
@@ -424,7 +424,7 @@ public class SupplierServiceTests : IAsyncLifetime
         var supplierProduct = new SupplierProduct
         {
             ProductId = product.Id,
-            SupplierId = createdSupplier.Id,
+            SupplierId = createdSupplier!.Id,
             SupplierProductCode = "SP1",
             CostPrice = 5500,
             Seq = 1
@@ -443,10 +443,10 @@ public class SupplierServiceTests : IAsyncLifetime
 
         // Assert
         result.Should().NotBeNull();
-        result.SupplierProductCode.Should().Be("SP1-UPDATED");
-        result.CostPrice.Should().Be(5800);
-        result.Seq.Should().Be(2);
-        result.IsActive.Should().BeFalse();
+        result!.SupplierProductCode.Should().Be("SP1-UPDATED");
+        result!.CostPrice.Should().Be(5800);
+        result!.Seq.Should().Be(2);
+        result!.IsActive.Should().BeFalse();
     }
 
     [Fact]
@@ -470,7 +470,7 @@ public class SupplierServiceTests : IAsyncLifetime
         var supplierProduct = new SupplierProduct
         {
             ProductId = product.Id,
-            SupplierId = createdSupplier.Id,
+            SupplierId = createdSupplier!.Id,
             SupplierProductCode = "SP1",
             CostPrice = 5500,
             Seq = 1
@@ -604,7 +604,7 @@ public class SupplierServiceTests : IAsyncLifetime
         var created = await _supplierService.CreateSupplierAsync(supplier);
 
         // Act
-        var result = await _supplierService.UpdateSupplierBalanceAsync(created.Id, 100000);
+        var result = await _supplierService.UpdateSupplierBalanceAsync(created!.Id, 100000);
 
         // Assert
         result.Should().BeTrue();
@@ -615,7 +615,7 @@ public class SupplierServiceTests : IAsyncLifetime
 
         updatedSupplier.Should().NotBeNull();
         updatedSupplier!.Balance.Should().NotBeNull();
-        updatedSupplier.Balance.ActiveBalance.Should().Be(100000);
+        updatedSupplier.Balance!.ActiveBalance.Should().Be(100000);
     }
 
     [Fact]
@@ -642,7 +642,7 @@ public class SupplierServiceTests : IAsyncLifetime
 
         // Act
         var result = await _supplierBalanceService.DepositToSupplierAsync(
-            created.Id,
+            created!.Id,
             50000,
             "Initial deposit",
             "Test deposit",
@@ -654,7 +654,7 @@ public class SupplierServiceTests : IAsyncLifetime
         var supplierWithBalance = await _supplierBalanceService.GetSupplierWithBalanceAsync(created.Id);
         supplierWithBalance.Should().NotBeNull();
         supplierWithBalance!.Balance.Should().NotBeNull();
-        supplierWithBalance.Balance.ActiveBalance.Should().Be(50000);
+        supplierWithBalance.Balance!.ActiveBalance.Should().Be(50000);
 
         var ledger = await _context.SupplierBalanceLedgers
             .FirstOrDefaultAsync(l => l.SupplierId == created.Id);
@@ -674,7 +674,7 @@ public class SupplierServiceTests : IAsyncLifetime
         var created = await _supplierService.CreateSupplierAsync(supplier);
 
         // First deposit
-        await _supplierBalanceService.DepositToSupplierAsync(created.Id, 100000, "Initial deposit");
+        await _supplierBalanceService.DepositToSupplierAsync(created!.Id, 100000, "Initial deposit");
 
         // Act
         var result = await _supplierBalanceService.DebitFromSupplierAsync(
@@ -686,7 +686,7 @@ public class SupplierServiceTests : IAsyncLifetime
         result.Should().BeTrue();
 
         var supplierWithBalance = await _supplierBalanceService.GetSupplierWithBalanceAsync(created.Id);
-        supplierWithBalance!.Balance.ActiveBalance.Should().Be(95000);
+        supplierWithBalance!.Balance!.ActiveBalance.Should().Be(95000);
 
         var ledgers = await _context.SupplierBalanceLedgers
             .Where(l => l.SupplierId == created.Id)
@@ -707,7 +707,7 @@ public class SupplierServiceTests : IAsyncLifetime
         var supplier = new Supplier { Name = "Test Supplier", Code = "TS" };
         var created = await _supplierService.CreateSupplierAsync(supplier);
 
-        await _supplierBalanceService.DepositToSupplierAsync(created.Id, 10000, "Initial deposit");
+        await _supplierBalanceService.DepositToSupplierAsync(created!.Id, 10000, "Initial deposit");
 
         // Act - Try to debit more than available
         var result = await _supplierBalanceService.DebitFromSupplierAsync(
@@ -719,7 +719,7 @@ public class SupplierServiceTests : IAsyncLifetime
         result.Should().BeFalse();
 
         var supplierWithBalance = await _supplierBalanceService.GetSupplierWithBalanceAsync(created.Id);
-        supplierWithBalance!.Balance.ActiveBalance.Should().Be(10000); // Unchanged
+        supplierWithBalance!.Balance!.ActiveBalance.Should().Be(10000); // Unchanged
     }
 
     [Fact]

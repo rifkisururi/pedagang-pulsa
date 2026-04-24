@@ -236,11 +236,11 @@ public class ReferralServiceTests : IAsyncLifetime
         result.Should().BeTrue();
 
         // Verify balance was updated
-        _context.Entry(referrer.Balance).ReloadAsync().Wait();
+        await _context.Entry(referrer.Balance).ReloadAsync();
         referrer.Balance.ActiveBalance.Should().Be(initialBalance + 25000);
 
         // Verify log was updated
-        _context.Entry(referralLog).ReloadAsync().Wait();
+        await _context.Entry(referralLog).ReloadAsync();
         referralLog.BonusStatus.Should().Be(ReferralBonusStatus.Paid);
         referralLog.PaidAt.Should().NotBeNull();
     }
@@ -302,7 +302,7 @@ public class ReferralServiceTests : IAsyncLifetime
         result.Should().BeTrue();
 
         // Verify log was updated
-        _context.Entry(referralLog).ReloadAsync().Wait();
+        await _context.Entry(referralLog).ReloadAsync();
         referralLog.BonusStatus.Should().Be(ReferralBonusStatus.Cancelled);
         referralLog.CancelledAt.Should().NotBeNull();
         referralLog.CancellationReason.Should().Be("Test cancellation");

@@ -428,6 +428,6 @@ public class ProductControllerTests : IAsyncDisposable
     public class ApiResponse<T>
     {
         public bool success { get; set; }
-        public T data { get; set; }
+        public T data { get; set; } = default!;
     }
 }

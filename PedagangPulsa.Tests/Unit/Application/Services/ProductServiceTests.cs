@@ -115,7 +115,7 @@ public class ProductServiceTests : IAsyncLifetime
 
         // Assert
         result.Should().NotBeNull();
-        result.Id.Should().Be(product.Id);
+        result!.Id.Should().Be(product.Id);
         result.Name.Should().Be("Pulsa Telkomsel 5.000");
         result.Code.Should().Be("TSEL5");
 
@@ -236,7 +236,7 @@ public class ProductServiceTests : IAsyncLifetime
 
         // Assert
         result.Should().NotBeNull();
-        result.Name.Should().Be("Updated Name");
+        result!.Name.Should().Be("Updated Name");
         result.Code.Should().Be("TSEL5-UPDATED");
         result.Denomination.Should().Be(10000);
         result.Operator.Should().Be("Telkomsel Updated");
