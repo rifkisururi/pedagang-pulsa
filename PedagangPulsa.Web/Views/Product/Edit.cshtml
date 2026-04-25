@@ -92,11 +92,16 @@
                             <span asp-validation-for="ValidityText" class="text-danger small"></span>
                         </div>
                         <div class="col-md-3">
-                            <label asp-for="QuotaMb" class="form-label">Kuota (MB)</label>
+                            <label asp-for="QuotaMb" class="form-label">Kuota</label>
                             <div class="input-group">
-                                <input asp-for="QuotaMb" class="form-control" type="number" min="1" placeholder="5120" />
-                                <span class="input-group-text">MB</span>
+                                <input id="quotaInput" type="number" min="0" step="any" class="form-control" placeholder="5" />
+                                <select id="quotaUnit" class="form-select" style="max-width: 80px;">
+                                    <option value="GB">GB</option>
+                                    <option value="MB">MB</option>
+                                </select>
                             </div>
+                            <input asp-for="QuotaMb" type="hidden" id="quotaMbHidden" />
+                            <span class="text-muted small" id="quotaPreview"></span>
                             <span asp-validation-for="QuotaMb" class="text-danger small"></span>
                         </div>
                         <div class="col-md-3">
@@ -205,6 +210,33 @@
         $(document).ready(function() {
             var catId = $('#categoryId').val();
             if (catId) filterGroups(catId);
+
+            // Populate quota input from existing QuotaMb value
+            var quotaMb = parseInt($('#quotaMbHidden').val()) || 0;
+            if (quotaMb > 0 && quotaMb % 1024 === 0) {
+                $('#quotaInput').val(quotaMb / 1024);
+                $('#quotaUnit').val('GB');
+            } else if (quotaMb > 0) {
+                $('#quotaInput').val(quotaMb);
+                $('#quotaUnit').val('MB');
+            }
+            updateQuotaPreview();
         });
+
+        function updateQuotaPreview() {
+            var val = parseFloat($('#quotaInput').val()) || 0;
+            var unit = $('#quotaUnit').val();
+            var mb = unit === 'GB' ? Math.round(val * 1024) : Math.round(val);
+            $('#quotaMbHidden').val(mb > 0 ? mb : '');
+
+            if (val > 0) {
+                var display = unit === 'GB' ? val + ' GB = ' + mb.toLocaleString('id-ID') + ' MB' : mb.toLocaleString('id-ID') + ' MB';
+                $('#quotaPreview').text('= ' + display);
+            } else {
+                $('#quotaPreview').text('');
+            }
+        }
+
+        $('#quotaInput, #quotaUnit').on('input change', updateQuotaPreview);
     </script>
 }
