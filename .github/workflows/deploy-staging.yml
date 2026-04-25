@@ -111,21 +111,6 @@ jobs:
           if [ "$DELETE_COUNT" -gt 0 ]; then
             echo "Found $DELETE_COUNT old image(s) to delete"
             while IFS= read -r DIGEST; do
-              # First, remove any SHA tags pointing to this image
-              gcloud artifacts tags list \
-                --repository=docker-repo \
-                --location=${{ env.REGION }} \
-                --package=pedagangpulsa-api-dev \
-                --filter="version:$DIGEST" \
-                --format='value(name)' \
-                --quiet 2>/dev/null | while IFS= read -r TAG; do
-                  echo "  Removing tag: $TAG"
-                  gcloud artifacts tags delete "$TAG" \
-                    --repository=docker-repo \
-                    --location=${{ env.REGION }} \
-                    --package=pedagangpulsa-api-dev \
-                    --quiet 2>/dev/null || true
-                done
               echo "Deleting image: $DIGEST"
               gcloud artifacts docker images delete "${{ env.IMAGE }}@$DIGEST" \
                 --quiet --delete-tags 2>/dev/null && echo "  Deleted." || echo "  WARNING: failed to delete $DIGEST"

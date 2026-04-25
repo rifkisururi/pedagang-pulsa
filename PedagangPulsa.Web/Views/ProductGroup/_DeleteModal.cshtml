@@ -1,0 +1,57 @@
+@model PedagangPulsa.Web.Areas.Admin.ViewModels.ProductGroupViewModel
+
+<div class="modal-header bg-danger text-white">
+    <h5 class="modal-title">
+        <i class="bi bi-exclamation-triangle me-1"></i> Hapus Product Group
+    </h5>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+</div>
+<div class="modal-body">
+    <div class="text-center mb-3">
+        <i class="bi bi-trash text-danger" style="font-size: 3rem;"></i>
+    </div>
+    <p class="text-center mb-0">
+        Apakah Anda yakin ingin menghapus group <strong>"@Model.Name"</strong>?
+    </p>
+    @if (Model.CategoryId > 0)
+    {
+        <p class="text-center text-muted small mt-2">
+            Aksi ini tidak dapat dibatalkan.
+        </p>
+    }
+    <form asp-action="Delete" asp-controller="ProductGroup" method="post" id="deleteForm">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="Id" />
+    </form>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+        <i class="bi bi-x-circle"></i> Cancel
+    </button>
+    <button type="button" class="btn btn-danger" onclick="submitDeleteForm()">
+        <i class="bi bi-trash"></i> Hapus
+    </button>
+</div>
+
+<script>
+    function submitDeleteForm() {
+        var form = $('#deleteForm');
+        $.ajax({
+            url: form.attr('action'),
+            type: 'POST',
+            data: form.serialize(),
+            success: function (response) {
+                if (response.success) {
+                    $('#deleteModal').modal('hide');
+                    $('#groupsTable').DataTable().ajax.reload();
+                    toastr.success(response.message);
+                } else {
+                    toastr.error(response.message || 'Gagal menghapus group.');
+                }
+            },
+            error: function () {
+                toastr.error('Terjadi kesalahan saat menghapus data.');
+            }
+        });
+    }
+</script>

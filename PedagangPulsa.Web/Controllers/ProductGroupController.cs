@@ -91,11 +91,12 @@ public class ProductGroupController : Controller
     }
 
     [HttpGet]
+    [Authorize(Roles = "SuperAdmin")]
     public async Task<IActionResult> Create()
     {
         var model = new ProductGroupViewModel();
         await PopulateCategoriesAsync(model);
-        return View(model);
+        return PartialView("_FormModal", model);
     }
 
     [HttpPost]
@@ -105,8 +106,11 @@ public class ProductGroupController : Controller
     {
         if (!ModelState.IsValid)
         {
-            await PopulateCategoriesAsync(model);
-            return View(model);
+            var errors = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .ToList();
+            return Json(new { success = false, message = "Data tidak valid.", errors });
         }
 
         var group = new ProductGroup
@@ -123,11 +127,11 @@ public class ProductGroupController : Controller
         _context.ProductGroups.Add(group);
         await _context.SaveChangesAsync();
 
-        TempData["Success"] = "Product group berhasil ditambahkan.";
-        return RedirectToAction(nameof(Index));
+        return Json(new { success = true, message = "Product group berhasil ditambahkan." });
     }
 
     [HttpGet]
+    [Authorize(Roles = "SuperAdmin")]
     public async Task<IActionResult> Edit(int id)
     {
         var group = await _context.ProductGroups.FindAsync(id);
@@ -144,7 +148,7 @@ public class ProductGroupController : Controller
         };
 
         await PopulateCategoriesAsync(model);
-        return View(model);
+        return PartialView("_FormModal", model);
     }
 
     [HttpPost]
@@ -154,12 +158,18 @@ public class ProductGroupController : Controller
     {
         if (!ModelState.IsValid)
         {
-            await PopulateCategoriesAsync(model);
-            return View(model);
+            var errors = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .ToList();
+            return Json(new { success = false, message = "Data tidak valid.", errors });
         }
 
         var group = await _context.ProductGroups.FindAsync(model.Id);
-        if (group == null) return NotFound();
+        if (group == null)
+        {
+            return Json(new { success = false, message = "Product group tidak ditemukan." });
+        }
 
         group.Name = model.Name;
         group.Operator = model.Operator;
@@ -170,23 +180,47 @@ public class ProductGroupController : Controller
 
         await _context.SaveChangesAsync();
 
-        TempData["Success"] = "Product group berhasil diperbarui.";
-        return RedirectToAction(nameof(Index));
+        return Json(new { success = true, message = "Product group berhasil diperbarui." });
     }
 
-    [HttpPost]
-    [ValidateAntiForgeryToken]
+    [HttpGet]
     [Authorize(Roles = "SuperAdmin")]
     public async Task<IActionResult> Delete(int id)
     {
         var group = await _context.ProductGroups.FindAsync(id);
         if (group == null) return NotFound();
 
+        var model = new ProductGroupViewModel
+        {
+            Id = group.Id,
+            Name = group.Name,
+            CategoryId = group.CategoryId
+        };
+
+        return PartialView("_DeleteModal", model);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = "SuperAdmin")]
+    public async Task<IActionResult> Delete(ProductGroupViewModel model)
+    {
+        var group = await _context.ProductGroups.FindAsync(model.Id);
+        if (group == null)
+        {
+            return Json(new { success = false, message = "Product group tidak ditemukan." });
+        }
+
+        var productCount = await _context.Products.CountAsync(p => p.ProductGroupId == group.Id);
+        if (productCount > 0)
+        {
+            return Json(new { success = false, message = $"Group ini masih memiliki {productCount} produk. Hapus atau pindahkan produk terlebih dahulu." });
+        }
+
         _context.ProductGroups.Remove(group);
         await _context.SaveChangesAsync();
 
-        TempData["Success"] = "Product group berhasil dihapus.";
-        return RedirectToAction(nameof(Index));
+        return Json(new { success = true, message = "Product group berhasil dihapus." });
     }
 
     [HttpGet]

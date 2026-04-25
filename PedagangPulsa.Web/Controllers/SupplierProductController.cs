@@ -335,7 +335,8 @@ public class SupplierProductController : Controller
         [FromForm] string? search = null,
         [FromForm] string? productId = null,
         [FromForm] string? supplierId = null,
-        [FromForm] string? isActive = null)
+        [FromForm] string? isActive = null,
+        [FromForm] int? categoryId = null)
     {
         var page = (start / length) + 1;
         var pageSize = length;
@@ -345,6 +346,12 @@ public class SupplierProductController : Controller
             .Include(sp => sp.Product)
             .ThenInclude(p => p.Category)
             .AsQueryable();
+
+        // Apply category filter
+        if (categoryId.HasValue)
+        {
+            query = query.Where(sp => sp.Product != null && sp.Product.CategoryId == categoryId.Value);
+        }
 
         // Apply product filter
         if (!string.IsNullOrWhiteSpace(productId) && Guid.TryParse(productId, out var prodId))
@@ -420,6 +427,23 @@ public class SupplierProductController : Controller
             recordsFiltered = totalFiltered,
             data = data
         });
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "SuperAdmin,Admin")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ClearProductCache()
+    {
+        try
+        {
+            await _productCache.InvalidateProductCacheAsync();
+            return Json(new { success = true, message = "Product cache cleared successfully." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to clear product cache");
+            return Json(new { success = false, message = "Failed to clear product cache." });
+        }
     }
 
     #endregion

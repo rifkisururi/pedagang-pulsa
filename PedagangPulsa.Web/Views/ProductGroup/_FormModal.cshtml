@@ -1,0 +1,111 @@
+@model PedagangPulsa.Web.Areas.Admin.ViewModels.ProductGroupViewModel
+
+@{
+    var isEdit = Model.Id.HasValue;
+    var title = isEdit ? "Edit Product Group" : "Add Product Group";
+    var actionName = isEdit ? "Edit" : "Create";
+}
+
+<div class="modal-header bg-primary text-white">
+    <h5 class="modal-title">
+        <i class="bi bi-@(isEdit ? "pencil" : "plus-circle") me-1"></i> @title
+    </h5>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+</div>
+<div class="modal-body">
+    <form asp-action="@actionName" asp-controller="ProductGroup" method="post" id="productGroupForm">
+        @Html.AntiForgeryToken()
+        @if (isEdit)
+        {
+            <input type="hidden" asp-for="Id" />
+        }
+        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+        <div class="mb-3">
+            <label asp-for="Name" class="form-label">Nama Group <span class="text-danger">*</span></label>
+            <input asp-for="Name" class="form-control" placeholder="e.g., Pulsa Reg Telkomsel PROMO" required />
+            <span asp-validation-for="Name" class="text-danger small"></span>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="CategoryId" class="form-label">Category <span class="text-danger">*</span></label>
+            <select asp-for="CategoryId" class="form-select" required>
+                <option value="">-- Pilih Category --</option>
+                @foreach (var cat in Model.AvailableCategories)
+                {
+                    <option value="@cat.Id">@cat.Name</option>
+                }
+            </select>
+            <span asp-validation-for="CategoryId" class="text-danger small"></span>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label asp-for="Operator" class="form-label">Operator</label>
+                <input asp-for="Operator" class="form-control" placeholder="e.g., Telkomsel" />
+                <span asp-validation-for="Operator" class="text-danger small"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="SortOrder" class="form-label">Sort Order</label>
+                <input asp-for="SortOrder" class="form-control" type="number" value="0" />
+            </div>
+        </div>
+
+        <div class="mb-2">
+            <div class="form-check form-switch">
+                <input asp-for="IsActive" class="form-check-input" type="checkbox" />
+                <label asp-for="IsActive" class="form-check-label">Active</label>
+            </div>
+        </div>
+    </form>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+        <i class="bi bi-x-circle"></i> Cancel
+    </button>
+    <button type="button" class="btn btn-primary" onclick="submitProductGroupForm()">
+        <i class="bi bi-check-circle"></i> @(isEdit ? "Save Changes" : "Create Group")
+    </button>
+</div>
+
+<script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+<script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+
+<script>
+    function submitProductGroupForm() {
+        var form = $('#productGroupForm');
+        if (!form.valid()) return;
+
+        $.ajax({
+            url: form.attr('action'),
+            type: 'POST',
+            data: form.serialize(),
+            success: function (response) {
+                if (response.success) {
+                    $('#formModal').modal('hide');
+                    $('#groupsTable').DataTable().ajax.reload();
+                    toastr.success(response.message);
+                } else {
+                    if (response.errors) {
+                        // Render validation errors
+                        var summary = form.find('[data-valmsg-summary="true"]');
+                        if (summary.length) {
+                            summary.html('<ul>' + response.errors.map(function(e) { return '<li>' + e + '</li>'; }).join('') + '</ul>');
+                            summary.show();
+                        }
+                    } else {
+                        toastr.error(response.message || 'Gagal menyimpan data.');
+                    }
+                }
+            },
+            error: function (xhr) {
+                if (xhr.status === 400) {
+                    // Re-render form with validation errors
+                    $('#formModal .modal-content').html(xhr.responseText);
+                } else {
+                    toastr.error('Terjadi kesalahan saat menyimpan data.');
+                }
+            }
+        });
+    }
+</script>

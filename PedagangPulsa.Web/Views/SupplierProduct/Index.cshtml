@@ -11,8 +11,11 @@
     <div class="btn-toolbar mb-2 mb-md-0">
         @if (User.IsInRole("SuperAdmin") || User.IsInRole("Admin"))
         {
-            <button type="button" class="btn btn-primary" id="btnAddNew">
+            <button type="button" class="btn btn-primary me-2" id="btnAddNew">
                 <i class="bi bi-plus-circle"></i> Add Mapping
+            </button>
+            <button type="button" class="btn btn-outline-warning" id="btnClearCache">
+                <i class="bi bi-arrow-repeat"></i> Clear Product Cache
             </button>
         }
     </div>
@@ -21,11 +24,17 @@
 <div class="card shadow-sm mb-4">
     <div class="card-header bg-white py-3">
         <div class="row g-3 align-items-end">
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label small fw-bold">Search</label>
                 <input type="text" class="form-control" id="searchInput" placeholder="Search code, name...">
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Category</label>
+                <select class="form-select" id="categoryFilter">
+                    <option value="">All Categories</option>
+                </select>
+            </div>
+            <div class="col-md-2">
                 <label class="form-label small fw-bold">Product</label>
                 <select class="form-select select2-filter" id="productFilter">
                     <option value="">All Products</option>
@@ -37,15 +46,15 @@
                     <option value="">All Suppliers</option>
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <label class="form-label small fw-bold">Status</label>
                 <select class="form-select" id="statusFilter">
-                    <option value="">All Status</option>
+                    <option value="">All</option>
                     <option value="true">Active</option>
                     <option value="false">Inactive</option>
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <label class="form-label small fw-bold">&nbsp;</label>
                 <button type="button" class="btn btn-outline-secondary w-100" id="resetFilters">
                     <i class="bi bi-arrow-clockwise"></i> Reset
@@ -188,6 +197,15 @@
                 dropdownParent: $('#supplierProductModal')
             });
 
+            // Load categories for filter
+            $.get('/Product/GetCategories', function(data) {
+                if (data && data.length > 0) {
+                    $.each(data, function(i, item) {
+                        $('#categoryFilter').append('<option value="' + item.id + '">' + item.name + '</option>');
+                    });
+                }
+            });
+
             // Load suppliers for filter & modal
             $.get('/Supplier/GetSuppliersSelect', function(data) {
                 if (data && data.length > 0) {
@@ -220,6 +238,7 @@
                     type: 'POST',
                     data: function(d) {
                         d.search = $('#searchInput').val();
+                        d.categoryId = $('#categoryFilter').val() || null;
                         d.productId = $('#productFilter').val();
                         d.supplierId = $('#supplierFilter').val();
                         d.isActive = $('#statusFilter').val();
@@ -383,7 +402,7 @@
             });
 
             // Apply filters on change
-            $('#searchInput, #productFilter, #supplierFilter, #statusFilter').on('change', function() {
+            $('#searchInput, #categoryFilter, #productFilter, #supplierFilter, #statusFilter').on('change', function() {
                 table.ajax.reload();
             });
 
@@ -396,11 +415,41 @@
             // Reset filters
             $('#resetFilters').on('click', function() {
                 $('#searchInput').val('');
+                $('#categoryFilter').val('');
                 $('#productFilter').val('').trigger('change');
                 $('#supplierFilter').val('').trigger('change');
                 $('#statusFilter').val('');
                 table.ajax.reload();
             });
+
+            // Clear Product Cache
+            $('#btnClearCache').on('click', function() {
+                if (!confirm('Clear all product cache? This will force the API to fetch fresh data on next request.')) return;
+
+                var $btn = $(this);
+                $btn.prop('disabled', true).html('<i class="bi bi-arrow-repeat spin"></i> Clearing...');
+
+                var token = $('input[name="__RequestVerificationToken"]').val();
+                $.post('/SupplierProduct/ClearProductCache', { __RequestVerificationToken: token }, function(response) {
+                    $btn.prop('disabled', false).html('<i class="bi bi-arrow-repeat"></i> Clear Product Cache');
+                    if (response.success) {
+                        showToast(response.message, 'success');
+                    } else {
+                        showToast(response.message, 'danger');
+                    }
+                }).fail(function() {
+                    $btn.prop('disabled', false).html('<i class="bi bi-arrow-repeat"></i> Clear Product Cache');
+                    showToast('Failed to clear product cache.', 'danger');
+                });
+            });
+
+            function showToast(message, type) {
+                var $toast = $('<div class="alert alert-' + type + ' position-fixed top-0 end-0 m-3 z-index-9999" style="min-width:300px;">' +
+                    '<button type="button" class="btn-close float-end" onclick="$(this).parent().remove()"></button>' +
+                    message + '</div>');
+                $('body').append($toast);
+                setTimeout(function() { $toast.fadeOut(function() { $(this).remove(); }); }, 3000);
+            }
         });
 
         function formatCurrency(amount) {
