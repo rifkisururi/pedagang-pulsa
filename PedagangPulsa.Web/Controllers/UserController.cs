@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PedagangPulsa.Application.Services;
 using PedagangPulsa.Domain.Entities;
+using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Web.Areas.Admin.ViewModels;
 
 namespace PedagangPulsa.Web.Controllers;
@@ -45,7 +46,8 @@ public class UserController : Controller
             HeldBalance = user.Balance?.HeldBalance ?? 0,
             CreatedAt = user.CreatedAt.ToString("dd MMM yyyy HH:mm"),
             ReferralCode = user.ReferralCode,
-            ReferredBy = user.Referrer?.UserName
+            ReferredBy = user.Referrer?.UserName,
+            PinLockedAt = user.PinLockedAt
         };
 
         // Map balance ledger
@@ -171,6 +173,130 @@ public class UserController : Controller
 
         return RedirectToAction(nameof(Details), new { id = model.UserId });
     }
+
+    #region User Management Actions
+
+    [HttpPost]
+    [Authorize(Roles = "SuperAdmin,Admin")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UnblockPin(Guid id)
+    {
+        var result = await _userService.UnblockPinAsync(id);
+        if (!result)
+        {
+            return Json(new { success = false, message = "User not found." });
+        }
+        return Json(new { success = true, message = "PIN unblocked successfully." });
+    }
+
+    [HttpGet]
+    [Authorize(Roles = "SuperAdmin,Admin")]
+    public async Task<IActionResult> ResetPassword(Guid id)
+    {
+        var user = await _userService.GetUserByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        var model = new ResetPasswordViewModel
+        {
+            UserId = user.Id,
+            Username = user.UserName
+        };
+
+        return View(model);
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "SuperAdmin,Admin")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResetPassword(ResetPasswordViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var result = await _userService.ResetPasswordAsync(model.UserId, model.NewPassword);
+        if (!result)
+        {
+            ModelState.AddModelError("", "Failed to reset password. User not found.");
+            return View(model);
+        }
+
+        TempData["Success"] = "Password reset successfully.";
+        return RedirectToAction(nameof(Details), new { id = model.UserId });
+    }
+
+    [HttpGet]
+    [Authorize(Roles = "SuperAdmin,Admin")]
+    public async Task<IActionResult> ResetPin(Guid id)
+    {
+        var user = await _userService.GetUserByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        var model = new ResetPinViewModel
+        {
+            UserId = user.Id,
+            Username = user.UserName
+        };
+
+        return View(model);
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "SuperAdmin,Admin")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResetPin(ResetPinViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var result = await _userService.ResetPinAsync(model.UserId, model.NewPin);
+        if (!result)
+        {
+            ModelState.AddModelError("", "Failed to reset PIN. User not found.");
+            return View(model);
+        }
+
+        TempData["Success"] = "PIN reset successfully.";
+        return RedirectToAction(nameof(Details), new { id = model.UserId });
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "SuperAdmin,Admin")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetStatus(Guid id, UserStatus status)
+    {
+        var user = await _userService.GetUserByIdAsync(id);
+        if (user == null)
+        {
+            return Json(new { success = false, message = "User not found." });
+        }
+
+        // Prevent toggling Suspended status here (use Suspend page instead)
+        if (status == UserStatus.Suspended)
+        {
+            return Json(new { success = false, message = "Use Suspend action instead." });
+        }
+
+        var result = await _userService.SetUserStatusAsync(id, status);
+        if (!result)
+        {
+            return Json(new { success = false, message = "Failed to update user status." });
+        }
+
+        var label = status == UserStatus.Active ? "activated" : "deactivated";
+        return Json(new { success = true, message = $"User {label} successfully." });
+    }
+
+    #endregion
 
     #region AJAX Endpoints for DataTables
 

@@ -668,4 +668,215 @@ public class UserServiceTests : IAsyncLifetime
     }
 
     #endregion
+
+    #region User Management Tests (Unblock PIN, Reset Password, Reset PIN, Set Status)
+
+    [Fact]
+    public async Task UnblockPinAsync_WithLockedUser_ResetsPinFields()
+    {
+        // Arrange
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "lockeduser",
+            PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
+            PinFailedAttempts = 3,
+            PinLockedAt = DateTime.UtcNow,
+            LevelId = _regularLevelId,
+            Status = UserStatus.Active
+        };
+
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _userService.UnblockPinAsync(user.Id);
+
+        // Assert
+        result.Should().BeTrue();
+
+        var updatedUser = await _context.Users.FindAsync(user.Id);
+        updatedUser.Should().NotBeNull();
+        updatedUser!.PinFailedAttempts.Should().Be(0);
+        updatedUser.PinLockedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UnblockPinAsync_WithInvalidId_ReturnsFalse()
+    {
+        // Act
+        var result = await _userService.UnblockPinAsync(Guid.NewGuid());
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_WithValidData_UpdatesPasswordHash()
+    {
+        // Arrange
+        var oldHash = BCrypt.Net.BCrypt.HashPassword("oldpass", workFactor: 12);
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "passtest",
+            PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
+            PasswordHash = oldHash,
+            LevelId = _regularLevelId,
+            Status = UserStatus.Active
+        };
+
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _userService.ResetPasswordAsync(user.Id, "newpass123");
+
+        // Assert
+        result.Should().BeTrue();
+
+        var updatedUser = await _context.Users.FindAsync(user.Id);
+        updatedUser.Should().NotBeNull();
+        updatedUser!.PasswordHash.Should().NotBe(oldHash);
+        BCrypt.Net.BCrypt.Verify("newpass123", updatedUser.PasswordHash).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_WithShortPassword_ReturnsFalse()
+    {
+        // Act
+        var result = await _userService.ResetPasswordAsync(Guid.NewGuid(), "abc");
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_WithInvalidId_ReturnsFalse()
+    {
+        // Act
+        var result = await _userService.ResetPasswordAsync(Guid.NewGuid(), "newpass123");
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ResetPinAsync_WithValidData_UpdatesPinHash()
+    {
+        // Arrange
+        var oldPinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12);
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "pintest",
+            PinHash = oldPinHash,
+            PinFailedAttempts = 5,
+            PinLockedAt = DateTime.UtcNow,
+            LevelId = _regularLevelId,
+            Status = UserStatus.Active
+        };
+
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _userService.ResetPinAsync(user.Id, "654321");
+
+        // Assert
+        result.Should().BeTrue();
+
+        var updatedUser = await _context.Users.FindAsync(user.Id);
+        updatedUser.Should().NotBeNull();
+        updatedUser!.PinHash.Should().NotBe(oldPinHash);
+        BCrypt.Net.BCrypt.Verify("654321", updatedUser.PinHash).Should().BeTrue();
+        updatedUser.PinFailedAttempts.Should().Be(0);
+        updatedUser.PinLockedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ResetPinAsync_WithNonDigitPin_ReturnsFalse()
+    {
+        // Act
+        var result = await _userService.ResetPinAsync(Guid.NewGuid(), "abc123");
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ResetPinAsync_WithInvalidId_ReturnsFalse()
+    {
+        // Act
+        var result = await _userService.ResetPinAsync(Guid.NewGuid(), "123456");
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SetUserStatusAsync_Activate_SetsStatusToActive()
+    {
+        // Arrange
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "inactivetest",
+            PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
+            LevelId = _regularLevelId,
+            Status = UserStatus.Inactive
+        };
+
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _userService.SetUserStatusAsync(user.Id, UserStatus.Active);
+
+        // Assert
+        result.Should().BeTrue();
+
+        var updatedUser = await _context.Users.FindAsync(user.Id);
+        updatedUser.Should().NotBeNull();
+        updatedUser!.Status.Should().Be(UserStatus.Active);
+    }
+
+    [Fact]
+    public async Task SetUserStatusAsync_Deactivate_SetsStatusToInactive()
+    {
+        // Arrange
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "activetest",
+            PinHash = BCrypt.Net.BCrypt.HashPassword("123456", workFactor: 12),
+            LevelId = _regularLevelId,
+            Status = UserStatus.Active
+        };
+
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _userService.SetUserStatusAsync(user.Id, UserStatus.Inactive);
+
+        // Assert
+        result.Should().BeTrue();
+
+        var updatedUser = await _context.Users.FindAsync(user.Id);
+        updatedUser.Should().NotBeNull();
+        updatedUser!.Status.Should().Be(UserStatus.Inactive);
+    }
+
+    [Fact]
+    public async Task SetUserStatusAsync_WithInvalidId_ReturnsFalse()
+    {
+        // Act
+        var result = await _userService.SetUserStatusAsync(Guid.NewGuid(), UserStatus.Active);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    #endregion
 }

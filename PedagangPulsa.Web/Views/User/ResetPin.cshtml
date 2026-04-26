@@ -1,0 +1,53 @@
+@model PedagangPulsa.Web.Areas.Admin.ViewModels.ResetPinViewModel
+
+@{
+    ViewData["Title"] = "Reset PIN";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Reset PIN</h1>
+    <a asp-action="Details" asp-route-id="@Model.UserId" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Details
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="card-title mb-0"><i class="bi bi-exclamation-triangle"></i> Reset PIN for @Model.Username</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning small">
+                    <i class="bi bi-info-circle"></i>
+                    This will set a new 6-digit PIN for the user. The user will need to use the new PIN for transactions.
+                </div>
+                <form asp-action="ResetPin" method="post">
+                    <input type="hidden" asp-for="UserId" />
+                    <input type="hidden" asp-for="Username" />
+
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="NewPin" class="form-label fw-bold"></label>
+                        <input asp-for="NewPin" class="form-control" maxlength="6" placeholder="6 digit angka" inputmode="numeric" />
+                        <span asp-validation-for="NewPin" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="ConfirmPin" class="form-label fw-bold"></label>
+                        <input asp-for="ConfirmPin" class="form-control" maxlength="6" placeholder="Ulangi PIN baru" inputmode="numeric" />
+                        <span asp-validation-for="ConfirmPin" class="text-danger small"></span>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-pin-angle"></i> Reset PIN
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

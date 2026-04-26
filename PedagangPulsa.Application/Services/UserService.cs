@@ -3,6 +3,7 @@ using MediatR;
 using PedagangPulsa.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using PedagangPulsa.Application.Abstractions.Persistence;
+using PedagangPulsa.Application.Abstractions.Caching;
 using PedagangPulsa.Domain.Entities;
 
 namespace PedagangPulsa.Application.Services;
@@ -10,10 +11,12 @@ namespace PedagangPulsa.Application.Services;
 public class UserService
 {
     private readonly IAppDbContext _context;
+    private readonly IRedisService? _redisService;
 
-    public UserService(IAppDbContext context)
+    public UserService(IAppDbContext context, IRedisService? redisService = null)
     {
         _context = context;
+        _redisService = redisService;
     }
 
     public async Task<(List<User> Users, int TotalFiltered, int TotalRecords)> GetUsersPagedAsync(
@@ -190,6 +193,91 @@ public class UserService
         await _context.SaveChangesAsync();
 
         // Log to audit (placeholder)
+        return true;
+    }
+
+    public async Task<bool> UnblockPinAsync(Guid userId)
+    {
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null) return false;
+
+        user.PinFailedAttempts = 0;
+        user.PinLockedAt = null;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        // Clear Redis lockout key
+        if (_redisService != null)
+        {
+            try
+            {
+                await _redisService.RemoveAsync($"pin_lockout:{userId}");
+            }
+            catch
+            {
+                // Redis unavailable — ignore
+            }
+        }
+
+        return true;
+    }
+
+    public async Task<bool> ResetPasswordAsync(Guid userId, string newPassword)
+    {
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 6)
+            return false;
+
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null) return false;
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> ResetPinAsync(Guid userId, string newPin)
+    {
+        if (string.IsNullOrWhiteSpace(newPin) || newPin.Length != 6 || !newPin.All(char.IsDigit))
+            return false;
+
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null) return false;
+
+        user.PinHash = BCrypt.Net.BCrypt.HashPassword(newPin);
+        user.PinFailedAttempts = 0;
+        user.PinLockedAt = null;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        // Clear Redis lockout key
+        if (_redisService != null)
+        {
+            try
+            {
+                await _redisService.RemoveAsync($"pin_lockout:{userId}");
+            }
+            catch
+            {
+                // Redis unavailable — ignore
+            }
+        }
+
+        return true;
+    }
+
+    public async Task<bool> SetUserStatusAsync(Guid userId, UserStatus status)
+    {
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null) return false;
+
+        user.Status = status;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
         return true;
     }
 

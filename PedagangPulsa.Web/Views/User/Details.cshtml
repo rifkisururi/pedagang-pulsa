@@ -82,12 +82,29 @@
                         <a asp-action="EditLevel" asp-route-id="@Model.Id" class="btn btn-outline-primary">
                             <i class="bi bi-gear"></i> Edit Level
                         </a>
+                        <a asp-action="ResetPassword" asp-route-id="@Model.Id" class="btn btn-outline-danger">
+                            <i class="bi bi-key"></i> Reset Password
+                        </a>
+                        <a asp-action="ResetPin" asp-route-id="@Model.Id" class="btn btn-outline-info">
+                            <i class="bi bi-pin-angle"></i> Reset PIN
+                        </a>
+                        <button type="button" class="btn btn-outline-success" id="btnToggleStatus"
+                                data-user-id="@Model.Id"
+                                data-current-status="@Model.Status">
+                            <i class="bi bi-toggle-on"></i> @(Model.Status == "Active" ? "Deactivate" : "Activate")
+                        </button>
                     }
                     @if (User.IsInRole("SuperAdmin"))
                     {
                         <a asp-action="Suspend" asp-route-id="@Model.Id" class="btn btn-outline-warning">
                             <i class="bi bi-lock"></i> @(Model.Status == "Suspended" ? "Unsuspend" : "Suspend")
                         </a>
+                    }
+                    @if ((User.IsInRole("SuperAdmin") || User.IsInRole("Admin")) && Model.PinLockedAt != null)
+                    {
+                        <button type="button" class="btn btn-outline-secondary" id="btnUnblockPin" data-user-id="@Model.Id">
+                            <i class="bi bi-unlock"></i> Unblock PIN
+                        </button>
                     }
                 </div>
             </div>
@@ -232,6 +249,71 @@
             // Load user transactions when tab is shown
             $('button[data-bs-target="#transactions"]').on('shown.bs.tab', function() {
                 loadUserTransactions();
+            });
+
+            // Toggle Activate/Deactivate
+            $('#btnToggleStatus').on('click', function() {
+                var btn = $(this);
+                var userId = btn.data('user-id');
+                var currentStatus = btn.data('current-status');
+                var newStatus = currentStatus === 'Active' ? '1' : '0'; // 1=Inactive, 0=Active
+                var action = currentStatus === 'Active' ? 'deactivate' : 'activate';
+
+                if (!confirm('Are you sure you want to ' + action + ' this user?')) return;
+
+                btn.prop('disabled', true).html('<i class="bi bi-spinner fa-spin"></i> Processing...');
+
+                $.ajax({
+                    url: '/User/SetStatus',
+                    type: 'POST',
+                    data: { id: userId, status: newStatus },
+                    headers: {
+                        'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            window.location.reload();
+                        } else {
+                            alert(response.message || 'Failed to update status.');
+                            btn.prop('disabled', false);
+                        }
+                    },
+                    error: function() {
+                        alert('An error occurred.');
+                        btn.prop('disabled', false);
+                    }
+                });
+            });
+
+            // Unblock PIN
+            $('#btnUnblockPin').on('click', function() {
+                var btn = $(this);
+                var userId = btn.data('user-id');
+
+                if (!confirm('Unblock PIN for this user?')) return;
+
+                btn.prop('disabled', true).html('<i class="bi bi-spinner fa-spin"></i> Processing...');
+
+                $.ajax({
+                    url: '/User/UnblockPin',
+                    type: 'POST',
+                    data: { id: userId },
+                    headers: {
+                        'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            window.location.reload();
+                        } else {
+                            alert(response.message || 'Failed to unblock PIN.');
+                            btn.prop('disabled', false);
+                        }
+                    },
+                    error: function() {
+                        alert('An error occurred.');
+                        btn.prop('disabled', false);
+                    }
+                });
             });
 
             function loadUserTransactions() {

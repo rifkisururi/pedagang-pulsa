@@ -52,8 +52,7 @@ public class PingController : ControllerBase
         string? serverIp = null;
         int serverIpMs = -1;
         try
-        {
-            using var sw = Stopwatch.StartNew();
+        {            var sw = Stopwatch.StartNew();
             using var directClient = new HttpClient();
             var directResponse = await directClient.GetStringAsync(ipifyUrl);
             serverIpMs = (int)sw.ElapsedMilliseconds;
@@ -74,7 +73,7 @@ public class PingController : ControllerBase
             if (handler != null)
             {
                 proxyUsed = true;
-                using var sw = Stopwatch.StartNew();
+                var sw = Stopwatch.StartNew();
                 using var proxyClient = new HttpClient(handler);
                 var proxyResponse = await proxyClient.GetStringAsync(ipifyUrl);
                 proxyIpMs = (int)sw.ElapsedMilliseconds;
