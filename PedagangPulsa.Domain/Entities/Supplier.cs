@@ -10,6 +10,7 @@ public class Supplier
     public string? Pin { get; set; }
     public string? Password { get; set; }
     public short TimeoutSeconds { get; set; } = 30;
+    public string SupplierSoftware { get; set; } = "Otomax";
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

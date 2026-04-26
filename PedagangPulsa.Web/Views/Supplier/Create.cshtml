@@ -28,7 +28,12 @@
                             <input asp-for="Name" class="form-control" placeholder="e.g., Digiflazz" required />
                             <span asp-validation-for="Name" class="text-danger small"></span>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-3">
+                            <label asp-for="SupplierSoftware" class="form-label">Software Supplier <span class="text-danger">*</span></label>
+                            <input asp-for="SupplierSoftware" class="form-control" placeholder="Otomax" value="Otomax" required />
+                            <span asp-validation-for="SupplierSoftware" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-3">
                             <label asp-for="TimeoutSeconds" class="form-label">Timeout (seconds) <span class="text-danger">*</span></label>
                             <input asp-for="TimeoutSeconds" class="form-control" type="number" min="10" max="120" value="30" required />
                             <span asp-validation-for="TimeoutSeconds" class="text-danger small"></span>

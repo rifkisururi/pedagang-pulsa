@@ -189,7 +189,7 @@ public class TransactionServiceTests : IAsyncLifetime
         // Arrange
         // Setup mock supplier
         _adapterFactoryMock
-            .Setup(x => x.CreateAdapter("DIGIFLAZZ", It.IsAny<ILoggerFactory>()))
+            .Setup(x => x.CreateAdapter(It.IsAny<string>(), It.IsAny<ILoggerFactory>()))
             .Returns(_supplierAdapterMock.Object);
 
         _supplierAdapterMock
@@ -243,7 +243,7 @@ public class TransactionServiceTests : IAsyncLifetime
         // Arrange
         // Setup mock supplier to fail
         _adapterFactoryMock
-            .Setup(x => x.CreateAdapter("DIGIFLAZZ", It.IsAny<ILoggerFactory>()))
+            .Setup(x => x.CreateAdapter(It.IsAny<string>(), It.IsAny<ILoggerFactory>()))
             .Returns(_supplierAdapterMock.Object);
 
         _supplierAdapterMock
@@ -296,7 +296,7 @@ public class TransactionServiceTests : IAsyncLifetime
         // Arrange
         // Setup mock supplier
         _adapterFactoryMock
-            .Setup(x => x.CreateAdapter("DIGIFLAZZ", It.IsAny<ILoggerFactory>()))
+            .Setup(x => x.CreateAdapter(It.IsAny<string>(), It.IsAny<ILoggerFactory>()))
             .Returns(_supplierAdapterMock.Object);
 
         _supplierAdapterMock
@@ -337,7 +337,7 @@ public class TransactionServiceTests : IAsyncLifetime
     {
         // Arrange
         _adapterFactoryMock
-            .Setup(x => x.CreateAdapter("DIGIFLAZZ", It.IsAny<ILoggerFactory>()))
+            .Setup(x => x.CreateAdapter(It.IsAny<string>(), It.IsAny<ILoggerFactory>()))
             .Returns(_supplierAdapterMock.Object);
 
         _supplierAdapterMock

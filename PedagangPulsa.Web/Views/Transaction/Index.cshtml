@@ -98,11 +98,11 @@
                     { data: 'createdAt' },
                     { data: 'username' },
                     { data: 'productName' },
-                    { data: 'destinationNumber' },
+                    { data: 'destination' },
                     {
-                        data: 'amount',
+                        data: 'sellPrice',
                         render: function(data) {
-                            return 'Rp ' + data.toLocaleString('id-ID');
+                            return data != null ? 'Rp ' + data.toLocaleString('id-ID') : '-';
                         }
                     },
                     {

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -14,6 +15,7 @@ using PedagangPulsa.Infrastructure.Data;
 using PedagangPulsa.Infrastructure.Fcm;
 using PedagangPulsa.Infrastructure.Sms;
 using PedagangPulsa.Infrastructure.Suppliers;
+using PedagangPulsa.Infrastructure.Suppliers.Otomax;
 using StackExchange.Redis;
 
 namespace PedagangPulsa.Infrastructure.DependencyInjection;
@@ -37,6 +39,13 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddScoped<ISupplierAdapterFactory, SupplierAdapterFactory>();
+        services.AddSingleton<OtomaxSettings>(sp =>
+        {
+            var configuration = sp.GetRequiredService<IConfiguration>();
+            var settings = new OtomaxSettings();
+            configuration.GetSection(OtomaxSettings.SectionName).Bind(settings);
+            return settings;
+        });
         services.AddHttpClient();
         services.AddHttpClient("Fcm", client => client.Timeout = TimeSpan.FromSeconds(10));
         services.AddHttpClient("GoogleAuth", client => client.Timeout = TimeSpan.FromSeconds(10));

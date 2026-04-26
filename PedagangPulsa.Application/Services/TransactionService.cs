@@ -66,6 +66,7 @@ public class TransactionService
         var transaction = new Transaction
         {
             Id = Guid.NewGuid(),
+            ReferenceId = GenerateReferenceId(),
             UserId = userId,
             ProductId = productId,
             Destination = destination,
@@ -295,6 +296,12 @@ public class TransactionService
         {
             var attemptResult = await TrySupplierAsync(transaction, supplierProduct);
 
+            if (attemptResult.IsQueued)
+            {
+                await QueueTransactionAsync(transaction, supplierProduct.SupplierId, supplierProduct.Seq, attemptResult);
+                return true;
+            }
+
             if (attemptResult.Success)
             {
                 await SuccessTransactionAsync(transaction, supplierProduct.SupplierId, attemptResult);
@@ -325,11 +332,13 @@ public class TransactionService
             AttemptedAt = DateTime.UtcNow
         };
 
+        // Todo : Enable after testing
         _context.TransactionAttempts.Add(attempt);
         await _context.SaveChangesAsync();
 
-        // Create supplier adapter
-        var adapter = _adapterFactory.CreateAdapter("DIGIFLAZZ", _loggerFactory);
+        // Create supplier adapter based on SupplierSoftware
+        var supplierSoftware = supplierProduct.Supplier?.SupplierSoftware ?? "DIGIFLAZZ";
+        var adapter = _adapterFactory.CreateAdapter(supplierSoftware, _loggerFactory);
         if (adapter == null)
         {
             attempt.Status = AttemptStatus.Failed;
@@ -349,13 +358,15 @@ public class TransactionService
         {
             SupplierId = supplierProduct.SupplierId,
             SupplierUsername = supplierProduct.Supplier?.Name ?? "",
-            SupplierApiKey = supplierProduct.Supplier?.MemberId ?? "",
+            SupplierApiKey = supplierProduct.Supplier?.MemberId,
             SupplierApiSecret = supplierProduct.Supplier?.Password,
             SupplierApiUrl = supplierProduct.Supplier?.ApiBaseUrl ?? "",
             SupplierProductCode = supplierProduct.SupplierProductCode ?? "",
             DestinationNumber = transaction.Destination,
             ReferenceId = transaction.ReferenceId,
-            TimeoutSeconds = supplierProduct.Supplier?.TimeoutSeconds ?? 30
+            Pin = supplierProduct.Supplier?.Pin,
+            TimeoutSeconds = supplierProduct.Supplier?.TimeoutSeconds ?? 30,
+            SupplierSoftware = supplierProduct.Supplier?.SupplierSoftware ?? "Otomax"
         };
 
         SupplierPurchaseResult result;
@@ -375,11 +386,18 @@ public class TransactionService
         }
 
         // Update attempt record
-        attempt.Status = result.Success ? AttemptStatus.Success : AttemptStatus.Failed;
-        attempt.ErrorMessage = result.Message;
+        if (result.IsQueued)
+        {
+            attempt.Status = AttemptStatus.Processing; // Keep as Processing for queued
+        }
+        else
+        {
+            attempt.Status = result.Success ? AttemptStatus.Success : AttemptStatus.Failed;
+            attempt.CompletedAt = DateTime.UtcNow;
+        }
+        attempt.SupplierRefId = transaction.ReferenceId;
         attempt.SupplierTrxId = result.SupplierTransactionId;
-        attempt.SupplierRefId = result.SerialNumber;
-        attempt.CompletedAt = DateTime.UtcNow;
+        attempt.ErrorMessage = result.Message;
 
         await _context.SaveChangesAsync();
 
@@ -417,6 +435,137 @@ public class TransactionService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Transaction {TransactionId} failed: {Message}", transaction.Id, errorMessage);
+    }
+
+    private async Task QueueTransactionAsync(Transaction transaction, int supplierId, short seq, SupplierPurchaseResult result)
+    {
+        transaction.Status = TransactionStatus.Processing;
+        transaction.SupplierId = supplierId;
+        transaction.CurrentSeq = seq;
+        transaction.UpdatedAt = DateTime.UtcNow;
+
+        // Do NOT debit balance — keep it held until reprocess confirms success/fail
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Transaction {TransactionId} queued at supplier {SupplierId}: {Message}",
+            transaction.Id, supplierId, result.Message);
+    }
+
+    /// <summary>
+    /// Reprocess a transaction that is in Processing status (queued by supplier).
+    /// Only retries the same supplier that previously returned queued, using the same RefID.
+    /// </summary>
+    public async Task<(bool Success, string Message)> ReprocessTransactionAsync(Guid transactionId)
+    {
+        _logger.LogInformation("Reprocessing transaction {TransactionId}", transactionId);
+
+        var transaction = await _context.Transactions
+            .Include(t => t.Product)
+            .Include(t => t.Attempts)
+            .FirstOrDefaultAsync(t => t.Id == transactionId);
+
+        if (transaction == null)
+        {
+            return (false, "Transaction not found");
+        }
+
+        if (transaction.Status != TransactionStatus.Processing)
+        {
+            return (false, "Only Processing transactions can be reprocessed");
+        }
+
+        // Find the last attempt with Processing status
+        var processingAttempt = transaction.Attempts
+            .Where(a => a.Status == AttemptStatus.Processing)
+            .OrderByDescending(a => a.AttemptedAt)
+            .FirstOrDefault();
+
+        if (processingAttempt == null)
+        {
+            return (false, "No Processing attempt found for this transaction");
+        }
+
+        // Get supplier product info from the attempt
+        var supplierProduct = await _context.SupplierProducts
+            .Include(sp => sp.Supplier)
+            .FirstOrDefaultAsync(sp => sp.Id == processingAttempt.SupplierProductId);
+
+        if (supplierProduct == null)
+        {
+            return (false, "Supplier product not found");
+        }
+
+        // Create adapter
+        var supplierSoftware = supplierProduct.Supplier?.SupplierSoftware ?? "DIGIFLAZZ";
+        var adapter = _adapterFactory.CreateAdapter(supplierSoftware, _loggerFactory);
+        if (adapter == null)
+        {
+            processingAttempt.Status = AttemptStatus.Failed;
+            processingAttempt.ErrorMessage = "Failed to create supplier adapter";
+            processingAttempt.CompletedAt = DateTime.UtcNow;
+            await FailTransactionAsync(transaction, "Failed to create supplier adapter on reprocess");
+            return (false, "Failed to create supplier adapter");
+        }
+
+        // Build purchase request — reuse same RefID from the original attempt
+        var refId = processingAttempt.SupplierRefId ?? transaction.ReferenceId;
+        var request = new SupplierPurchaseRequest
+        {
+            SupplierId = supplierProduct.SupplierId,
+            SupplierUsername = supplierProduct.Supplier?.Name ?? "",
+            SupplierApiKey = supplierProduct.Supplier?.MemberId,
+            SupplierApiSecret = supplierProduct.Supplier?.Password,
+            SupplierApiUrl = supplierProduct.Supplier?.ApiBaseUrl ?? "",
+            SupplierProductCode = supplierProduct.SupplierProductCode ?? "",
+            DestinationNumber = transaction.Destination,
+            ReferenceId = refId,
+            Pin = supplierProduct.Supplier?.Pin,
+            TimeoutSeconds = supplierProduct.Supplier?.TimeoutSeconds ?? 30,
+            SupplierSoftware = supplierProduct.Supplier?.SupplierSoftware ?? "Otomax"
+        };
+
+        SupplierPurchaseResult result;
+        try
+        {
+            result = await adapter.PurchaseAsync(request);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error calling supplier adapter on reprocess");
+            processingAttempt.Status = AttemptStatus.Failed;
+            processingAttempt.ErrorMessage = ex.Message;
+            processingAttempt.CompletedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            await FailTransactionAsync(transaction, $"Reprocess error: {ex.Message}");
+            return (false, $"Reprocess error: {ex.Message}");
+        }
+
+        // Update the existing attempt record
+        if (result.IsQueued)
+        {
+            // Still queued — keep Processing status
+            processingAttempt.ErrorMessage = result.Message;
+            processingAttempt.SupplierTrxId = result.SupplierTransactionId;
+            await _context.SaveChangesAsync();
+            return (true, "Transaction still queued at supplier");
+        }
+
+        processingAttempt.Status = result.Success ? AttemptStatus.Success : AttemptStatus.Failed;
+        processingAttempt.SupplierTrxId = result.SupplierTransactionId;
+        processingAttempt.ErrorMessage = result.Message;
+        processingAttempt.CompletedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        if (result.Success)
+        {
+            await SuccessTransactionAsync(transaction, supplierProduct.SupplierId, result);
+            return (true, "Transaction completed successfully");
+        }
+
+        // Failed — do NOT try other suppliers
+        await FailTransactionAsync(transaction, $"Reprocess failed: {result.Message}");
+        return (false, $"Reprocess failed: {result.Message}");
     }
 
     public async Task<Transaction?> GetTransactionByIdAsync(Guid id)
@@ -543,5 +692,24 @@ public class TransactionService
             .ToListAsync();
 
         return (transactions, totalFiltered, totalRecords);
+    }
+
+    /// <summary>
+    /// Generate a short alphanumeric reference ID (max 12 chars) for supplier transactions.
+    /// </summary>
+    private static string GenerateReferenceId()
+    {
+        // Timestamp-based prefix (yyMMddHHmm)
+        var timestamp = DateTime.UtcNow.ToString("yyMMddHHmm"); // 10 chars
+
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        var random = new char[2];
+
+        for (int i = 0; i < 2; i++)
+        {
+            random[i] = chars[Random.Shared.Next(chars.Length)];
+        }
+
+        return timestamp + new string(random); // total 12 chars
     }
 }

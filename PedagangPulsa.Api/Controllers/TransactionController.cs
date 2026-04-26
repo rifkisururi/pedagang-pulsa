@@ -144,58 +144,68 @@ public class TransactionController : ControllerBase
 
             var costPrice = await GetBestCostPriceAsync(request.ProductId);
 
-            if (costPrice <= 0)
+            decimal sellPrice;
+
+            if (product.IsInquiryProduct)
             {
-                return BadRequest(new ErrorResponse
+                // Inquiry products have no cost and are free (no balance deduction)
+                sellPrice = 0;
+            }
+            else
+            {
+                if (costPrice <= 0)
                 {
-                    Message = "Product not available (no supplier mapped)",
-                    ErrorCode = "PRODUCT_NOT_AVAILABLE"
-                });
-            }
+                    return BadRequest(new ErrorResponse
+                    {
+                        Message = "Product not available (no supplier mapped)",
+                        ErrorCode = "PRODUCT_NOT_AVAILABLE"
+                    });
+                }
 
-            var sellPrice = costPrice + (levelPrice?.Margin > 0 ? levelPrice.Margin : _pricingConfig.GetDefaultMargin(costPrice));
+                sellPrice = costPrice + (levelPrice?.Margin > 0 ? levelPrice.Margin : _pricingConfig.GetDefaultMargin(costPrice));
 
-            // Lock user balance row to prevent concurrent balance modifications
-            if (!isInMemory)
-            {
-                await _context.Database.ExecuteSqlRawAsync(
-                    "SELECT * FROM \"UserBalances\" WHERE \"UserId\" = {0} FOR UPDATE",
-                    userId);
-            }
-
-            // Re-check balance after acquiring lock
-            if (user.Balance.ActiveBalance < sellPrice)
-            {
-                return BadRequest(new ErrorResponse
+                // Lock user balance row to prevent concurrent balance modifications
+                if (!isInMemory)
                 {
-                    Message = "Insufficient balance",
-                    ErrorCode = "INSUFFICIENT_BALANCE"
-                });
+                    await _context.Database.ExecuteSqlRawAsync(
+                        "SELECT * FROM \"UserBalances\" WHERE \"UserId\" = {0} FOR UPDATE",
+                        userId);
+                }
+
+                // Re-check balance after acquiring lock
+                if (user.Balance.ActiveBalance < sellPrice)
+                {
+                    return BadRequest(new ErrorResponse
+                    {
+                        Message = "Insufficient balance",
+                        ErrorCode = "INSUFFICIENT_BALANCE"
+                    });
+                }
+
+                var heldBalanceBefore = user.Balance.HeldBalance;
+                var activeBalanceBefore = user.Balance.ActiveBalance;
+
+                user.Balance.ActiveBalance -= sellPrice;
+                user.Balance.HeldBalance += sellPrice;
+
+                var holdLedger = new BalanceLedger
+                {
+                    Id = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    UserId = userId,
+                    Type = BalanceTransactionType.PurchaseHold,
+                    Amount = -sellPrice,
+                    ActiveBefore = activeBalanceBefore,
+                    ActiveAfter = user.Balance.ActiveBalance,
+                    HeldBefore = heldBalanceBefore,
+                    HeldAfter = user.Balance.HeldBalance,
+                    RefType = "Transaction",
+                    Notes = $"Hold for {product.Name} - {request.DestinationNumber}",
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.BalanceLedgers.Add(holdLedger);
             }
 
-            var heldBalanceBefore = user.Balance.HeldBalance;
-            var activeBalanceBefore = user.Balance.ActiveBalance;
-
-            user.Balance.ActiveBalance -= sellPrice;
-            user.Balance.HeldBalance += sellPrice;
-
-            var holdLedger = new BalanceLedger
-            {
-                Id = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                UserId = userId,
-                Type = BalanceTransactionType.PurchaseHold,
-                Amount = -sellPrice,
-                ActiveBefore = activeBalanceBefore,
-                ActiveAfter = user.Balance.ActiveBalance,
-                HeldBefore = heldBalanceBefore,
-                HeldAfter = user.Balance.HeldBalance,
-                RefType = "Transaction",
-                Notes = $"Hold for {product.Name} - {request.DestinationNumber}",
-                CreatedAt = DateTime.UtcNow
-            };
-            _context.BalanceLedgers.Add(holdLedger);
-
-            var referenceIdGen = $"{userId}{DateTime.UtcNow:yyyyMMddHHmmss}{Random.Shared.Next(1000, 9999)}";
+            var referenceIdGen = $"{DateTime.UtcNow:yyMMddHHmm}{Random.Shared.Next(0, 100):D2}";
             var transaction = new Transaction
             {
                 Id = Guid.NewGuid(),
@@ -309,6 +319,9 @@ public class TransactionController : ControllerBase
                 CategoryName = t.Product.Category!.Name,
                 Destination = t.Destination,
                 SellPrice = t.SellPrice,
+                SerialNumber = t.SerialNumber,
+                ErrorMessage = t.ErrorMessage,
+                CompletedAt = t.CompletedAt,
                 CreatedAt = t.CreatedAt
             })
             .FirstOrDefaultAsync();
@@ -380,6 +393,9 @@ public class TransactionController : ControllerBase
                 CategoryName = t.Product.Category!.Name,
                 Destination = t.Destination,
                 SellPrice = t.SellPrice,
+                SerialNumber = t.SerialNumber,
+                ErrorMessage = t.ErrorMessage,
+                CompletedAt = t.CompletedAt,
                 CreatedAt = t.CreatedAt
             })
             .ToListAsync();

@@ -15,6 +15,7 @@ public class ProductListDto
     public int? QuotaMb { get; set; }
     public string? QuotaText { get; set; }
     public string? Description { get; set; }
+    public bool IsInquiryProduct { get; set; }
     public decimal? Price { get; set; }
     public bool Available { get; set; }
 }
@@ -65,6 +66,7 @@ public class CatalogProductDto
     public int? QuotaMb { get; set; }
     public string? QuotaText { get; set; }
     public string? Description { get; set; }
+    public bool IsInquiryProduct { get; set; }
     public decimal? Price { get; set; }
     public bool Available { get; set; }
 }

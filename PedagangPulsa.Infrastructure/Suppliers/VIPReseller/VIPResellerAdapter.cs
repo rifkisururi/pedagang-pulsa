@@ -19,6 +19,16 @@ public class VIPResellerAdapter : SupplierAdapterBase
     {
         try
         {
+            if (string.IsNullOrEmpty(request.SupplierApiKey))
+            {
+                return new SupplierPurchaseResult
+                {
+                    Success = false,
+                    ErrorCode = "INVALID_CONFIG",
+                    Message = "SupplierApiKey is required"
+                };
+            }
+
             _logger.LogInformation("Initiating VIPReseller purchase for {Destination} with product {ProductCode}",
                 request.DestinationNumber, request.SupplierProductCode);
 
@@ -75,6 +85,15 @@ public class VIPResellerAdapter : SupplierAdapterBase
     {
         try
         {
+            if (string.IsNullOrEmpty(request.SupplierApiKey))
+            {
+                return new SupplierBalanceResult
+                {
+                    Success = false,
+                    Message = "SupplierApiKey is required"
+                };
+            }
+
             _logger.LogInformation("Checking VIPReseller balance");
 
             var payload = new
@@ -125,7 +144,7 @@ public class VIPResellerAdapter : SupplierAdapterBase
         return await PingAsync(pingUrl);
     }
 
-    private string GenerateSignature(string username, string apiKey)
+    private string GenerateSignature(string username, string? apiKey)
     {
         // VIPReseller signature: md5(apiKey + "vip")
         using var md5 = System.Security.Cryptography.MD5.Create();

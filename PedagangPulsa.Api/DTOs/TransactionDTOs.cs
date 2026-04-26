@@ -36,6 +36,9 @@ public class TransactionDetailItem
     public string? CategoryName { get; set; }
     public string Destination { get; set; } = string.Empty;
     public decimal SellPrice { get; set; }
+    public string? SerialNumber { get; set; }
+    public string? ErrorMessage { get; set; }
+    public DateTime? CompletedAt { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 

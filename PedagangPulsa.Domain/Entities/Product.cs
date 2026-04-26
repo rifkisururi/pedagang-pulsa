@@ -30,6 +30,7 @@ public class Product
     public string? QuotaText { get; set; }
     public string? Operator { get; set; }
     public string? Description { get; set; }
+    public bool IsInquiryProduct { get; set; } = false;
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

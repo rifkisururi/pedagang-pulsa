@@ -46,6 +46,7 @@
                 <thead>
                     <tr>
                         <th>Name</th>
+                        <th>Software Supplier</th>
                         <th>API URL</th>
                         <th>Timeout</th>
                         <th>Balance</th>
@@ -83,6 +84,13 @@
                         data: 'name',
                         render: function(data, type, row) {
                             return '<a href="/Supplier/Details/' + row.id + '" class="text-decoration-none fw-bold">' + data + '</a>';
+                        }
+                    },
+                    {
+                        data: 'supplierSoftware',
+                        render: function(data) {
+                            if (!data) return '-';
+                            return '<span class="badge bg-info">' + data + '</span>';
                         }
                     },
                     {

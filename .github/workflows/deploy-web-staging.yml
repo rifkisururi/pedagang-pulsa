@@ -18,8 +18,25 @@ env:
   DOMAIN: admin-dev.pedagangpulsa.com
 
 jobs:
+  test:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run Tests
+        run: dotnet test PedagangPulsa.Tests/PedagangPulsa.Tests.csproj --logger "console;verbosity=detailed"
+
   deploy:
     runs-on: ubuntu-latest
+    needs: test
 
     steps:
       - name: Checkout

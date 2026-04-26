@@ -22,6 +22,16 @@ public class DigiflazzAdapter : SupplierAdapterBase
     {
         try
         {
+            if (string.IsNullOrEmpty(request.SupplierApiKey))
+            {
+                return new SupplierPurchaseResult
+                {
+                    Success = false,
+                    ErrorCode = "INVALID_CONFIG",
+                    Message = "SupplierApiKey is required"
+                };
+            }
+
             _logger.LogInformation("Initiating purchase for {Destination} with product {ProductCode}",
                 request.DestinationNumber, request.SupplierProductCode);
 
@@ -82,6 +92,15 @@ public class DigiflazzAdapter : SupplierAdapterBase
     {
         try
         {
+            if (string.IsNullOrEmpty(request.SupplierApiKey))
+            {
+                return new SupplierBalanceResult
+                {
+                    Success = false,
+                    Message = "SupplierApiKey is required"
+                };
+            }
+
             _logger.LogInformation("Checking balance for supplier {SupplierId}", request.SupplierId);
 
             // Build request payload for Digiflazz balance check API
@@ -133,7 +152,7 @@ public class DigiflazzAdapter : SupplierAdapterBase
         return await PingAsync(pingUrl);
     }
 
-    private string GenerateSignature(string username, string apiKey)
+    private string GenerateSignature(string username, string? apiKey)
     {
         // Digiflazz signature: md5(username + apiKey + "depo")
         var input = username + apiKey + "depo";

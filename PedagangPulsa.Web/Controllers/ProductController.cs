@@ -168,6 +168,7 @@ public class ProductController : Controller
             ValidityText = model.ValidityText,
             QuotaMb = model.QuotaMb,
             QuotaText = model.QuotaText,
+            IsInquiryProduct = model.IsInquiryProduct,
             IsActive = model.IsActive,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -228,6 +229,7 @@ public class ProductController : Controller
             QuotaText = product.QuotaText,
             Operator = product.Operator,
             Description = product.Description,
+            IsInquiryProduct = product.IsInquiryProduct,
             IsActive = product.IsActive,
             AvailableCategories = categories.Select(c => new ProductViewModel.CategoryItem
             {
@@ -281,6 +283,7 @@ public class ProductController : Controller
             QuotaText = model.QuotaText,
             Operator = model.Operator,
             Description = model.Description,
+            IsInquiryProduct = model.IsInquiryProduct,
             IsActive = model.IsActive,
             UpdatedAt = DateTime.UtcNow
         };

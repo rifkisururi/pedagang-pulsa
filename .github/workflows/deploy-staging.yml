@@ -12,8 +12,25 @@ env:
   DOMAIN: api-dev.pedagangpulsa.com
 
 jobs:
+  test:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run Tests
+        run: dotnet test PedagangPulsa.Tests/PedagangPulsa.Tests.csproj --logger "console;verbosity=detailed"
+
   deploy:
     runs-on: ubuntu-latest
+    needs: test
 
     steps:
       - name: Checkout
@@ -46,7 +63,7 @@ jobs:
             --timeout 300 \
             --concurrency 50 \
             --allow-unauthenticated \
-            --set-env-vars "ASPNETCORE_ENVIRONMENT=Staging,ConnectionStrings__DefaultConnection=${{ secrets.DB_CONNECTION }},ConnectionStrings__Redis=${{ secrets.REDIS_CONNECTION }},Jwt__Key=${{ secrets.JWT_KEY }},Jwt__Issuer=PedagangPulsa.Api,Jwt__Audience=PedagangPulsa.Client,EnableSwagger=true,EnableScalar=true,SmsGate__Username=${{ secrets.SMSGATE_USERNAME }},SmsGate__Password=${{ secrets.SMSGATE_PASSWORD }},GoogleAuth__ClientId=${{ secrets.GOOGLE_CLIENT_ID }}" \
+            --set-env-vars "ASPNETCORE_ENVIRONMENT=Staging,ConnectionStrings__DefaultConnection=${{ secrets.DB_CONNECTION }},ConnectionStrings__Redis=${{ secrets.REDIS_CONNECTION }},Jwt__Key=${{ secrets.JWT_KEY }},Jwt__Issuer=PedagangPulsa.Api,Jwt__Audience=PedagangPulsa.Client,EnableSwagger=true,EnableScalar=true,SmsGate__Username=${{ secrets.SMSGATE_USERNAME }},SmsGate__Password=${{ secrets.SMSGATE_PASSWORD }},GoogleAuth__ClientId=${{ secrets.GOOGLE_CLIENT_ID }},Otomax__UseProxy=${{ secrets.OTOMAX_USE_PROXY }},Otomax__ProxyHost=${{ secrets.OTOMAX_PROXY_HOST }},Otomax__ProxyPort=${{ secrets.OTOMAX_PROXY_PORT }},Otomax__ProxyUsername=${{ secrets.OTOMAX_PROXY_USERNAME }},Otomax__ProxyPassword=${{ secrets.OTOMAX_PROXY_PASSWORD }}" \
             --project ${{ env.PROJECT_ID }}
 
       - name: Map Custom Domain

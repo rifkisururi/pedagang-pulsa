@@ -9,6 +9,7 @@ public class SupplierDetailViewModel
     public string Pin { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public int TimeoutSeconds { get; set; }
+    public string SupplierSoftware { get; set; } = "Otomax";
     public decimal Balance { get; set; }
     public decimal? BalanceThresholdLow { get; set; }
     public decimal? BalanceThresholdCritical { get; set; }

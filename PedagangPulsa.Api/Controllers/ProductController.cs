@@ -181,7 +181,8 @@ public class ProductController : Controller
                 ValidityText = p.ValidityText,
                 QuotaMb = p.QuotaMb,
                 QuotaText = p.QuotaText,
-                Description = p.Description
+                Description = p.Description,
+                IsInquiryProduct = p.IsInquiryProduct
             })
             .ToListAsync();
 
@@ -193,14 +194,22 @@ public class ProductController : Controller
 
         foreach (var dto in products)
         {
-            var hasCost = costPrices.TryGetValue(dto.Id, out var cost) && cost > 0;
-            var hasMargin = margins.TryGetValue(dto.Id, out var margin) && margin > 0;
+            if (dto.IsInquiryProduct)
+            {
+                dto.Available = true;
+                dto.Price = null;
+            }
+            else
+            {
+                var hasCost = costPrices.TryGetValue(dto.Id, out var cost) && cost > 0;
+                var hasMargin = margins.TryGetValue(dto.Id, out var margin) && margin > 0;
 
-            // Fallback to default margin from config if no margin set
-            var effectiveMargin = hasMargin ? margin : _pricingConfig.GetDefaultMargin(cost);
+                // Fallback to default margin from config if no margin set
+                var effectiveMargin = hasMargin ? margin : _pricingConfig.GetDefaultMargin(cost);
 
-            dto.Price = (hasCost && effectiveMargin > 0) ? cost + effectiveMargin : (decimal?)null;
-            dto.Available = hasCost && effectiveMargin > 0;
+                dto.Price = (hasCost && effectiveMargin > 0) ? cost + effectiveMargin : (decimal?)null;
+                dto.Available = hasCost && effectiveMargin > 0;
+            }
         }
 
         var productResponse = new ProductListResponse
@@ -459,26 +468,50 @@ public class ProductController : Controller
 
         foreach (var p in products)
         {
-            var hasCost = costPrices.TryGetValue(p.Id, out var cost) && cost > 0;
-            var hasMargin = margins.TryGetValue(p.Id, out var margin) && margin > 0;
+            CatalogProductDto dto;
 
-            // Fallback to default margin from config if no margin set
-            var effectiveMargin = hasMargin ? margin : _pricingConfig.GetDefaultMargin(cost);
-
-            var dto = new CatalogProductDto
+            if (p.IsInquiryProduct)
             {
-                Id = p.Id,
-                Name = p.Name,
-                Code = p.Code,
-                Denomination = p.Denomination,
-                ValidityDays = p.ValidityDays,
-                ValidityText = p.ValidityText,
-                QuotaMb = p.QuotaMb,
-                QuotaText = p.QuotaText,
-                Description = p.Description,
-                Price = (hasCost && effectiveMargin > 0) ? cost + effectiveMargin : null,
-                Available = hasCost && effectiveMargin > 0
-            };
+                dto = new CatalogProductDto
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Code = p.Code,
+                    Denomination = p.Denomination,
+                    ValidityDays = p.ValidityDays,
+                    ValidityText = p.ValidityText,
+                    QuotaMb = p.QuotaMb,
+                    QuotaText = p.QuotaText,
+                    Description = p.Description,
+                    IsInquiryProduct = true,
+                    Available = true,
+                    Price = null
+                };
+            }
+            else
+            {
+                var hasCost = costPrices.TryGetValue(p.Id, out var cost) && cost > 0;
+                var hasMargin = margins.TryGetValue(p.Id, out var margin) && margin > 0;
+
+                // Fallback to default margin from config if no margin set
+                var effectiveMargin = hasMargin ? margin : _pricingConfig.GetDefaultMargin(cost);
+
+                dto = new CatalogProductDto
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Code = p.Code,
+                    Denomination = p.Denomination,
+                    ValidityDays = p.ValidityDays,
+                    ValidityText = p.ValidityText,
+                    QuotaMb = p.QuotaMb,
+                    QuotaText = p.QuotaText,
+                    Description = p.Description,
+                    IsInquiryProduct = false,
+                    Price = (hasCost && effectiveMargin > 0) ? cost + effectiveMargin : null,
+                    Available = hasCost && effectiveMargin > 0
+                };
+            }
 
             if (p.ProductGroupId.HasValue)
             {
@@ -499,7 +532,7 @@ public class ProductController : Controller
             Name = g.Name,
             Operator = g.Operator,
             Products = productsByGroup.GetValueOrDefault(g.Id, new())
-        }).ToList();
+        }).Where(g => g.Products.Count > 0).ToList();
 
         if (ungrouped is { Count: > 0 })
         {

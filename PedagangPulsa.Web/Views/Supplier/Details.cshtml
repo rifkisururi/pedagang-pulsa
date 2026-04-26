@@ -51,6 +51,11 @@
                     <dt class="col-sm-5 text-muted">Timeout</dt>
                     <dd class="col-sm-7">@Model.TimeoutSeconds seconds</dd>
 
+                    <dt class="col-sm-5 text-muted">Software Supplier</dt>
+                    <dd class="col-sm-7">
+                        <span class="badge bg-info">@Model.SupplierSoftware</span>
+                    </dd>
+
                     <dt class="col-sm-5 text-muted">Status</dt>
                     <dd class="col-sm-7">
                         <span class="badge @(Model.IsActive ? "bg-success" : "bg-secondary")">

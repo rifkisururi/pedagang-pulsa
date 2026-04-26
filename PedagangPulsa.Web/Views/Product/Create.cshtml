@@ -148,6 +148,13 @@
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
                             <div class="form-check form-switch">
+                                <input asp-for="IsInquiryProduct" class="form-check-input" type="checkbox" />
+                                <label asp-for="IsInquiryProduct" class="form-check-label">Produk Inquiry</label>
+                                <small class="text-muted d-block">Produk cek/inquiry (tanpa harga jual), misalnya cek nama pelanggan PLN</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
                                 <input asp-for="IsActive" class="form-check-input" type="checkbox" checked />
                                 <label asp-for="IsActive" class="form-check-label">Active</label>
                             </div>

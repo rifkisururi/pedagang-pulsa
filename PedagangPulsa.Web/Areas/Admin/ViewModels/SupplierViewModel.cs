@@ -33,6 +33,10 @@ public class SupplierViewModel
     [Range(10, 120, ErrorMessage = "Timeout must be between 10 and 120 seconds")]
     public int TimeoutSeconds { get; set; } = 30;
 
+    [Required(ErrorMessage = "Software Supplier is required")]
+    [StringLength(50, ErrorMessage = "Software Supplier cannot be longer than 50 characters")]
+    public string SupplierSoftware { get; set; } = "Otomax";
+
     [Required(ErrorMessage = "Initial balance is required")]
     [Range(0, double.MaxValue, ErrorMessage = "Balance must be greater than or equal to 0")]
     public decimal InitialBalance { get; set; }

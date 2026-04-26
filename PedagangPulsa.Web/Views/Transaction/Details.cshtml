@@ -1,0 +1,261 @@
+@model PedagangPulsa.Web.Areas.Admin.ViewModels.TransactionDetailViewModel
+
+@{
+    ViewData["Title"] = "Transaction Details";
+    Layout = "_AdminLayout";
+
+    var statusClass = Model.Status.ToLower() switch
+    {
+        "success" => "bg-success",
+        "failed" => "bg-danger",
+        "pending" => "bg-warning",
+        "processing" => "bg-warning",
+        "cancelled" => "bg-secondary",
+        "refunded" => "bg-info",
+        _ => "bg-secondary"
+    };
+
+    var statusIcon = Model.Status.ToLower() switch
+    {
+        "success" => "bi-check-circle",
+        "failed" => "bi-x-circle",
+        "pending" => "bi-clock",
+        "processing" => "bi-arrow-repeat",
+        "cancelled" => "bi-ban",
+        "refunded" => "bi-arrow-counterclockwise",
+        _ => ""
+    };
+
+    var canProcess = Model.Status == "Pending";
+    var canReprocess = Model.Status == "Processing";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Transaction Details</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a asp-action="Index" class="btn btn-outline-secondary me-2">
+            <i class="bi bi-arrow-left"></i> Back to List
+        </a>
+        @if (canProcess)
+        {
+            <button type="button" class="btn btn-primary" id="btnProcess">
+                <i class="bi bi-play-circle"></i> Process to Supplier
+            </button>
+        }
+        @if (canReprocess)
+        {
+            <button type="button" class="btn btn-warning" id="btnReprocess">
+                <i class="bi bi-arrow-repeat"></i> Reprocess Transaction
+            </button>
+        }
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="row">
+    <!-- Transaction Info Card -->
+    <div class="col-lg-4 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0"><i class="bi bi-receipt"></i> Transaction</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-5 text-muted">Reference ID</dt>
+                    <dd class="col-sm-7"><code>@Model.ReferenceId.Substring(0, 8)</code></dd>
+
+                    <dt class="col-sm-5 text-muted">Status</dt>
+                    <dd class="col-sm-7">
+                        <span class="badge @statusClass"><i class="bi @statusIcon"></i> @Model.Status</span>
+                    </dd>
+
+                    <dt class="col-sm-5 text-muted">Created</dt>
+                    <dd class="col-sm-7">@Model.CreatedAt.ToString("dd MMM yyyy HH:mm:ss")</dd>
+
+                    <dt class="col-sm-5 text-muted">Completed</dt>
+                    <dd class="col-sm-7">@(Model.CompletedAt?.ToString("dd MMM yyyy HH:mm:ss") ?? "-")</dd>
+
+                    <dt class="col-sm-5 text-muted">Username</dt>
+                    <dd class="col-sm-7">@Model.Username</dd>
+
+                    <dt class="col-sm-5 text-muted">Product</dt>
+                    <dd class="col-sm-7">@Model.ProductName</dd>
+
+                    <dt class="col-sm-5 text-muted">Destination</dt>
+                    <dd class="col-sm-7"><code>@Model.Destination</code></dd>
+
+                    <dt class="col-sm-5 text-muted">Sell Price</dt>
+                    <dd class="col-sm-7 fw-semibold text-primary">Rp @Model.SellPrice.ToString("N0")</dd>
+
+                    <dt class="col-sm-5 text-muted">Serial Number</dt>
+                    <dd class="col-sm-7">@(Model.SerialNumber ?? "-")</dd>
+
+                    <dt class="col-sm-5 text-muted">Supplier</dt>
+                    <dd class="col-sm-7">@(Model.SupplierName ?? "-")</dd>
+
+                    <dt class="col-sm-5 text-muted">Supplier Trx ID</dt>
+                    <dd class="col-sm-7">@(Model.SupplierTrxId ?? "-")</dd>
+                </dl>
+
+                @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                {
+                    <div class="alert alert-danger small mb-0">
+                        <strong>Error:</strong> @Model.ErrorMessage
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Attempts Tab -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0"><i class="bi bi-arrow-repeat"></i> Supplier Attempts</h5>
+                <span class="badge bg-secondary">@Model.Attempts.Count attempt(s)</span>
+            </div>
+            <div class="card-body">
+                @if (Model.Attempts.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Supplier</th>
+                                    <th>Status</th>
+                                    <th>Attempted At</th>
+                                    <th>Completed At</th>
+                                    <th>Supplier Ref</th>
+                                    <th>Supplier Trx</th>
+                                    <th>Error</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var attempt in Model.Attempts.OrderByDescending(a => a.AttemptedAt))
+                                {
+                                    var attemptStatusClass = attempt.Status.ToLower() switch
+                                    {
+                                        "success" => "bg-success",
+                                        "failed" => "bg-danger",
+                                        "timeout" => "bg-warning",
+                                        "pending" => "bg-secondary",
+                                        "processing" => "bg-warning",
+                                        _ => "bg-secondary"
+                                    };
+
+                                    <tr>
+                                        <td>@attempt.Seq</td>
+                                        <td>@attempt.SupplierName</td>
+                                        <td><span class="badge @attemptStatusClass">@attempt.Status</span></td>
+                                        <td>@attempt.AttemptedAt.ToString("dd MMM yyyy HH:mm:ss")</td>
+                                        <td>@(attempt.CompletedAt?.ToString("dd MMM yyyy HH:mm:ss") ?? "-")</td>
+                                        <td><code>@(attempt.SupplierRefId ?? "-")</code></td>
+                                        <td><code>@(attempt.SupplierTrxId ?? "-")</code></td>
+                                        <td class="text-danger small">@(attempt.ErrorMessage ?? "-")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted mb-0">
+                        <i class="bi bi-info-circle"></i>
+                        No supplier attempts yet.
+                        @if (canProcess)
+                        {
+                            <span>Click <strong>"Process to Supplier"</strong> to start processing.</span>
+                        }
+                        @if (canReprocess)
+                        {
+                            <span>Click <strong>"Reprocess Transaction"</strong> to retry.</span>
+                        }
+                    </p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            $('#btnProcess').on('click', function() {
+                var btn = $(this);
+                var transactionId = '@Model.Id';
+
+                if (!confirm('Process this transaction to supplier?')) return;
+
+                btn.prop('disabled', true).html('<i class="bi bi-spinner fa-spin"></i> Processing...');
+
+                $.ajax({
+                    url: '/Transaction/ProcessTransaction',
+                    type: 'POST',
+                    data: { id: transactionId },
+                    headers: {
+                        'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            window.location.reload();
+                        } else {
+                            alert(response.message || 'Failed to process transaction.');
+                            btn.prop('disabled', false).html('<i class="bi bi-play-circle"></i> Process to Supplier');
+                        }
+                    },
+                    error: function(xhr) {
+                        alert(xhr.responseText || 'An error occurred.');
+                        btn.prop('disabled', false).html('<i class="bi bi-play-circle"></i> Process to Supplier');
+                    }
+                });
+            });
+
+            $('#btnReprocess').on('click', function() {
+                var btn = $(this);
+                var transactionId = '@Model.Id';
+
+                if (!confirm('Reprocess this queued transaction with the same RefID?')) return;
+
+                btn.prop('disabled', true).html('<i class="bi bi-spinner fa-spin"></i> Reprocessing...');
+
+                $.ajax({
+                    url: '/Transaction/ProcessTransaction',
+                    type: 'POST',
+                    data: { id: transactionId },
+                    headers: {
+                        'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            window.location.reload();
+                        } else {
+                            alert(response.message || 'Failed to reprocess transaction.');
+                            btn.prop('disabled', false).html('<i class="bi bi-arrow-repeat"></i> Reprocess Transaction');
+                        }
+                    },
+                    error: function(xhr) {
+                        alert(xhr.responseText || 'An error occurred.');
+                        btn.prop('disabled', false).html('<i class="bi bi-arrow-repeat"></i> Reprocess Transaction');
+                    }
+                });
+            });
+        });
+    </script>
+}

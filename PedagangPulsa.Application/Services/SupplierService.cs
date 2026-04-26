@@ -29,7 +29,8 @@ public class SupplierService
             var searchLower = search.Trim().ToLower();
             query = query.Where(s =>
                 s.Name.ToLower().Contains(searchLower) ||
-                (s.ApiBaseUrl != null && s.ApiBaseUrl.ToLower().Contains(searchLower)));
+                (s.ApiBaseUrl != null && s.ApiBaseUrl.ToLower().Contains(searchLower)) ||
+                s.SupplierSoftware.ToLower().Contains(searchLower));
         }
 
         // Apply active filter
@@ -103,6 +104,7 @@ public class SupplierService
         existing.Pin = supplier.Pin;
         existing.Password = supplier.Password;
         existing.TimeoutSeconds = supplier.TimeoutSeconds;
+        existing.SupplierSoftware = supplier.SupplierSoftware;
         existing.Balance = supplier.Balance;
         existing.IsActive = supplier.IsActive;
         existing.UpdatedAt = DateTime.UtcNow;

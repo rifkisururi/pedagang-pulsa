@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PedagangPulsa.Application.Services;
+using PedagangPulsa.Domain.Enums;
 using PedagangPulsa.Web.Areas.Admin.ViewModels;
 
 namespace PedagangPulsa.Web.Controllers;
@@ -67,6 +68,58 @@ public class TransactionController : Controller
     }
 
     #region AJAX Endpoints
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ProcessTransaction(Guid id)
+    {
+        try
+        {
+            // Check transaction status to determine which method to call
+            var transaction = await _transactionService.GetTransactionByIdAsync(id);
+            if (transaction == null)
+            {
+                return Json(new { success = false, message = "Transaction not found." });
+            }
+
+            if (transaction.Status == TransactionStatus.Processing)
+            {
+                // Reprocess a queued transaction
+                var (success, message) = await _transactionService.ReprocessTransactionAsync(id);
+                if (success)
+                {
+                    TempData["Success"] = message;
+                    return Json(new { success = true });
+                }
+
+                TempData["Error"] = message;
+                return Json(new { success = false, message });
+            }
+
+            if (transaction.Status == TransactionStatus.Pending)
+            {
+                // Normal process flow
+                var result = await _transactionService.ProcessTransactionAsync(id);
+                if (result)
+                {
+                    TempData["Success"] = "Transaction processed successfully.";
+                    return Json(new { success = true });
+                }
+
+                var tx = await _transactionService.GetTransactionByIdAsync(id);
+                var msg = tx?.ErrorMessage ?? "Failed to process transaction.";
+                TempData["Error"] = msg;
+                return Json(new { success = false, message = msg });
+            }
+
+            return Json(new { success = false, message = $"Transaction is {transaction.Status}, cannot process." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing transaction {TransactionId}", id);
+            return Json(new { success = false, message = ex.Message });
+        }
+    }
 
     [HttpPost]
     public async Task<IActionResult> GetData(

@@ -21,18 +21,21 @@ public class SupplierPurchaseRequest
 {
     public int SupplierId { get; set; }
     public string SupplierUsername { get; set; } = string.Empty;
-    public string SupplierApiKey { get; set; } = string.Empty;
+    public string? SupplierApiKey { get; set; }
     public string? SupplierApiSecret { get; set; }
     public string SupplierApiUrl { get; set; } = string.Empty;
     public string SupplierProductCode { get; set; } = string.Empty;
     public string DestinationNumber { get; set; } = string.Empty;
     public string ReferenceId { get; set; } = string.Empty;
+    public string? Pin { get; set; }
     public int TimeoutSeconds { get; set; } = 30;
+    public string SupplierSoftware { get; set; } = "Otomax";
 }
 
 public class SupplierPurchaseResult
 {
     public bool Success { get; set; }
+    public bool IsQueued { get; set; }
     public string ErrorCode { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
     public string? SerialNumber { get; set; }
@@ -45,9 +48,10 @@ public class SupplierBalanceRequest
 {
     public Guid SupplierId { get; set; }
     public string SupplierUsername { get; set; } = string.Empty;
-    public string SupplierApiKey { get; set; } = string.Empty;
+    public string? SupplierApiKey { get; set; }
     public string? SupplierApiSecret { get; set; }
     public string SupplierApiUrl { get; set; } = string.Empty;
+    public string? Pin { get; set; }
 }
 
 public class SupplierBalanceResult

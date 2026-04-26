@@ -41,6 +41,7 @@ public class SupplierController : Controller
             Pin = supplier.Pin ?? string.Empty,
             Password = supplier.Password ?? string.Empty,
             TimeoutSeconds = supplier.TimeoutSeconds,
+            SupplierSoftware = supplier.SupplierSoftware,
             Balance = supplier.Balance?.ActiveBalance ?? 0,
             IsActive = supplier.IsActive,
             CreatedAt = supplier.CreatedAt,
@@ -75,6 +76,7 @@ public class SupplierController : Controller
             Pin = model.Pin,
             Password = model.Password,
             TimeoutSeconds = (short)model.TimeoutSeconds,
+            SupplierSoftware = model.SupplierSoftware,
             IsActive = model.IsActive
         };
 
@@ -108,6 +110,7 @@ public class SupplierController : Controller
             Pin = string.Empty, // Don't show existing PIN
             Password = string.Empty, // Don't show existing password
             TimeoutSeconds = supplier.TimeoutSeconds,
+            SupplierSoftware = supplier.SupplierSoftware,
             InitialBalance = supplier.Balance?.ActiveBalance ?? 0,
             IsActive = supplier.IsActive
         };
@@ -141,6 +144,7 @@ public class SupplierController : Controller
             Pin = string.IsNullOrWhiteSpace(model.Pin) ? existingSupplier.Pin : model.Pin,
             Password = string.IsNullOrWhiteSpace(model.Password) ? existingSupplier.Password : model.Password,
             TimeoutSeconds = (short)model.TimeoutSeconds,
+            SupplierSoftware = model.SupplierSoftware,
             IsActive = model.IsActive
         };
 
@@ -234,6 +238,7 @@ public class SupplierController : Controller
             Name = s.Name,
             ApiUrl = s.ApiBaseUrl,
             TimeoutSeconds = s.TimeoutSeconds,
+            SupplierSoftware = s.SupplierSoftware,
             Balance = s.Balance?.ActiveBalance ?? 0,
             IsActive = s.IsActive ? "Active" : "Inactive"
         }).ToList();
