@@ -139,7 +139,7 @@
                         <div class="card shadow-sm">
                             <div class="card-body">
                                 <h6 class="text-muted mb-1">Active Balance</h6>
-                                <h4 class="mb-0 text-success">Rp Model.ActiveBalance.ToString("N0")</h4>
+                                <h4 class="mb-0 text-success">Rp @Model.ActiveBalance.ToString("N0")</h4>
                             </div>
                         </div>
                     </div>
@@ -147,7 +147,7 @@
                         <div class="card shadow-sm">
                             <div class="card-body">
                                 <h6 class="text-muted mb-1">Held Balance</h6>
-                                <h4 class="mb-0 text-warning">Rp Model.HeldBalance.ToString("N0")</h4>
+                                <h4 class="mb-0 text-warning">Rp @Model.HeldBalance.ToString("N0")</h4>
                             </div>
                         </div>
                     </div>
@@ -155,7 +155,7 @@
                         <div class="card shadow-sm">
                             <div class="card-body">
                                 <h6 class="text-muted mb-1">Total Balance</h6>
-                                <h3 class="mb-0 text-primary">Rp Model.TotalBalance.ToString("N0")</h3>
+                                <h3 class="mb-0 text-primary">Rp @Model.TotalBalance.ToString("N0")</h3>
                             </div>
                         </div>
                     </div>
@@ -187,9 +187,9 @@
                                             <tr>
                                                 <td>@tx.CreatedAt.ToString("dd MMM yyyy HH:mm")</td>
                                                 <td>@tx.Type</td>
-                                                <td class="@GetTxAmountClass(tx.Type)">Rp tx.Amount.ToString("N0")</td>
-                                                <td>Rp tx.ActiveBefore.ToString("N0")</td>
-                                                <td>Rp tx.ActiveAfter.ToString("N0")</td>
+                                                <td class="@GetTxAmountClass(tx.Type)">Rp @tx.Amount.ToString("N0")</td>
+                                                <td>Rp @tx.ActiveBefore.ToString("N0")</td>
+                                                <td>Rp @tx.ActiveAfter.ToString("N0")</td>
                                                 <td class="text-muted small">@tx.Notes ?? "-"</td>
                                             </tr>
                                         }
