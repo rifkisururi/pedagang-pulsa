@@ -23,17 +23,20 @@ public class TransactionController : ControllerBase
     private readonly ILogger<TransactionController> _logger;
     private readonly AuthService _authService;
     private readonly PricingConfig _pricingConfig;
+    private readonly TransactionService _transactionService;
 
     public TransactionController(
         AppDbContext context,
         ILogger<TransactionController> logger,
         AuthService authService,
-        IOptions<PricingConfig> pricingConfig)
+        IOptions<PricingConfig> pricingConfig,
+        TransactionService transactionService)
     {
         _context = context;
         _logger = logger;
         _authService = authService;
         _pricingConfig = pricingConfig.Value;
+        _transactionService = transactionService;
     }
 
     private async Task<decimal> GetBestCostPriceAsync(Guid productId)
@@ -262,6 +265,19 @@ public class TransactionController : ControllerBase
 
             await _context.SaveChangesAsync();
             if (dbTransaction != null) await dbTransaction.CommitAsync();
+
+            // Process transaction to supplier immediately (fire-and-forget)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _transactionService.ProcessTransactionAsync(transaction.Id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Background process failed for transaction {TransactionId}", transaction.Id);
+                }
+            });
 
             return StatusCode(201, response);
         }
