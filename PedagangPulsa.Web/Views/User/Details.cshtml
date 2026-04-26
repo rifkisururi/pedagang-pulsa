@@ -329,21 +329,24 @@
                         length: 10,
                         userId: userId
                     },
+                    headers: {
+                        'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                    },
                     success: function(response) {
                         if (response.data && response.data.length > 0) {
                             tableBody.empty();
                             response.data.forEach(function(tx) {
-                                const statusClass = getStatusClass(tx.status);
-                                const statusIcon = getStatusIcon(tx.status);
+                                const statusClass = getStatusClass(tx.Status);
+                                const statusIcon = getStatusIcon(tx.Status);
                                 const row = `
                                     <tr>
-                                        <td>${tx.createdAt}</td>
-                                        <td>${tx.productName}</td>
-                                        <td><code>${tx.destinationNumber}</code></td>
-                                        <td>${'Rp ' + tx.amount.toLocaleString('id-ID')}</td>
-                                        <td><span class="badge ${statusClass}">${statusIcon} ${tx.status}</span></td>
+                                        <td>${tx.CreatedAt}</td>
+                                        <td>${tx.ProductName}</td>
+                                        <td><code>${tx.Destination}</code></td>
+                                        <td>Rp ${tx.SellPrice.toLocaleString('id-ID')}</td>
+                                        <td><span class="badge ${statusClass}">${statusIcon} ${tx.Status}</span></td>
                                         <td>
-                                            <a href="/Transaction/Details/${tx.id}" class="btn btn-sm btn-outline-primary">
+                                            <a href="/Transaction/Details/${tx.Id}" class="btn btn-sm btn-outline-primary">
                                                 <i class="bi bi-eye"></i>
                                             </a>
                                         </td>
