@@ -328,3 +328,5 @@ nul
 # ==============================================
 .kilo/
 build_output.txt
+gcp-sa-key.json
+*.key.json
