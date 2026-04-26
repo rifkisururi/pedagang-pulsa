@@ -7,6 +7,8 @@ using Moq;
 using PedagangPulsa.Api.Controllers;
 using PedagangPulsa.Api.DTOs;
 using PedagangPulsa.Application.Abstractions.Caching;
+using PedagangPulsa.Application.Abstractions.Persistence;
+using PedagangPulsa.Application.Abstractions.Suppliers;
 using PedagangPulsa.Application.Services;
 using PedagangPulsa.Domain.Configuration;
 using PedagangPulsa.Domain.Entities;
@@ -44,11 +46,18 @@ public class TransactionControllerTests : IAsyncDisposable
             MockServices.CreateLogger<AuthService>().Object,
             _redisServiceMock.Object);
 
+        var transactionService = new TransactionService(
+            _context,
+            Mock.Of<ISupplierAdapterFactory>(),
+            Mock.Of<ILoggerFactory>()
+        );
+
         _controller = new TransactionController(
             _context,
             _loggerMock.Object,
             _authService,
-            Options.Create(new PricingConfig())
+            Options.Create(new PricingConfig()),
+            transactionService
         );
     }
 
