@@ -23,20 +23,20 @@ public class TransactionController : ControllerBase
     private readonly ILogger<TransactionController> _logger;
     private readonly AuthService _authService;
     private readonly PricingConfig _pricingConfig;
-    private readonly TransactionService _transactionService;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     public TransactionController(
         AppDbContext context,
         ILogger<TransactionController> logger,
         AuthService authService,
         IOptions<PricingConfig> pricingConfig,
-        TransactionService transactionService)
+        IServiceScopeFactory scopeFactory)
     {
         _context = context;
         _logger = logger;
         _authService = authService;
         _pricingConfig = pricingConfig.Value;
-        _transactionService = transactionService;
+        _scopeFactory = scopeFactory;
     }
 
     private async Task<decimal> GetBestCostPriceAsync(Guid productId)
@@ -269,9 +269,11 @@ public class TransactionController : ControllerBase
             // Process transaction to supplier immediately (fire-and-forget)
             _ = Task.Run(async () =>
             {
+                await using var scope = _scopeFactory.CreateAsyncScope();
+                var transactionService = scope.ServiceProvider.GetRequiredService<TransactionService>();
                 try
                 {
-                    await _transactionService.ProcessTransactionAsync(transaction.Id);
+                    await transactionService.ProcessTransactionAsync(transaction.Id);
                 }
                 catch (Exception ex)
                 {

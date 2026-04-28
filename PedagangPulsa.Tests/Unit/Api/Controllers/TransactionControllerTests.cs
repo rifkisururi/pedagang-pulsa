@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -46,18 +47,20 @@ public class TransactionControllerTests : IAsyncDisposable
             MockServices.CreateLogger<AuthService>().Object,
             _redisServiceMock.Object);
 
-        var transactionService = new TransactionService(
-            _context,
-            Mock.Of<ISupplierAdapterFactory>(),
-            Mock.Of<ILoggerFactory>()
-        );
+        var services = new ServiceCollection();
+        services.AddSingleton(_context);
+        services.AddSingleton(Mock.Of<ISupplierAdapterFactory>());
+        services.AddSingleton(Mock.Of<ILoggerFactory>());
+        services.AddTransient<TransactionService>();
+        var serviceProvider = services.BuildServiceProvider();
+        var scopeFactory = serviceProvider.GetRequiredService<IServiceScopeFactory>();
 
         _controller = new TransactionController(
             _context,
             _loggerMock.Object,
             _authService,
             Options.Create(new PricingConfig()),
-            transactionService
+            scopeFactory
         );
     }
 
