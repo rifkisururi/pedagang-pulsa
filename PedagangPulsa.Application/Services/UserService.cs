@@ -164,7 +164,9 @@ public class UserService
 
     public async Task<List<UserLevel>> GetAllLevelsAsync()
     {
+        // ⚡ Bolt Optimization: Added AsNoTracking() for read-only lookup query to eliminate EF Core change tracking overhead, saving CPU and memory per request.
         return await _context.UserLevels
+            .AsNoTracking()
             .OrderBy(l => l.Id)
             .ToListAsync();
     }
@@ -214,7 +216,9 @@ public class UserService
 
     public async Task<List<ProductCategory>> GetCategoriesAsync()
     {
+        // ⚡ Bolt Optimization: Added AsNoTracking() for read-only lookup query to eliminate EF Core change tracking overhead, saving CPU and memory per request.
         return await _context.ProductCategories
+            .AsNoTracking()
             .Where(c => c.IsActive)
             .OrderBy(c => c.SortOrder)
             .ToListAsync();
