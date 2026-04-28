@@ -17,7 +17,9 @@ public class UserLevelService
 
     public async Task<List<UserLevel>> GetAllLevelsAsync()
     {
+        // ⚡ Bolt Optimization: Added AsNoTracking() for read-only lookup query to eliminate EF Core change tracking overhead, saving CPU and memory per request.
         return await _context.UserLevels
+            .AsNoTracking()
             .OrderBy(l => l.Id)
             .ToListAsync();
     }

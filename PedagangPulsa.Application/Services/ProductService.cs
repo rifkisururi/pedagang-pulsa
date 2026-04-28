@@ -128,7 +128,9 @@ public class ProductService
 
     public async Task<List<ProductCategory>> GetCategoriesAsync()
     {
+        // ⚡ Bolt Optimization: Added AsNoTracking() for read-only lookup query to eliminate EF Core change tracking overhead, saving CPU and memory per request.
         return await _context.ProductCategories
+            .AsNoTracking()
             .Where(c => c.IsActive)
             .OrderBy(c => c.SortOrder)
             .ToListAsync();
@@ -136,7 +138,9 @@ public class ProductService
 
     public async Task<List<UserLevel>> GetLevelsAsync()
     {
+        // ⚡ Bolt Optimization: Added AsNoTracking() for read-only lookup query to eliminate EF Core change tracking overhead, saving CPU and memory per request.
         return await _context.UserLevels
+            .AsNoTracking()
             .OrderBy(l => l.Id)
             .ToListAsync();
     }
@@ -211,7 +215,9 @@ public class ProductService
 
     public async Task<List<Product>> GetActiveProductsAsync()
     {
+        // ⚡ Bolt Optimization: Added AsNoTracking() for read-only lookup query to eliminate EF Core change tracking overhead, saving CPU and memory per request.
         return await _context.Products
+            .AsNoTracking()
             .Include(p => p.Category)
             .Where(p => p.IsActive)
             .OrderBy(p => p.Name)
@@ -247,7 +253,9 @@ public class ProductService
 
     public async Task<List<ProductLevelPrice>> GetProductPricesAsync(Guid productId)
     {
+        // ⚡ Bolt Optimization: Added AsNoTracking() for read-only lookup query to eliminate EF Core change tracking overhead, saving CPU and memory per request.
         return await _context.ProductLevelPrices
+            .AsNoTracking()
             .Where(p => p.ProductId == productId)
             .Include(p => p.Level)
             .OrderBy(p => p.LevelId)
