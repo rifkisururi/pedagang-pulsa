@@ -27,7 +27,9 @@ public class ReferralService
         string? orderColumn = null,
         string? orderDirection = null)
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only logs to eliminate change tracking overhead, saving CPU and memory per request.
         var query = _context.ReferralLogs
+            .AsNoTracking()
             .Include(rl => rl.Referrer)
             .Include(rl => rl.Referee)
             .AsQueryable();
@@ -106,7 +108,9 @@ public class ReferralService
 
     public async Task<List<ReferralSummary>> GetTopReferrersAsync(int count = 20)
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only user summary to eliminate change tracking overhead, saving CPU and memory per request.
         return await _context.Users
+            .AsNoTracking()
             .Include(u => u.ReferralLogsAsReferrer)
             .Where(u => u.ReferralLogsAsReferrer.Any(rl => rl.BonusStatus == ReferralBonusStatus.Paid))
             .Select(u => new ReferralSummary

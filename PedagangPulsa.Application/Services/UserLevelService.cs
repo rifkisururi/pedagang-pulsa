@@ -94,7 +94,8 @@ public class UserLevelService
         string? search = null,
         bool? isActive = null)
     {
-        var query = _context.UserLevels.AsQueryable();
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only user levels list to eliminate change tracking overhead, saving CPU and memory per request.
+        var query = _context.UserLevels.AsNoTracking().AsQueryable();
 
         // Apply search filter
         if (!string.IsNullOrWhiteSpace(search))

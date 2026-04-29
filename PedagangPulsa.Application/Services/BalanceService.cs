@@ -27,7 +27,9 @@ public class BalanceService
         string? orderColumn = null,
         string? orderDirection = null)
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only ledger list to eliminate change tracking overhead, saving CPU and memory per request.
         var query = _context.BalanceLedgers
+            .AsNoTracking()
             .Include(bl => bl.User)
             .AsQueryable();
 
