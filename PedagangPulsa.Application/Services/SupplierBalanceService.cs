@@ -27,7 +27,9 @@ public class SupplierBalanceService
         string? orderColumn = null,
         string? orderDirection = null)
     {
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only supplier ledgers list to eliminate change tracking overhead, saving CPU and memory per request.
         var query = _context.SupplierBalanceLedgers
+            .AsNoTracking()
             .Include(bl => bl.Supplier)
             .AsQueryable();
 

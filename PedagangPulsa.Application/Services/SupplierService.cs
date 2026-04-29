@@ -21,7 +21,8 @@ public class SupplierService
         string? search = null,
         bool? isActive = null)
     {
-        var query = _context.Suppliers.AsQueryable();
+        // ⚡ Bolt Optimization: Use AsNoTracking for read-only suppliers list to eliminate change tracking overhead, saving CPU and memory per request.
+        var query = _context.Suppliers.AsNoTracking().AsQueryable();
 
         // Apply search filter
         if (!string.IsNullOrWhiteSpace(search))
