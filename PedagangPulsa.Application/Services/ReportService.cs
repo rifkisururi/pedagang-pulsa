@@ -125,11 +125,9 @@ public class ReportService
 
     public async Task<ProfitBySupplierReport> GetProfitBySupplierAsync(DateTime? startDate = null, DateTime? endDate = null)
     {
-        // ⚡ Bolt Optimization: Use AsNoTracking for read-only reports to eliminate change tracking overhead
+        // ⚡ Bolt Optimization: Use AsNoTracking and projection (Select) to fetch only required fields, avoiding full entity tracking overhead and significantly reducing memory allocations and DB transfer size.
         var query = _context.TransactionAttempts
             .AsNoTracking()
-            .Include(a => a.Supplier)
-            .Include(a => a.Transaction)
             .Where(a => a.Status == AttemptStatus.Success);
 
         if (startDate.HasValue)
@@ -142,17 +140,25 @@ public class ReportService
             query = query.Where(a => a.AttemptedAt <= endDate.Value);
         }
 
-        var attempts = await query.ToListAsync();
+        var projectedQuery = query.Select(a => new
+        {
+            a.SupplierId,
+            SupplierName = a.Supplier != null ? a.Supplier.Name : "Unknown",
+            SellPrice = a.Transaction != null ? a.Transaction.SellPrice : 0,
+            CostPrice = a.Transaction != null ? a.Transaction.CostPrice ?? 0 : 0
+        });
+
+        var attempts = await projectedQuery.ToListAsync();
 
         var bySupplier = attempts
-            .GroupBy(a => new { a.SupplierId, SupplierName = a.Supplier?.Name ?? "Unknown" })
+            .GroupBy(a => new { a.SupplierId, a.SupplierName })
             .Select(g => new SupplierProfitItem
             {
                 SupplierName = g.Key.SupplierName,
                 TotalTransactions = g.Count(),
-                TotalRevenue = g.Sum(a => a.Transaction!.SellPrice),
-                TotalCost = g.Sum(a => a.Transaction!.CostPrice ?? 0),
-                TotalProfit = g.Sum(a => a.Transaction!.SellPrice) - g.Sum(a => a.Transaction!.CostPrice ?? 0)
+                TotalRevenue = g.Sum(a => a.SellPrice),
+                TotalCost = g.Sum(a => a.CostPrice),
+                TotalProfit = g.Sum(a => a.SellPrice) - g.Sum(a => a.CostPrice)
             })
             .OrderByDescending(s => s.TotalProfit)
             .ToList();
@@ -176,10 +182,9 @@ public class ReportService
 
     public async Task<ProfitByProductReport> GetProfitByProductAsync(DateTime? startDate = null, DateTime? endDate = null)
     {
-        // ⚡ Bolt Optimization: Use AsNoTracking for read-only reports to eliminate change tracking overhead
+        // ⚡ Bolt Optimization: Use AsNoTracking and projection (Select) to fetch only required fields, avoiding full entity tracking overhead and significantly reducing memory allocations and DB transfer size.
         var query = _context.Transactions
             .AsNoTracking()
-            .Include(t => t.Product)
             .Where(t => t.Status == TransactionStatus.Success);
 
         if (startDate.HasValue)
@@ -192,18 +197,27 @@ public class ReportService
             query = query.Where(t => t.CreatedAt <= endDate.Value);
         }
 
-        var transactions = await query.ToListAsync();
+        var projectedQuery = query.Select(t => new
+        {
+            t.ProductId,
+            ProductName = t.Product != null ? t.Product.Name : "Unknown",
+            Category = t.Product != null && t.Product.Category != null ? t.Product.Category.Name : "Unknown",
+            t.SellPrice,
+            CostPrice = t.CostPrice ?? 0
+        });
+
+        var transactions = await projectedQuery.ToListAsync();
 
         var byProduct = transactions
-            .GroupBy(t => new { t.ProductId, ProductName = t.Product?.Name ?? "Unknown", Category = t.Product?.Category?.Name ?? "Unknown" })
+            .GroupBy(t => new { t.ProductId, t.ProductName, t.Category })
             .Select(g => new ProductProfitItem
             {
                 ProductName = g.Key.ProductName,
                 Category = g.Key.Category,
                 TotalTransactions = g.Count(),
                 TotalRevenue = g.Sum(t => t.SellPrice),
-                TotalCost = g.Sum(t => t.CostPrice ?? 0),
-                TotalProfit = g.Sum(t => t.SellPrice) - g.Sum(t => t.CostPrice ?? 0)
+                TotalCost = g.Sum(t => t.CostPrice),
+                TotalProfit = g.Sum(t => t.SellPrice) - g.Sum(t => t.CostPrice)
             })
             .OrderByDescending(p => p.TotalProfit)
             .ToList();
